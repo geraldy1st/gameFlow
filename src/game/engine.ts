@@ -21,6 +21,17 @@ import {
   PASSIVE_WIN,
   PREMIUM_DEALS,
   SMALL_DEALS,
+  TRAINING_CAREER,
+  TRAINING_COMPARE,
+  TRAINING_DEAL,
+  TRAINING_DEAL_CAP,
+  TRAINING_DICE,
+  TRAINING_FROM,
+  TRAINING_MONTHLY_CAP,
+  TRAINING_SPEND,
+  TRAINING_SPEND_CAP,
+  TRAINING_TURNS,
+  TRAINING_START,
   VENTURE_GOAL,
   type CareerDef,
   type DealDef,
@@ -280,6 +291,24 @@ export interface GameState {
     market: string[];
     career: string[];
   };
+  /** Training mode (scripted tutorial). null = normal rules, exactly as before. Absent in old saves → null. */
+  training: TrainingState | null;
+}
+
+export interface TrainingState {
+  /** Current scripted turn, 1..TRAINING_TURNS. Advances at the start of the training player's turns. */
+  turn: number;
+  /** Index of the player who follows the script (always 0 for now). */
+  player: number;
+  /** True after "Skip the tutorial": normal rules from the next turn. */
+  skipped: boolean;
+}
+
+/** Training state when it applies to the current player, else null. */
+export function trainingFor(s: GameState): TrainingState | null {
+  const t = s.training;
+  if (!t || s.current !== t.player || t.turn < 1 || t.turn > TRAINING_TURNS) return null;
+  return t;
 }
 
 export interface Pick {
@@ -453,13 +482,14 @@ function dealById(id: string): DealDef {
   return d;
 }
 
-function price(p: Player, deal: DealDef): { down: number; cashFlow: number } {
+function price(p: Player, deal: DealDef, training = false): { down: number; cashFlow: number } {
   let down = deal.down;
   let cashFlow = deal.cashFlow;
   if (hasTrait(p, "Investor")) down = Math.round(down * 0.9);
   if (p.nextDownCut) down = Math.round(down * 0.8);
   if (p.nextCfBoost) cashFlow = Math.round(cashFlow * 1.2);
   if (isRealty(deal.id)) cashFlow = Math.max(40, cashFlow + clothDelta(p.outfit));
+  if (training) down = Math.min(down, TRAINING_DEAL_CAP);
   return { down, cashFlow };
 }
 
@@ -499,8 +529,8 @@ function cardShell(partial: Omit<CardView, "lines" | "choices"> & { lines?: Line
   return { lines: [], choices: [gold("Continue", "ok", true)], ...partial };
 }
 
-function dealCard(p: Player, deal: DealDef, pool: "small" | "big" | "premium"): CardView {
-  const priced = price(p, deal);
+function dealCard(p: Player, deal: DealDef, pool: "small" | "big" | "premium", training = false): CardView {
+  const priced = price(p, deal, training);
   const lines: Line[] = [
     { k: deal.passive ? "Down payment" : "Cost", v: money(priced.down), tone: "down" },
     {
@@ -513,7 +543,7 @@ function dealCard(p: Player, deal: DealDef, pool: "small" | "big" | "premium"): 
   if (deal.passive) lines.push({ k: "Total price", v: money(deal.cost) });
   if (isRealty(deal.id)) lines.push(clothesLine(clothDelta(p.outfit)));
   if (hasTrait(p, "Investor")) lines.push({ k: "Investor friend", v: "−10% down", tone: "gold" });
-  const afford = p.cash >= priced.down;
+  const afford = training || p.cash >= priced.down;
   const choices: Choice[] = afford
     ? [gold(deal.passive ? "Buy it" : "Take it", "accept"), ghost("Decline", "decline")]
     : [gold(`Borrow ${money(LOAN_CASH)}`, "borrow"), ghost("Decline", "decline")];
@@ -640,16 +670,20 @@ export function blankMenu(): GameState {
     winReason: null,
     winner: 0,
     decks: { small: [], big: [], premium: [], life: [], market: [], career: [] },
+    training: null,
   };
 }
 
-export function createMatch(picks: Pick[], seed: number, muted: boolean): GameState {
+export function createMatch(picks: Pick[], seed: number, muted: boolean, opts?: { training?: boolean }): GameState {
+  const training = !!opts?.training && picks.length > 0;
   const starters = CAREERS.filter((c) => c.starting);
   let s = seed || 1;
   const players: Player[] = picks.map((pick, i) => {
     const r = rand(s);
     s = r.seed;
-    const career = starters[Math.floor(r.value * starters.length)]!;
+    // The rand above is consumed even in training so the seed follows the same trajectory as a normal game.
+    const scripted = training && i === 0;
+    const career = scripted ? careerById(TRAINING_CAREER) : starters[Math.floor(r.value * starters.length)]!;
     const cash = Math.round(career.salary * 0.55);
     return {
       id: `p${i + 1}`,
@@ -666,7 +700,7 @@ export function createMatch(picks: Pick[], seed: number, muted: boolean): GameSt
       children: [],
       friends: [],
       track: "grind",
-      position: 11,
+      position: scripted ? TRAINING_START : 11,
       brokeTurns: 0,
       skipTurns: 0,
       dreamBought: false,
@@ -701,6 +735,7 @@ export function createMatch(picks: Pick[], seed: number, muted: boolean): GameSt
     intro: true,
     turn: 1,
     phase: "card",
+    training: training ? { turn: 1, player: 0, skipped: false } : null,
   };
   state = blip(state, "card");
   state.card = startCard(state.players[0]!);
@@ -734,6 +769,8 @@ function landing(s: GameState): GameState {
 
 function buildSpace(s: GameState, kind: string): CardView {
   const p = cur(s);
+  const t = trainingFor(s);
+  if (t) return trainingCard(s, kind, t.turn);
   if (kind === "payday") {
     const amount = s.passedPay;
     return cardShell({
@@ -771,7 +808,71 @@ function buildSpace(s: GameState, kind: string): CardView {
   if (kind === "brand") return brandCard(p);
   if (kind === "scale") return scaleCard(p);
   if (kind === "exit") return exitCard(s);
+  return quietCard();
+}
+
+function quietCard(): CardView {
   return cardShell({ title: "A quiet square", story: "Nothing but the sound of the die settling.", art: "/game/art/crest.jpg", tag: "Board", payload: { t: "ok" } });
+}
+
+/** Kinds that can never be served while training (big deals, market, tax, health, love, career, mentor, Freedom...). */
+const TRAINING_REFUSED = new Set([
+  "big", "premium", "market", "boom", "tax", "health", "love", "family", "career", "mentor",
+  "legacy", "dream", "philanthropy", "client", "hire", "expand", "ops", "pitch", "press", "brand", "scale", "exit",
+]);
+
+/** Scripted card for training turn `turn`. Only uses existing factories; never draws from the decks or consumes rand. */
+function trainingCard(s: GameState, kind: string, turn: number): CardView {
+  const p = cur(s);
+  if (TRAINING_REFUSED.has(kind)) return quietCard();
+  if (turn === 1 && kind === "rest") {
+    const card = restCard();
+    return { ...card, lines: card.lines.filter((l) => l.k === "Rest"), choices: [ghost("Just rest", "rest")] };
+  }
+  if (turn === 2 && kind === "payday") {
+    return buildSpace({ ...s, training: null }, kind);
+  }
+  if (turn === 3 && kind === "small") {
+    const card = dealCard(p, dealById(TRAINING_DEAL), "small", true);
+    return {
+      ...card,
+      lines: [...card.lines, { k: "Training price cap", v: `${money(TRAINING_DEAL_CAP)} max`, tone: "gold" }],
+    };
+  }
+  if (turn === 4 && kind === "lifestyle") return trainingSpendCard(p);
+  if (turn === 5 && kind === "social") {
+    return cardShell({
+      title: "A nod across the room",
+      story: "Someone almost introduces themselves. The moment passes.",
+      art: "/game/art/friends.jpg",
+      tag: "Social circle",
+      payload: { t: "ok" },
+    });
+  }
+  return quietCard();
+}
+
+function trainingSpendCard(p: Player): CardView {
+  const spend = LIFESTYLE.find((x) => x.id === TRAINING_SPEND)!;
+  const once = LIFESTYLE.find((x) => x.id === TRAINING_COMPARE)!;
+  const amount = Math.min(spend.amount, TRAINING_SPEND_CAP);
+  const monthly = Math.min(spend.monthly ?? 0, TRAINING_MONTHLY_CAP);
+  const year = amount + monthly * 12;
+  void p;
+  return {
+    title: spend.title,
+    story: spend.story,
+    art: spend.art,
+    tag: "Lifestyle expense",
+    lines: [
+      { k: "Pay", v: money(-amount, true), tone: "down" },
+      { k: "Then monthly", v: `${money(monthly, true)}/mo`, tone: "down" },
+      { k: "One-off", v: money(once.amount), tone: "gold" },
+      { k: "Subscription over 12 months", v: money(year), tone: "down" },
+    ],
+    choices: [ghost(`Pay ${money(amount)}`, "pay"), gold("Let it pass", "decline")],
+    payload: { t: "spend", spendId: spend.id, amount },
+  };
 }
 
 function drawDeal(s: GameState, pool: "small" | "big" | "premium"): CardView {
@@ -1772,6 +1873,10 @@ function win(s: GameState, reason: WinReason): GameState {
 
 function finish(s: GameState, note: string, reaction: Reaction = "idle"): GameState {
   let n = withP(log(s, note), (p) => ({ ...p, reaction }));
+  if (trainingFor(n)) {
+    // Training can never bankrupt: clamp instead of offering a loan.
+    n = withP(n, (p) => ({ ...p, cash: Math.max(0, p.cash), brokeTurns: 0, skipTurns: 0 }));
+  }
   if (cur(n).cash < 0) {
     return blip({ ...n, phase: "card", card: loanCard(false) }, "card");
   }
@@ -1785,10 +1890,25 @@ function advance(s: GameState): GameState {
   return beginTurn({ ...s, turn: s.turn + 1 });
 }
 
-function beginTurn(s: GameState): GameState {
+function beginTurn(s0: GameState, first = false): GameState {
   const faded: string[] = [];
+  let s = s0;
+  // Training: frozen wellbeing for the training player while the script runs (including the turn that ends it,
+  // whose drift would belong to turn 5). Skipping restores normal rules right away.
+  let frozen = false;
+  if (s.training && s.current === s.training.player) {
+    const t = s.training;
+    const turn = first ? t.turn : t.turn + 1;
+    frozen = !t.skipped;
+    if (t.skipped || turn > TRAINING_TURNS) {
+      s = log({ ...s, training: null }, t.skipped ? "Training stopped. Normal rules." : "Training complete.");
+    } else {
+      s = { ...s, training: { ...t, turn } };
+    }
+  }
   let n = withP(s, (p) => {
     const turns = p.turns + 1;
+    if (frozen) return { ...p, turns, householdIn: Math.max(0, p.householdIn - 1), reaction: "idle" };
     let calm = p.calm;
     let friends = p.friends.map((f) => ({ ...f }));
     if (turns % 3 === 0) {
@@ -1936,7 +2056,8 @@ export type Action =
   | { type: "RULES" }
   | { type: "CREDITS" }
   | { type: "MUTE" }
-  | { type: "NEW"; picks: Pick[] }
+  | { type: "NEW"; picks: Pick[]; training?: boolean }
+  | { type: "SKIP_TRAINING" }
   | { type: "CONTINUE"; saved: GameState };
 
 export function reduce(state: GameState, action: Action): GameState {
@@ -1950,7 +2071,10 @@ export function reduce(state: GameState, action: Action): GameState {
     case "MUTE":
       return { ...state, muted: !state.muted };
     case "NEW":
-      return createMatch(action.picks, (Date.now() ^ (state.seed + 17)) >>> 0, state.muted);
+      return createMatch(action.picks, (Date.now() ^ (state.seed + 17)) >>> 0, state.muted, { training: !!action.training });
+    case "SKIP_TRAINING":
+      if (!state.training || state.training.skipped) return state;
+      return log({ ...state, training: { ...state.training, skipped: true } }, "Training skipped: normal rules from the next turn.");
     case "CONTINUE":
       return hydrate(action.saved);
     case "ROLL":
@@ -2002,7 +2126,16 @@ function doRoll(s: GameState): GameState {
   if (s.screen !== "play" || s.phase !== "idle") return s;
   const p = cur(s);
   const r = rand(s.seed);
-  const die = 1 + Math.floor(r.value * 6);
+  let die = 1 + Math.floor(r.value * 6);
+  const t = trainingFor(s);
+  if (t) {
+    if (p.track !== "grind" || p.position !== TRAINING_FROM[t.turn - 1]) {
+      // Off-script (corrupted save, manual edit...): leave training rather than guess.
+      s = log({ ...s, training: null }, "Training ended.");
+    } else {
+      die = TRAINING_DICE[t.turn - 1]!;
+    }
+  }
   const len = trackOf(p.track).length;
   const path: number[] = [];
   for (let i = 1; i <= die; i++) path.push((p.position + i) % len);
@@ -2028,6 +2161,7 @@ function doChoice(s: GameState, id: string): GameState {
   const payload = s.card.payload;
   const p = cur(s);
   if (id === "borrow") {
+    if (trainingFor(s)) return s;
     const n = withP({ ...s, seq: s.seq + 1 }, (pl) => addLoan(pl, s.seq));
     const rebuilt = rebuild(n, payload);
     return blip(log({ ...rebuilt, phase: "card" }, "Borrowed $1,000 at $100/mo."), "cash");
@@ -2037,7 +2171,7 @@ function doChoice(s: GameState, id: string): GameState {
       const next = { ...s, current: s.current + 1 };
       return blip({ ...next, card: startCard(cur(next)) }, "card");
     }
-    return beginTurn({ ...s, current: 0, intro: false, turn: 1, card: null });
+    return beginTurn({ ...s, current: 0, intro: false, turn: 1, card: null }, true);
   }
   if (payload.t === "ok" || payload.t === "letter") {
     if (payload.t === "letter") return finish(withP(s, (pl) => ({ ...pl, cash: pl.cash + 120 })), "A letter steadies you. +$120.", "happy");
@@ -2959,6 +3093,7 @@ function doBreathe(s: GameState): GameState {
 }
 
 function doBorrow(s: GameState): GameState {
+  if (trainingFor(s)) return s;
   if (s.phase === "card") return doChoice(s, "borrow");
   if (s.phase !== "idle") return s;
   return blip(log(withP({ ...s, seq: s.seq + 1 }, (p) => addLoan(p, s.seq)), "Borrowed $1,000 at $100/mo."), "cash");
@@ -3080,6 +3215,13 @@ function hydratePlayer(raw: Player): Player {
   };
 }
 
+function hydrateTraining(t: unknown, count: number): TrainingState | null {
+  if (!t || typeof t !== "object") return null;
+  const x = t as Partial<TrainingState>;
+  if (typeof x.turn !== "number" || typeof x.player !== "number" || x.player < 0 || x.player >= count) return null;
+  return { turn: x.turn, player: x.player, skipped: !!x.skipped };
+}
+
 export function hydrate(saved: GameState): GameState {
   const players = (saved.players ?? []).map((p) => hydratePlayer(p));
   let s: GameState = {
@@ -3088,6 +3230,7 @@ export function hydrate(saved: GameState): GameState {
     players,
     sfx: null,
     history: Array.isArray(saved.history) ? saved.history : saved.log ?? [],
+    training: hydrateTraining(saved.training, players.length),
   };
   if (!players.length) return { ...blankMenu(), muted: !!saved.muted };
   if (s.screen === "win" || s.phase === "win") {

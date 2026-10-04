@@ -121,6 +121,24 @@ export const MAX_FRIENDS = 5;
 /** Social gained when someone joins your circle (friend or business partner). Same size as a meetup. */
 export const FRIEND_SOCIAL_BONUS = 10;
 
+/* Training mode ("Entraînement"): a scripted 5-turn tutorial for player 1. See tutorial/RULES.md. */
+export const TRAINING_TURNS = 5;
+/** Start on GRIND[21] (Health): it is the start square, never landed on. */
+export const TRAINING_START = 21;
+/** Forced dice: 21 → 23 Charity → 0 Payday → 1 Small deal → 2 Lifestyle → 3 Social. */
+export const TRAINING_DICE = [2, 1, 1, 1, 1] as const;
+/** Expected position at the start of each training turn (defence against corrupted saves). */
+export const TRAINING_FROM = [21, 23, 0, 1, 2] as const;
+export const TRAINING_DEAL_CAP = 600;
+export const TRAINING_SPEND_CAP = 200;
+export const TRAINING_MONTHLY_CAP = 70;
+export const TRAINING_CAREER = "barista";
+export const TRAINING_DEAL = "room";
+export const TRAINING_SPEND = "subs";
+export const TRAINING_COMPARE = "dinner";
+/** Value written to TUTORIAL_KEY once the training is finished or skipped. Any non-empty value counts as seen. */
+export const TUTORIAL_SEEN_VALUE = "training-v1";
+
 export const CHARACTERS: CharacterDef[] = [
   {
     id: "aoi",
