@@ -12,7 +12,6 @@ import {
   blankMenu,
   cur,
   dreamOf,
-  money,
   nameOf,
   portraitOf,
   reduce,
@@ -28,7 +27,7 @@ import {
 } from "@/game/engine";
 import { arrivalLine, arrivalMood, bodyPortrait, dressedPortrait, expressionOf, outcomeLine, phraseSalt, speakerIsNpc } from "@/game/speech";
 import { DealSheet } from "./boite/DealSheet";
-import { fmtMoney } from "./boite/format";
+import { fmtMoney, localizeMoney } from "./boite/format";
 import { FriendScene, type FriendEvent } from "./boite/FriendScene";
 import { CoinRain, GateScene } from "./boite/GateScene";
 import { usePassiveHistory, type Point } from "./boite/history";
@@ -81,7 +80,7 @@ function ChoiceButtons({ card, onChoose, t }: { card: CardView; onChoose: (id: s
 
 /** Money is never shown by colour alone: amounts on green/red rows always carry a sign. */
 function signedRow(v: string, tone?: string): string {
-  if (!/^\$\d/.test(v)) return v;
+  if (!/^(\$\d|\d[\d\u202f.]*\u00a0\$)/.test(v)) return v;
   if (tone === "up") return `+${v}`;
   if (tone === "down") return `−${v}`;
   return v;
@@ -571,7 +570,8 @@ export function GameFlow() {
   const logRef = useRef(state.log[0] ?? "");
   const stateRef = useRef(state);
   stateRef.current = state;
-  const t: TFn = (text, vars) => tr(lang, text, vars);
+  const t: TFn = (text, vars) => localizeMoney(lang, tr(lang, text, vars));
+  const money = (n: number, signed = false) => fmtMoney(lang, n, signed);
 
   useEffect(() => {
     setHasSave(!!localStorage.getItem(SAVE_KEY));

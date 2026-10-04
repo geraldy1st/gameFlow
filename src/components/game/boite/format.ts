@@ -1,4 +1,4 @@
-import type { Lang } from "@/game/i18n";
+import { tr, type Lang } from "@/game/i18n";
 
 function group(n: number, lang: Lang): string {
   const s = String(Math.abs(Math.round(n)));
@@ -33,4 +33,16 @@ export function fmtDec(lang: Lang, n: number): string {
 /** "Label: value" with French spacing ("Libellé : valeur"). */
 export function colon(lang: Lang): string {
   return lang === "fr" ? "\u00a0: " : ": ";
+}
+
+/**
+ * Re-format engine-built "$1,234" / "+$4,200" amounts inside an already translated string,
+ * so fr/es screens never mix "$4,200" with "3 060 $". English is returned unchanged.
+ */
+export function localizeMoney(lang: Lang, text: string): string {
+  if (lang === "en" || !text.includes("$")) return text;
+  return text.replace(/([+\-\u2212]?)\$(\d{1,3}(?:,\d{3})+|\d+)(?![\d,]*\d)(\/mo\b)?/g, (_m, sign: string, digits: string, mo?: string) => {
+    const n = Number(digits.replace(/,/g, ""));
+    return `${sign === "-" ? "\u2212" : sign}${fmtNum(lang, n)}\u00a0$${mo ? tr(lang, "/mo") : ""}`;
+  });
 }
