@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
-import { CHARACTERS, FORTUNE_CASH, FORTUNE_PASSIVE, FRIENDS, INTRO_KEY, PARTNERS, PASSIVE_WIN, SAVE_KEY, TUTORIAL_KEY, VENTURE_GOAL } from "@/game/data";
+import { CHARACTERS, DREAMS, FORTUNE_CASH, FORTUNE_PASSIVE, FRIENDS, INTRO_KEY, PARTNERS, PASSIVE_WIN, SAVE_KEY, TUTORIAL_KEY, TUTORIAL_SEEN_VALUE, VENTURE_GOAL } from "@/game/data";
 import { playSfx, resumeAudio, setMuted, unlockAudio } from "@/game/audio";
 import { LANG_KEY, readLang, tr, trKey, type Lang } from "@/game/i18n";
 import { CHATS, chatText } from "@/game/chats";
@@ -17,6 +17,7 @@ import {
   portraitOf,
   reduce,
   statement,
+  trainingFor,
   unlocked,
   type Action,
   type CardView,
@@ -37,6 +38,8 @@ import { FAMILIES, IconDefs, Ico, type Family } from "./boite/icons";
 import { IntroVideo, probeIntro, type IntroPick } from "./boite/IntroVideo";
 import { MenuScreen } from "./boite/MenuScreen";
 import { MetroBoard, trackSpaces } from "./boite/MetroBoard";
+import { TrainingCoach, coachView, type TutLocal } from "./boite/TrainingCoach";
+import { TRAINING_STRINGS, fill } from "./boite/training-strings";
 import { BoxDie, Dock, FlowBox, GateBox, MobileHud, PassiveChart, StationStrip, WhoBox, hereLabel, lineName, rollLabel } from "./boite/PlayerMat";
 
 type TFn = (text: string, vars?: Record<string, string | number>) => string;
@@ -293,7 +296,9 @@ function LedgerBody({
       </div>
       {idle && (
         <div className="chip-row">
-          <button type="button" className="btn btn-ghost" onClick={() => dispatch({ type: "BORROW" })}>{t("Borrow $1,000")}</button>
+          {!trainingFor(state) && (
+            <button type="button" className="btn btn-ghost" onClick={() => dispatch({ type: "BORROW" })}>{t("Borrow $1,000")}</button>
+          )}
           {partner && player.householdIn === 0 && (
             <button type="button" className="btn btn-ghost" onClick={() => dispatch({ type: "HOUSE" })}>{t("Household decision")}</button>
           )}
@@ -522,6 +527,10 @@ function QuizDesk({
   );
 }
 
+/** The save set aside while "Replay the tutorial" runs (restored from the done card or Options). */
+const TRAINING_BACKUP_KEY = `${SAVE_KEY}:before-training`;
+const FRESH_TUT: TutLocal = { post: null, done: false };
+
 function persistGame(s: GameState): boolean {
   if ((s.screen !== "play" && s.screen !== "win") || s.players.length === 0) return false;
   localStorage.setItem(SAVE_KEY, JSON.stringify(s));
@@ -564,15 +573,24 @@ export function GameFlow() {
   const [chat, setChat] = useState<{ friendId: string; index: number; step: number } | null>(null);
   const [savedFlash, setSavedFlash] = useState(false);
   const [intro, setIntro] = useState<number | "boot" | null>("boot");
+  const [tut, setTut] = useState<TutLocal | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const [replayAsk, setReplayAsk] = useState(false);
+  const [hasBackup, setHasBackup] = useState(false);
   const [outcome, setOutcome] = useState<{ mood: Reaction; line: string; fact: string; portrait: string; fallback: string; name: string } | null>(null);
   const phaseRef = useRef(state.phase);
   const logRef = useRef(state.log[0] ?? "");
   const stateRef = useRef(state);
   stateRef.current = state;
   const t: TFn = (text, vars) => tr(lang, text, vars);
+  const coach = coachView(state, tut);
+  const coachRef = useRef(coach);
+  coachRef.current = coach;
+  const TS = TRAINING_STRINGS[lang];
 
   useEffect(() => {
     setHasSave(!!localStorage.getItem(SAVE_KEY));
+    setHasBackup(!!localStorage.getItem(TRAINING_BACKUP_KEY));
     setLang(readLang());
     setPassed(loadPassed());
     if (localStorage.getItem(INTRO_KEY)) setIntro(null);
@@ -634,6 +652,12 @@ export function GameFlow() {
   useEffect(() => {
     if (persistGame(state)) setHasSave(true);
   }, [state]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const id = window.setTimeout(() => setToast(null), 4200);
+    return () => window.clearTimeout(id);
+  }, [toast]);
 
   useEffect(() => {
     if (!savedFlash) return;
@@ -704,6 +728,8 @@ export function GameFlow() {
       }
     }
     if (prevPhase === "card" && (state.phase === "idle" || state.phase === "pass") && logLine && logLine !== prevLog) {
+      // The training coach speaks for the player during the scripted turns.
+      if (coachRef.current || (state.training && !state.training.skipped && state.current === state.training.player)) return;
       const p = state.players[state.current];
       if (!p) return;
       setOutcome({
@@ -737,6 +763,7 @@ export function GameFlow() {
     const onKey = (e: KeyboardEvent) => {
       const s = stateRef.current;
       if (friendEv || introMode) return;
+      if (coachRef.current && !rules && !optionsOpen) return; // the coach owns Enter / Space meanwhile
       if (gateOpenRef.current && !rules && !optionsOpen) {
         if (e.key === "Escape") dismissGateRef.current();
         return;
@@ -881,7 +908,10 @@ export function GameFlow() {
     if (!raw) return;
     try {
       const saved = JSON.parse(raw) as GameState;
-      if (saved.version === 1 && saved.players?.length) go({ type: "CONTINUE", saved });
+      if (saved.version === 1 && saved.players?.length) {
+        go({ type: "CONTINUE", saved });
+        setTut(saved.training && !saved.training.skipped ? FRESH_TUT : null);
+      }
     } catch {
       setHasSave(false);
     }
@@ -889,8 +919,71 @@ export function GameFlow() {
   const startGame = (picks: Pick[]) => {
     setPendingPicks(null);
     setConfirmNew(false);
-    go({ type: "NEW", picks });
-    if (!localStorage.getItem(TUTORIAL_KEY)) setTutorial(0);
+    // First sitting on this device: the 5-turn training replaces the old rules slideshow (still in Rules).
+    const training = !localStorage.getItem(TUTORIAL_KEY);
+    go({ type: "NEW", picks, training });
+    setTut(training ? FRESH_TUT : null);
+  };
+  /** Player 1's character and dream, from the running game, the save, or the menu default. */
+  const tutorialPick = (): Pick => {
+    const fromPlayer = (p?: Player): Pick | null => (p ? { characterId: p.characterId, dreamId: p.dreamId, ...(p.custom ? { custom: p.custom } : {}) } : null);
+    const live = fromPlayer(stateRef.current.players[0]);
+    if (live) return live;
+    try {
+      const raw = localStorage.getItem(SAVE_KEY);
+      const saved = raw ? (JSON.parse(raw) as GameState) : null;
+      const p = fromPlayer(saved?.players?.[0]);
+      if (p) return p;
+    } catch {
+      /* broken save: fall back to the default pick */
+    }
+    return { characterId: CHARACTERS[0]!.id, dreamId: DREAMS[0]!.id };
+  };
+  const startTraining = (pick: Pick) => {
+    setReplayAsk(false);
+    setOptionsOpen(false);
+    unlockAudio();
+    go({ type: "NEW", picks: [pick], training: true });
+    setTut(FRESH_TUT);
+  };
+  const replayTutorial = () => {
+    setOptionsOpen(false);
+    if (hasSave && !localStorage.getItem(TRAINING_BACKUP_KEY)) {
+      setReplayAsk(true);
+      return;
+    }
+    startTraining(tutorialPick());
+  };
+  const confirmReplay = () => {
+    const pick = tutorialPick();
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (raw && !localStorage.getItem(TRAINING_BACKUP_KEY)) {
+      localStorage.setItem(TRAINING_BACKUP_KEY, raw);
+      setHasBackup(true);
+    }
+    startTraining(pick);
+  };
+  const restoreBackup = () => {
+    const raw = localStorage.getItem(TRAINING_BACKUP_KEY);
+    setTut(null);
+    setOptionsOpen(false);
+    if (!raw) return;
+    localStorage.removeItem(TRAINING_BACKUP_KEY);
+    setHasBackup(false);
+    try {
+      const saved = JSON.parse(raw) as GameState;
+      localStorage.setItem(SAVE_KEY, raw);
+      if (saved.version === 1 && saved.players?.length) go({ type: "CONTINUE", saved });
+    } catch {
+      /* unreadable backup: keep the current game */
+    }
+  };
+  const markTutorialSeen = () => localStorage.setItem(TUTORIAL_KEY, TUTORIAL_SEEN_VALUE);
+  const skipTraining = () => {
+    go({ type: "SKIP_TRAINING" });
+    markTutorialSeen();
+    setTut(null);
+    setToast(TS.skipToast);
   };
   const replayIntro = () => {
     void probeIntro(prefersReducedMotion()).then((mode) => {
@@ -923,7 +1016,7 @@ export function GameFlow() {
   const passiveHistory = usePassiveHistory(state);
   const points: Point[] = player ? (passiveHistory[player.id] ?? []) : [];
   const isMobile = useIsMobile();
-  const otherOverlay = !!(outcome || friendEv || statusFor || historyOpen || friendId || circleOpen || dayOpen || shopOpen || wardrobeOpen || chat || ledgerOpen || legendOpen || rules || tutorial !== null || confirmNew || introMode || typeof intro === "number");
+  const otherOverlay = !!(coach || outcome || friendEv || statusFor || historyOpen || friendId || circleOpen || dayOpen || shopOpen || wardrobeOpen || chat || ledgerOpen || legendOpen || rules || tutorial !== null || confirmNew || introMode || typeof intro === "number");
   const gateOpen = !!player && state.screen === "play" && state.phase === "idle" && player.track === "grind" && player.level < 2 && unlocked(player) && !gateSeen[player.id] && !otherOverlay;
   const dismissGate = () => {
     if (player) setGateSeen((g) => ({ ...g, [player.id]: true }));
@@ -962,13 +1055,21 @@ export function GameFlow() {
   const hasCtx = !!player && state.phase === "idle" && ((player.track === "grind" && unlocked(player)) || (player.track === "freedom" && !player.dreamBought) || player.level >= 2);
   const idle = state.phase === "idle";
 
-  const topSub =
-    state.screen === "play" && player
+  // Header: "Training · Turn N/5" while the script runs, including the recap coachmarks shown after a turn.
+  const trainingTurn =
+    coach && coach.k !== "done"
+      ? coach.turn
+      : state.screen === "play" && state.training && !state.training.skipped && state.current === state.training.player
+        ? Math.min(state.training.turn, 5)
+        : 0;
+  const topSub = trainingTurn && player
+    ? fill(TS.topSub, { n: trainingTurn, name: nameOf(state.players[state.training?.player ?? 0] ?? player) })
+    : state.screen === "play" && player
       ? `${t("Turn {turn}", { turn: state.turn })} · ${nameOf(player)} · ${lineName(player, t)}${player.level >= 2 ? ` · ${t("Level 2")}` : ""}`
       : t("A board game about cash flow");
 
   return (
-    <div className={`gf-app ${state.screen === "play" ? "is-play" : ""}`}>
+    <div className={`gf-app ${state.screen === "play" ? "is-play" : ""} ${coach ? "tuto-on" : ""}`}>
       <IconDefs />
       <div className="gf-shell">
         <header className="top">
@@ -1171,7 +1272,7 @@ export function GameFlow() {
         )}
       </div>
 
-      {state.screen === "play" && state.phase === "card" && state.card && player && (
+      {state.screen === "play" && state.phase === "card" && state.card && player && !coach && (
         state.card.payload.t === "deal" ? (
           <DealSheet card={state.card} player={player} t={t} lang={lang} onChoose={(id) => go({ type: "CHOICE", id })} />
         ) : (
@@ -1197,6 +1298,50 @@ export function GameFlow() {
       )}
 
       {friendEv && <FriendScene ev={friendEv} t={t} lang={lang} onDone={closeFriend} />}
+
+      {coach && (
+        <TrainingCoach
+          state={state}
+          view={coach}
+          lang={lang}
+          mobile={isMobile}
+          reduced={prefersReducedMotion()}
+          hasBackup={hasBackup}
+          onRoll={() => go({ type: "ROLL" })}
+          onChoose={(id, post) => {
+            go({ type: "CHOICE", id });
+            if (post) setTut((x) => (x ? { ...x, post } : x));
+          }}
+          onPostDone={() => setTut((x) => (x ? { ...x, post: null } : x))}
+          onFinish={() => {
+            markTutorialSeen();
+            setTut({ post: null, done: true });
+          }}
+          onSkip={skipTraining}
+          onPlay={() => setTut(null)}
+          onReplay={() => startTraining(tutorialPick())}
+          onRestore={restoreBackup}
+        />
+      )}
+
+      {replayAsk && (
+        <div className="overlay" onClick={() => setReplayAsk(false)}>
+          <div className="rules-sheet" role="dialog" aria-modal="true" aria-labelledby="replay-title" onClick={(e) => e.stopPropagation()}>
+            <h2 id="replay-title" className="display">{TS.replay.title}</h2>
+            <p>{TS.replay.body}</p>
+            <div className="card-actions">
+              <button type="button" className="btn btn-ghost" onClick={() => setReplayAsk(false)}>{TS.replay.cancel}</button>
+              <button type="button" className="btn btn-gold" onClick={confirmReplay}>{TS.replay.go}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {toast && (
+        <div className="tut-toast" role="status">
+          {toast}
+        </div>
+      )}
 
       {ledgerOpen && player && state.screen === "play" && (
         <div className="overlay" onClick={() => setLedgerOpen(false)}>
@@ -1232,7 +1377,7 @@ export function GameFlow() {
         </div>
       )}
 
-      {state.screen === "play" && state.phase === "pass" && player && (
+      {state.screen === "play" && state.phase === "pass" && player && !coach && (
         <div className="overlay">
           <div className="pass-gate">
             <p className="kicker">{t("Hot-seat")}</p>
@@ -1240,6 +1385,9 @@ export function GameFlow() {
             <img src={portraitOf(state.players[(state.current + 1) % state.players.length]!)} alt="" />
             <p>{t("Next ledger belongs to {name}.", { name: nameOf(state.players[(state.current + 1) % state.players.length]!) })}</p>
             <button className="btn btn-gold" onClick={() => go({ type: "READY" })}>{t("I’m ready")}</button>
+            {state.training && state.current === state.training.player && (
+              <p className="tut-passnote">{fill(TS.passNote, { name: nameOf(player).split(" ")[0]! })}</p>
+            )}
           </div>
         </div>
       )}
@@ -1357,6 +1505,14 @@ export function GameFlow() {
                   <button type="button" className="btn btn-ghost" onClick={() => { setOptionsOpen(false); replayIntro(); }}>
                     {t("See the introduction again")}
                   </button>
+                  <button type="button" className="btn btn-ghost" onClick={replayTutorial}>
+                    {TS.done.replay}
+                  </button>
+                  {hasBackup && (
+                    <button type="button" className="btn btn-ghost" onClick={restoreBackup}>
+                      {TS.done.restore}
+                    </button>
+                  )}
                   <button type="button" className="btn btn-ghost" onClick={() => { setOptionsOpen(false); go({ type: "CREDITS" }); }}>
                     {t("Credits")}
                   </button>

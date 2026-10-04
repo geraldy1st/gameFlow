@@ -47,6 +47,8 @@ export const ICON_PATHS: Record<string, string> = {
   replay: `<path d="M4 12a8 8 0 1 0 2.4-5.7" ${S} stroke-width="2.8"/><path d="M3 3.5v5.5h5.5" ${S} stroke-width="2.8"/>`,
   next: `<path d="M5 12h13M13 6l6 6-6 6" ${S} stroke-width="2.8"/>`,
   skip: `<path d="M5 5l8 7-8 7zM13 5l8 7-8 7z" fill="currentColor"/>`,
+  shield: `<path d="M12 2.5l8 3v6c0 5-3.4 8.6-8 10-4.6-1.4-8-5-8-10v-6z" fill="currentColor"/><path d="M8 12l3 3 5-6" fill="none" stroke="#FFF6E5" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>`,
+  repeat: `<path d="M4 9a5 5 0 0 1 5-5h9M15 1l3 3-3 3M20 15a5 5 0 0 1-5 5H6M9 23l-3-3 3-3" ${S}/>`,
   ledger: `<rect x="4" y="2.5" width="16" height="19" rx="2.6" ${S}/><path d="M8 8h8M8 12h8M8 16h5" ${S}/>`,
   list: `<path d="M5 6h14M5 12h14M5 18h9" ${S}/>`,
   close: `<path d="M6 6l12 12M18 6L6 18" ${S} stroke-width="3"/>`,
