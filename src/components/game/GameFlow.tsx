@@ -1,27 +1,5 @@
-import { useEffect, useReducer, useRef, useState } from "react";
-import {
-  Baby,
-  BadgeDollarSign,
-  Briefcase,
-  Building2,
-  Coins,
-  Dices,
-  Handshake,
-  Heart,
-  Landmark,
-  Newspaper,
-  Palette,
-  Rocket,
-  ScrollText,
-  Sparkles,
-  Store,
-  UserPlus,
-  Users,
-  Volume2,
-  VolumeX,
-  Wrench,
-} from "lucide-react";
-import { CHARACTERS, DREAMS, FORTUNE_CASH, FORTUNE_PASSIVE, FREEDOM, FRIENDS, GRIND, INTRO_KEY, PARTNERS, PASSIVE_WIN, SAVE_KEY, TUTORIAL_KEY, VENTURE, VENTURE_GOAL, type SpaceKind } from "@/game/data";
+import { useCallback, useEffect, useReducer, useRef, useState } from "react";
+import { CHARACTERS, FORTUNE_CASH, FORTUNE_PASSIVE, FRIENDS, INTRO_KEY, PARTNERS, PASSIVE_WIN, SAVE_KEY, TUTORIAL_KEY, VENTURE_GOAL } from "@/game/data";
 import { playSfx, resumeAudio, setMuted, unlockAudio } from "@/game/audio";
 import { LANG_KEY, readLang, tr, trKey, type Lang } from "@/game/i18n";
 import { CHATS, chatText } from "@/game/chats";
@@ -33,7 +11,6 @@ import { TROPHIES, TROPHY_KEY, mergeTrophies, type TrophyPeak } from "@/game/tro
 import {
   blankMenu,
   cur,
-  customPortrait,
   dreamOf,
   money,
   nameOf,
@@ -44,95 +21,25 @@ import {
   type Action,
   type CardView,
   type Choice,
-  type CustomLook,
   type GameState,
   type Pick,
   type Player,
   type Reaction,
 } from "@/game/engine";
 import { arrivalLine, arrivalMood, bodyPortrait, dressedPortrait, expressionOf, outcomeLine, phraseSalt, speakerIsNpc } from "@/game/speech";
+import { DealSheet } from "./boite/DealSheet";
+import { fmtMoney } from "./boite/format";
+import { FriendScene, type FriendEvent } from "./boite/FriendScene";
+import { CoinRain, GateScene } from "./boite/GateScene";
+import { usePassiveHistory, type Point } from "./boite/history";
+import { prefersReducedMotion, useIsMobile } from "./boite/hooks";
+import { FAMILIES, IconDefs, Ico, type Family } from "./boite/icons";
+import { IntroVideo, probeIntro, type IntroPick } from "./boite/IntroVideo";
+import { MenuScreen } from "./boite/MenuScreen";
+import { MetroBoard, trackSpaces } from "./boite/MetroBoard";
+import { BoxDie, Dock, FlowBox, GateBox, MobileHud, PassiveChart, StationStrip, WhoBox, hereLabel, lineName, rollLabel } from "./boite/PlayerMat";
 
 type TFn = (text: string, vars?: Record<string, string | number>) => string;
-
-const PIPS: Record<number, number[]> = {
-  1: [4],
-  2: [0, 8],
-  3: [0, 4, 8],
-  4: [0, 2, 6, 8],
-  5: [0, 2, 4, 6, 8],
-  6: [0, 2, 3, 5, 6, 8],
-};
-
-function Die({ value, spinning }: { value: number; spinning: boolean }) {
-  const on = new Set(PIPS[value] ?? []);
-  return (
-    <div className={spinning ? "die spin" : "die"} aria-label={`Die showing ${value}`}>
-      {Array.from({ length: 9 }, (_, i) => (
-        <i key={i} className={on.has(i) ? "on" : ""} />
-      ))}
-    </div>
-  );
-}
-
-function Ticker({ value, signed = false }: { value: number; signed?: boolean }) {
-  const [shown, setShown] = useState(value);
-  const from = useRef(value);
-  useEffect(() => {
-    const start = performance.now();
-    const a = from.current;
-    const b = value;
-    let raf = 0;
-    const loop = (now: number) => {
-      const t = Math.min(1, (now - start) / 420);
-      const e = 1 - (1 - t) ** 2;
-      setShown(Math.round(a + (b - a) * e));
-      if (t < 1) raf = requestAnimationFrame(loop);
-      else from.current = b;
-    };
-    raf = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(raf);
-  }, [value]);
-  return <>{money(shown, signed)}</>;
-}
-
-function slot(i: number, n: number, rx: number, ry: number) {
-  const a = -Math.PI / 2 + (i / n) * Math.PI * 2;
-  return {
-    left: `${50 + Math.cos(a) * rx}%`,
-    top: `${50 + Math.sin(a) * ry}%`,
-    faceRight: Math.sin(a) < 0,
-  };
-}
-
-const ICONS: Partial<Record<SpaceKind, typeof Coins>> = {
-  payday: Coins,
-  career: Briefcase,
-  small: Sparkles,
-  big: Landmark,
-  lifestyle: Sparkles,
-  market: Landmark,
-  social: Users,
-  love: Heart,
-  health: Heart,
-  tax: ScrollText,
-  mentor: Users,
-  rest: Heart,
-  premium: Sparkles,
-  legacy: Landmark,
-  boom: Landmark,
-  dream: Sparkles,
-  philanthropy: Heart,
-  family: Baby,
-  client: Store,
-  hire: UserPlus,
-  expand: Building2,
-  ops: Wrench,
-  pitch: Handshake,
-  press: Newspaper,
-  brand: Palette,
-  scale: Rocket,
-  exit: BadgeDollarSign,
-};
 
 function MoodFace({
   src,
@@ -160,134 +67,6 @@ function MoodFace({
     </div>
   );
 }
-
-function TokenSprite({
-  player,
-  walking,
-  faceRight,
-  offset,
-  onOpen,
-}: {
-  player: Player;
-  walking: boolean;
-  faceRight: boolean;
-  offset: boolean;
-  onOpen?: () => void;
-}) {
-  const [frame, setFrame] = useState(1);
-  useEffect(() => {
-    if (!walking) return;
-    let i = 0;
-    let raf = 0;
-    let last = performance.now();
-    let acc = 0;
-    const order = [2, 4, 3, 1];
-    const loop = (now: number) => {
-      const dt = Math.min(100, now - last);
-      last = now;
-      acc += dt;
-      if (acc > 130) {
-        acc = 0;
-        i = (i + 1) % order.length;
-        setFrame(order[i] ?? 1);
-      }
-      raf = requestAnimationFrame(loop);
-    };
-    raf = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(raf);
-  }, [walking]);
-  const custom = player.custom;
-  const src = custom
-    ? customPortrait(custom)
-    : `/game/tokens/${player.characterId}/frame-${walking ? frame : 1}.png`;
-  const mood = walking ? "walk" : player.reaction;
-  return (
-    <button type="button" className={`token ${custom ? "is-portrait" : ""} ${mood} ${faceRight ? "" : "flip"} ${offset ? "is-p2" : ""}`} onClick={onOpen} aria-label={nameOf(player)}>
-      <img src={src} alt="" />
-    </button>
-  );
-}
-
-function Board({ state, t, onStatus }: { state: GameState; t: TFn; onStatus: (player: Player) => void }) {
-  const host = useRef<HTMLDivElement>(null);
-  const [scale, setScale] = useState(1);
-  useEffect(() => {
-    const el = host.current;
-    if (!el) return;
-    const fit = () => {
-      const w = el.clientWidth;
-      const h = el.clientHeight;
-      if (w < 8 || h < 8) return;
-      setScale(Math.min(w / 860, h / 780));
-    };
-    fit();
-    const ro = new ResizeObserver(fit);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-  const active = state.players.length ? cur(state) : null;
-  const st = active ? statement(active) : null;
-  const tight = scale < 0.72;
-  const outerR: [number, number] = tight ? [41, 38] : [45, 42];
-  const innerR: [number, number] = tight ? [27, 24] : [30.5, 27.5];
-  return (
-    <div className={`board-wrap ${tight ? "is-tight" : ""}`} ref={host}>
-      <div className="board-scale" style={{ transform: `translate(-50%, -50%) scale(${scale})` }}>
-        <div className="board">
-        {(active?.track === "venture" ? VENTURE : FREEDOM).map((space, i) => {
-          const ringSpaces = active?.track === "venture" ? VENTURE : FREEDOM;
-          const pos = slot(i, ringSpaces.length, outerR[0], outerR[1]);
-          const Icon = ICONS[space.kind] ?? Sparkles;
-          const hot = active && active.track !== "grind" && active.position === i;
-          const ring = active?.track === "venture" ? "The Venture" : "Freedom";
-          return (
-            <div key={`f${i}`} className={`space is-outer ${hot ? "is-hot" : ""}`} style={{ left: pos.left, top: pos.top }} title={`${t(space.label)} · ${t(ring)}`}>
-              <Icon aria-hidden />
-              <strong>{t(space.label)}</strong>
-            </div>
-          );
-        })}
-        {GRIND.map((space, i) => {
-          const pos = slot(i, GRIND.length, innerR[0], innerR[1]);
-          const Icon = ICONS[space.kind] ?? Sparkles;
-          const hot = active?.track === "grind" && active.position === i;
-          return (
-            <div key={`g${i}`} className={`space ${hot ? "is-hot" : ""}`} style={{ left: pos.left, top: pos.top }} title={`${t(space.label)} · ${t("The Grind")}`}>
-              <Icon aria-hidden />
-              <strong>{t(space.label)}</strong>
-            </div>
-          );
-        })}
-        {state.players.map((p, idx) => {
-          const track = p.track === "grind" ? GRIND : p.track === "venture" ? VENTURE : FREEDOM;
-          const outer = p.track !== "grind";
-          const pos = slot(p.position, track.length, outer ? outerR[0] : innerR[0], outer ? outerR[1] : innerR[1]);
-          const walking = state.phase === "moving" && idx === state.current;
-          return (
-            <div key={`${p.id}-${walking ? p.position : "still"}`} className={`token-anchor ${walking ? "is-step" : ""}`} style={{ position: "absolute", left: pos.left, top: pos.top, zIndex: 5 }}>
-              <TokenSprite player={p} walking={walking} faceRight={pos.faceRight} offset={idx === 1} onOpen={() => onStatus(p)} />
-            </div>
-          );
-        })}
-        <div className="medallion">
-          <img src="/game/art/crest.jpg" alt="" />
-          <h3>{t(active?.track === "venture" ? "The Venture" : active?.track === "freedom" ? "Freedom" : "The Grind")}</h3>
-          {st && (
-            <p>
-              {t("Passive")} <Ticker value={st.passive} /> · {t("Expenses")} <Ticker value={st.expenses} />
-            </p>
-          )}
-          {active && active.level >= 2 && active.track === "venture" && <div className="gate-pill">{t("Level 2 · Venture")}</div>}
-          {active && active.level >= 2 && active.track === "freedom" && <div className="gate-pill">{t("Level 2")}</div>}
-          {active && active.level < 2 && unlocked(active) && active.track === "grind" && <div className="gate-pill">{t("Gate is open")}</div>}
-          {active && active.level < 2 && active.track === "freedom" && <div className="gate-pill">{t("Outer track")}</div>}
-        </div>
-      </div>
-      </div>
-    </div>
-  );
-}
-
 function ChoiceButtons({ card, onChoose, t }: { card: CardView; onChoose: (id: string) => void; t: TFn }) {
   return (
     <div className="card-actions">
@@ -298,6 +77,14 @@ function ChoiceButtons({ card, onChoose, t }: { card: CardView; onChoose: (id: s
       ))}
     </div>
   );
+}
+
+/** Money is never shown by colour alone: amounts on green/red rows always carry a sign. */
+function signedRow(v: string, tone?: string): string {
+  if (!/^\$\d/.test(v)) return v;
+  if (tone === "up") return `+${v}`;
+  if (tone === "down") return `−${v}`;
+  return v;
 }
 
 function CardModal({
@@ -334,7 +121,7 @@ function CardModal({
             {card.lines.map((row) => (
               <div key={row.k}>
                 <span>{t(row.k)}</span>
-                <strong className={row.tone ?? ""}>{t(row.v)}</strong>
+                <strong className={row.tone ?? ""}>{signedRow(t(row.v), row.tone)}</strong>
               </div>
             ))}
           </div>
@@ -467,123 +254,76 @@ function RulesBody({ t }: { t: TFn }) {
   );
 }
 
-function Statement({
+
+function LedgerBody({
   player,
   state,
   dispatch,
   t,
-  onStatus,
+  lang,
+  points,
   onHistory,
   onFriend,
-  onCircle,
-  onDay,
-  onShop,
 }: {
   player: Player;
   state: GameState;
   dispatch: (a: Action) => void;
   t: TFn;
-  onStatus: () => void;
+  lang: Lang;
+  points: Point[];
   onHistory: () => void;
   onFriend: (id: string) => void;
-  onCircle: () => void;
-  onDay: () => void;
-  onShop: () => void;
 }) {
   const st = statement(player);
-  const dream = dreamOf(player);
   const partner = player.partner ? PARTNERS.find((p) => p.id === player.partner!.id) : null;
   const idle = state.phase === "idle";
+  const m = (n: number, signed = false) => fmtMoney(lang, n, signed);
   return (
-    <aside className="panel">
-      <div className="who">
-        <div className="who-col">
-          <button type="button" className="who-face" onClick={onStatus} aria-label={t("Status")}>
-            <img src={dressedPortrait(player, player.reaction)} alt="" onError={(e) => { (e.currentTarget as HTMLImageElement).src = portraitOf(player); }} />
-          </button>
-          <VitalsBars vitals={player.vitals} t={t} />
-          <p className="outfit-tag">{t(OUTFITS.find((o) => o.id === player.outfit)?.name ?? "Jeans")}</p>
-        </div>
-        <div>
-          <h2>{nameOf(player)}</h2>
-          <p>
-            {t(st.career.title)}
-            {player.custom ? ` · ${player.custom.age}` : ""}
-            {player.level >= 2 ? ` · ${t("Level 2")}` : ""}
-            {player.business ? ` · ${t(player.business.name)}` : ""}
-          </p>
-        </div>
-        <Die value={state.die} spinning={state.phase === "rolling"} />
-      </div>
-      <div className="roll-row is-above">
-        {state.phase === "idle" && (
-          <button className="btn btn-gold" onClick={() => dispatch({ type: "ROLL" })}>
-            <span style={{ display: "inline-flex", gap: "0.35rem", alignItems: "center" }}>
-              <Dices size={18} /> {t("Roll")}
-            </span>
-          </button>
-        )}
-        {state.phase === "rolling" && <button className="btn btn-ghost" disabled>{t("The die is thinking")}</button>}
-        {state.phase === "moving" && <button className="btn btn-ghost" disabled>{t("Walking the ring")}</button>}
-        {idle && (
-          <button className="btn btn-ghost" onClick={onDay}>{t("Day")}</button>
-        )}
-        {idle && (
-          <button className="btn btn-ghost" onClick={onShop}>{t("Shop")}</button>
-        )}
-        {idle && (
-          <button className="btn btn-ghost" onClick={() => dispatch({ type: "BORROW" })}>{t("Borrow $1,000")}</button>
-        )}
-        {(player.friends.length > 0 || player.partner) && (
-          <button className="btn btn-ghost" onClick={onCircle}>{t("Circle")}</button>
-        )}
-      </div>
-      <div className="flow-hero">
-        <div>
-          <span>{t("Monthly cash flow")}</span>
-          <strong className={st.cashFlow >= 0 ? "" : "down"}>
-            <Ticker value={st.cashFlow} signed />
-          </strong>
-        </div>
-        <div>
-          <span>{t("Cash")}</span>
-          <strong>
-            <Ticker value={player.cash} />
-          </strong>
-        </div>
-      </div>
+    <div className="ledger">
       <div className="rows">
-        <div><span>{t("Salary & earned")}</span><strong className="up"><Ticker value={st.salary} /></strong></div>
-        <div><span>{t("Passive income")}</span><strong className="up"><Ticker value={st.passive} /></strong></div>
-        {st.allyIncome > 0 && <div><span>{t("Allied income")}</span><strong className="up">{money(st.allyIncome)}</strong></div>}
-        <div><span>{t("Monthly expenses")}</span><strong className="down"><Ticker value={st.expenses} /></strong></div>
-        <div><span>{t("Dream")}</span><strong className="gold">{player.dreamBought ? t("Owned") : t(dream.name)}</strong></div>
+        <div><span>{t("Cash")}</span><strong className="num">{m(player.cash)}</strong></div>
+        <div><span>{t("Salary & earned")}</span><strong className="num up">{m(st.salary, true)}</strong></div>
+        <div><span>{t("Passive income")}</span><strong className="num up">{m(st.passive, true)}</strong></div>
+        {st.allyIncome > 0 && <div><span>{t("Allied income")}</span><strong className="num up">{m(st.allyIncome, true)}</strong></div>}
+        <div><span>{t("Monthly expenses")}</span><strong className="num down">{m(-st.expenses)}</strong></div>
+        <div className="total"><span>{t("Monthly cash flow")}</span><strong className={`num ${st.cashFlow >= 0 ? "up" : "down"}`}>{m(st.cashFlow, true)}</strong></div>
       </div>
+      <div className="m-only">
+        <PassiveChart points={points.length ? points : [{ turn: state.turn, passive: st.passive }]} expenses={st.expenses} t={t} lang={lang} />
+      </div>
+      {idle && (
+        <div className="chip-row">
+          <button type="button" className="btn btn-ghost" onClick={() => dispatch({ type: "BORROW" })}>{t("Borrow $1,000")}</button>
+          {partner && player.householdIn === 0 && (
+            <button type="button" className="btn btn-ghost" onClick={() => dispatch({ type: "HOUSE" })}>{t("Household decision")}</button>
+          )}
+        </div>
+      )}
       {player.business && (
         <div className="list-block">
           <h3>{t(player.business.name)}</h3>
           <div className="rows">
-            <div><span>{t("Revenue")}</span><strong className="up">{money(player.business.revenue)}{t("/mo")}</strong></div>
-            <div><span>{t("Payroll")}</span><strong className="down">{money(player.business.payroll)}{t("/mo")}</strong></div>
-            <div><span>{t("Venture goal")}</span><strong className="gold">{money(VENTURE_GOAL)}{t("/mo")}</strong></div>
+            <div><span>{t("Revenue")}</span><strong className="num up">{m(player.business.revenue, true)}{t("/mo")}</strong></div>
+            <div><span>{t("Payroll")}</span><strong className="num down">{m(-player.business.payroll)}{t("/mo")}</strong></div>
+            <div><span>{t("Venture goal")}</span><strong className="num">{m(VENTURE_GOAL)}{t("/mo")}</strong></div>
           </div>
         </div>
       )}
       {player.level >= 2 && player.keptRevenue && !player.stretchClaimed && (
-        <p className="muted">{t("Level 2 aim: {passive}/mo passive, or {cash} cash.", { passive: money(FORTUNE_PASSIVE), cash: money(FORTUNE_CASH) })}</p>
+        <p className="muted">{t("Level 2 aim: {passive}/mo passive, or {cash} cash.", { passive: m(FORTUNE_PASSIVE), cash: m(FORTUNE_CASH) })}</p>
       )}
       <details className="list-block">
         <summary>{t("Expense lines")}</summary>
         <div className="rows">
-          <div><span>{t("Taxes")}</span><span>{money(st.taxes)}</span></div>
-          <div><span>{t("Rent")}{st.roommate ? t(" (roommate)") : ""}</span><span>{money(st.rent)}</span></div>
-          <div><span>{t("Food & transport")}</span><span>{money(st.food + st.transport)}</span></div>
-          <div><span>{t("Other + lifestyle")}</span><span>{money(st.other + st.mods)}</span></div>
-          <div><span>{t("Partner")}</span><span>{money(st.partnerExpense)}</span></div>
-          <div><span>{t("Children")} ({player.children.length})</span><span>{money(st.childCost)}</span></div>
-          <div><span>{t("Debt payments")}</span><span>{money(st.debtPay)}</span></div>
-          {st.bizPayroll > 0 && <div><span>{t("Business payroll")}</span><span>{money(st.bizPayroll)}</span></div>}
-          {st.allyCost > 0 && <div><span>{t("Business partners")}</span><span>{money(st.allyCost)}</span></div>}
+          <div><span>{t("Taxes")}</span><span className="num">{m(-st.taxes)}</span></div>
+          <div><span>{t("Rent")}{st.roommate ? t(" (roommate)") : ""}</span><span className="num">{m(-st.rent)}</span></div>
+          <div><span>{t("Food & transport")}</span><span className="num">{m(-(st.food + st.transport))}</span></div>
+          <div><span>{t("Other + lifestyle")}</span><span className="num">{m(-(st.other + st.mods))}</span></div>
+          <div><span>{t("Partner")}</span><span className="num">{m(-st.partnerExpense)}</span></div>
+          <div><span>{t("Children")} ({player.children.length})</span><span className="num">{m(-st.childCost)}</span></div>
+          <div><span>{t("Debt payments")}</span><span className="num">{m(-st.debtPay)}</span></div>
+          {st.bizPayroll > 0 && <div><span>{t("Business payroll")}</span><span className="num">{m(-st.bizPayroll)}</span></div>}
+          {st.allyCost > 0 && <div><span>{t("Business partners")}</span><span className="num">{m(-st.allyCost)}</span></div>}
         </div>
       </details>
       <div className="list-block">
@@ -592,9 +332,9 @@ function Statement({
         {player.assets.map((a) => (
           <div className="mini" key={a.id}>
             <span>{t(a.name)}</span>
-            <span className="up">{money(a.cashFlow, true)}{t("/mo")}</span>
+            <span className="num up">{m(a.cashFlow, true)}{t("/mo")}</span>
             {idle && (
-              <button className="linkish" onClick={() => dispatch({ type: "SELL", id: a.id })}>{t("Sell")}</button>
+              <button type="button" className="linkish" onClick={() => dispatch({ type: "SELL", id: a.id })}>{t("Sell")}</button>
             )}
           </div>
         ))}
@@ -604,10 +344,10 @@ function Statement({
         {player.liabilities.length === 0 && <p className="muted">{t("No notes. The bank is patient, not kind.")}</p>}
         {player.liabilities.map((l) => (
           <div className="mini" key={l.id}>
-            <span>{l.name}</span>
-            <span className="down">{money(l.payment)}{t("/mo")}</span>
+            <span>{t(l.name)}</span>
+            <span className="num down">{m(-l.payment)}{t("/mo")}</span>
             {idle && player.cash >= l.principal && (
-              <button className="linkish" onClick={() => dispatch({ type: "REPAY", id: l.id })}>{t("Repay")} {money(l.principal)}</button>
+              <button type="button" className="linkish" onClick={() => dispatch({ type: "REPAY", id: l.id })}>{t("Repay")} {m(l.principal)}</button>
             )}
           </div>
         ))}
@@ -648,52 +388,46 @@ function Statement({
           <p className="muted">{t("You already saw your circle this turn.")}</p>
         )}
       </div>
-      {idle && player.track === "grind" && unlocked(player) && (
-        <button className="btn btn-gold btn-wide" style={{ marginTop: "0.55rem" }} onClick={() => dispatch({ type: "ENTER" })}>
-          {statement(player).passive >= PASSIVE_WIN ? t("The goal is met — step out") : t("Step onto the Freedom Track")}
-        </button>
-      )}
-      {idle && player.track === "freedom" && !player.dreamBought && (
-        <button className="btn btn-gold btn-wide" style={{ marginTop: "0.55rem" }} onClick={() => dispatch({ type: "DREAM" })}>
-          {t("Buy dream")} · {money(dream.cost)}
-        </button>
-      )}
-      {idle && partner && player.householdIn === 0 && (
-        <button className="btn btn-ghost btn-wide" style={{ marginTop: "0.45rem" }} onClick={() => dispatch({ type: "HOUSE" })}>
-          {t("Household decision")}
-        </button>
-      )}
-      {idle && player.level >= 2 && (
-        <button className="btn btn-ghost btn-wide" style={{ marginTop: "0.45rem" }} onClick={() => dispatch({ type: "RETIRE" })}>
-          {t("Retire from the table")}
-        </button>
-      )}
       <ul className="log">
         {state.log.map((line, i) => (
           <li key={`${line}-${i}`}>{t(line)}</li>
         ))}
       </ul>
-      <button type="button" className="btn btn-ghost btn-wide" style={{ marginTop: "0.55rem" }} onClick={onHistory}>{t("Decisions")}</button>
-    </aside>
+      <button type="button" className="btn btn-ghost btn-wide" onClick={onHistory}>{t("Decisions")}</button>
+    </div>
   );
 }
 
-const HAIR = ["black", "brown", "blonde", "auburn"] as const;
-const SKIN = ["fair", "warm", "deep"] as const;
-const SEX = [
-  { id: "f", label: "Woman" },
-  { id: "m", label: "Man" },
-  { id: "x", label: "Another" },
-] as const;
-
-const blankLook = (): CustomLook => ({
-  name: "",
-  age: 24,
-  sex: "f",
-  hair: "black",
-  skin: "fair",
-  bio: "",
-});
+function LegendBody({ t }: { t: TFn }) {
+  return (
+    <div className="legend-list">
+      {(Object.keys(FAMILIES) as Family[]).map((k) => {
+        const f = FAMILIES[k];
+        return (
+          <div className="lg-row" key={k}>
+            <span className="lg-ic" style={{ background: f.bg, color: f.fg }}>
+              <Ico name={f.icon} />
+            </span>
+            <span>
+              <b>{t(f.name)}</b>
+              {k === "ties" && <small>{t("Social + Love")}</small>}
+              {k === "care" && <small>{t("Health, Rest, Charity")}</small>}
+            </span>
+          </div>
+        );
+      })}
+      <div className="lg-row">
+        <span className="lg-ic gate">
+          <Ico name="door" />
+        </span>
+        <span>
+          <b>{t("The Gate")}</b>
+          <small>{t("Opens when passive income > expenses.")}</small>
+        </span>
+      </div>
+    </div>
+  );
+}
 
 function vitalBits(bump: Partial<Vitals>, t: TFn): string {
   const parts: string[] = [];
@@ -702,222 +436,6 @@ function vitalBits(bump: Partial<Vitals>, t: TFn): string {
   if (bump.mind) parts.push(`${t("Intelligence")} +${bump.mind}`);
   if (bump.luck) parts.push(`${t("Lucky")} +${bump.luck}`);
   return parts.join(" · ");
-}
-
-function Setup({
-  onCancel,
-  onStart,
-  t,
-  unlocked,
-  canCreate,
-}: {
-  onCancel: () => void;
-  onStart: (picks: Pick[]) => void;
-  t: TFn;
-  unlocked: string[];
-  canCreate: boolean;
-}) {
-  const [count, setCount] = useState<1 | 2>(1);
-  const [step, setStep] = useState(0);
-  const [picks, setPicks] = useState<{ characterId?: string; dreamId?: string; custom?: CustomLook | null }[]>([{}, {}]);
-  const [creating, setCreating] = useState(false);
-  const [draft, setDraft] = useState<CustomLook>(blankLook);
-  const current = picks[step] ?? {};
-  const taken = new Set(
-    picks
-      .filter((_, i) => i !== step)
-      .map((p) => p.characterId)
-      .filter((id): id is string => !!id && id !== "custom"),
-  );
-  const ready = Boolean(current.dreamId && (current.characterId === "custom" ? current.custom?.name : current.characterId));
-  const setPick = (patch: Partial<{ characterId: string; dreamId: string; custom: CustomLook | null }>) => {
-    setPicks((prev) => prev.map((p, i) => (i === step ? { ...p, ...patch } : p)));
-  };
-  const useFace = () => {
-    const name = draft.name.trim();
-    if (!name) return;
-    const age = Math.min(80, Math.max(18, Math.round(Number(draft.age) || 18)));
-    const look: CustomLook = { ...draft, name, age, bio: draft.bio.trim().slice(0, 600) };
-    setDraft(look);
-    setPick({ characterId: "custom", custom: look });
-    setCreating(false);
-  };
-  return (
-    <section className="menu-hero">
-      <div>
-        <p className="kicker">{step === 0 ? t("Player one") : t("Player two")} · {count === 1 ? t("Solo") : t("Hot-seat")}</p>
-        <h2 style={{ fontSize: "3rem" }}>{t("Choose a life")}</h2>
-        <p className="lede">{t("Pick an original face, then the dream that ends the game if you can pay for it on the Freedom Track.")}</p>
-        <div className="menu-actions">
-          <button className={`btn ${count === 1 ? "btn-gold" : "btn-ghost"}`} onClick={() => { setCount(1); setStep(0); }}>{t("1 player")}</button>
-          <button className={`btn ${count === 2 ? "btn-gold" : "btn-ghost"}`} onClick={() => setCount(2)}>{t("2 players")}</button>
-        </div>
-        <h3 style={{ marginTop: "1rem" }}>{t("Character")}</h3>
-        <div className="cast">
-          {CHARACTERS.map((c) => {
-            const open = unlocked.includes(c.id);
-            return (
-              <button
-                key={c.id}
-                className={`${current.characterId === c.id ? "is-on" : ""} ${open ? "" : "is-locked"}`}
-                disabled={!open || taken.has(c.id)}
-                onClick={() => {
-                  setCreating(false);
-                  setPick({ characterId: c.id, custom: null });
-                }}
-              >
-                <img src={c.portrait} alt="" />
-                <strong>{c.name}</strong>
-                <div className="muted">{open ? t(c.title) : t("Locked")}</div>
-              </button>
-            );
-          })}
-          {current.custom && (
-            <button className={current.characterId === "custom" ? "is-on" : ""} onClick={() => setCreating(true)}>
-              <img src={customPortrait(current.custom)} alt="" />
-              <strong>{current.custom.name}</strong>
-              <div className="muted">{current.custom.age}</div>
-            </button>
-          )}
-        </div>
-        {unlocked.length < CHARACTERS.length && (
-          <p className="muted">{t("Pass a finance quiz in Options to unlock another face.")}</p>
-        )}
-        <button
-          className={`btn ${creating || current.characterId === "custom" ? "btn-gold" : "btn-ghost"}`}
-          style={{ marginTop: "0.7rem" }}
-          disabled={!canCreate}
-          onClick={() => {
-            if (!canCreate) return;
-            if (current.custom) setDraft(current.custom);
-            setCreating((v) => !v);
-          }}
-        >
-          {t("Create your own")}
-        </button>
-        {!canCreate && <p className="muted">{t("Reach $1,000,000 cash to create a character.")}</p>}
-        {creating && canCreate && (
-          <div className="creator">
-            <img src={customPortrait(draft)} alt="" />
-            <div>
-              <p className="kicker">{t("Your character")}</p>
-              <label className="field">
-                {t("Name")}
-                <input
-                  value={draft.name}
-                  maxLength={28}
-                  onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-                />
-              </label>
-              <label className="field">
-                {t("Age")}
-                <input
-                  type="number"
-                  min={18}
-                  max={80}
-                  value={draft.age}
-                  onChange={(e) => setDraft({ ...draft, age: Number(e.target.value) })}
-                />
-              </label>
-              <div className="field">
-                {t("Sex")}
-                <div className="chip-row">
-                  {SEX.map((s) => (
-                    <button key={s.id} type="button" className={`btn ${draft.sex === s.id ? "btn-gold" : "btn-ghost"}`} onClick={() => setDraft({ ...draft, sex: s.id })}>
-                      {t(s.label)}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="field">
-                {t("Hair color")}
-                <div className="chip-row">
-                  {HAIR.map((h) => (
-                    <button key={h} type="button" className={`btn ${draft.hair === h ? "btn-gold" : "btn-ghost"}`} onClick={() => setDraft({ ...draft, hair: h })}>
-                      {t(h === "black" ? "Black" : h === "brown" ? "Brown" : h === "blonde" ? "Blonde" : "Auburn")}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="field">
-                {t("Skin color")}
-                <div className="chip-row">
-                  {SKIN.map((s) => (
-                    <button key={s} type="button" className={`btn ${draft.skin === s ? "btn-gold" : "btn-ghost"}`} onClick={() => setDraft({ ...draft, skin: s })}>
-                      {t(s === "fair" ? "Fair" : s === "warm" ? "Warm" : "Deep")}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <label className="field">
-                {t("Short biography")}
-                <textarea
-                  rows={4}
-                  maxLength={600}
-                  placeholder={t("Write a few lines they would recognize.")}
-                  value={draft.bio}
-                  onChange={(e) => setDraft({ ...draft, bio: e.target.value })}
-                />
-              </label>
-              <p className="muted">{t("Manga likeness. The portrait stays a young adult; age lives in the biography.")}</p>
-              <button className="btn btn-gold" style={{ marginTop: "0.55rem" }} disabled={!draft.name.trim()} onClick={useFace}>
-                {t("Use this face")}
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-      <div>
-        <h3>{t("Dream")}</h3>
-        <div className="pick-grid">
-          {DREAMS.map((d) => (
-            <button
-              key={d.id}
-              className={`pick-card ${current.dreamId === d.id ? "is-on" : ""}`}
-              onClick={() => setPick({ dreamId: d.id })}
-            >
-              <img src={d.art} alt="" />
-              <div>
-                <strong>{t(d.name)}</strong>
-                <p className="muted">{t(d.blurb)}</p>
-                <p className="gold">{money(d.cost)}</p>
-              </div>
-            </button>
-          ))}
-        </div>
-        <div className="menu-actions">
-          <button className="btn btn-ghost" onClick={onCancel}>{t("Back")}</button>
-          {count === 2 && step === 0 && (
-            <button
-              className="btn btn-gold"
-              disabled={!ready}
-              onClick={() => { setCreating(false); setStep(1); setDraft(picks[1]?.custom ?? blankLook()); }}
-            >
-              {t("Player two")}
-            </button>
-          )}
-          {(count === 1 || step === 1) && (
-            <button
-              className="btn btn-gold"
-              disabled={!ready}
-              onClick={() => {
-                const used = count === 1 ? picks.slice(0, 1) : picks.slice(0, 2);
-                if (used.every((p) => p.dreamId && (p.characterId === "custom" ? p.custom?.name : p.characterId))) {
-                  onStart(used.map((p) => ({
-                    characterId: p.characterId === "custom" ? "custom" : p.characterId!,
-                    dreamId: p.dreamId!,
-                    custom: p.characterId === "custom" ? p.custom ?? null : null,
-                  })));
-                }
-              }}
-            >
-              {t("Deal careers")}
-            </button>
-          )}
-        </div>
-      </div>
-    </section>
-  );
 }
 
 function QuizDesk({
@@ -1012,7 +530,14 @@ function persistGame(s: GameState): boolean {
 
 export function GameFlow() {
   const [state, dispatch] = useReducer(reduce, undefined, blankMenu);
-  const [setup, setSetup] = useState(false);
+  const [ledgerOpen, setLedgerOpen] = useState(false);
+  const [legendOpen, setLegendOpen] = useState(false);
+  const [zoom, setZoom] = useState(false);
+  const [gateSeen, setGateSeen] = useState<Record<string, boolean>>({});
+  const [friendEv, setFriendEv] = useState<FriendEvent | null>(null);
+  const [introMode, setIntroMode] = useState<IntroPick | null>(null);
+  const [pendingPicks, setPendingPicks] = useState<Pick[] | null>(null);
+  const pendingFriend = useRef<Omit<FriendEvent, "after"> | null>(null);
   const [hasSave, setHasSave] = useState(false);
   const [rules, setRules] = useState(false);
   const [tutorial, setTutorial] = useState<number | null>(null);
@@ -1050,7 +575,14 @@ export function GameFlow() {
     setHasSave(!!localStorage.getItem(SAVE_KEY));
     setLang(readLang());
     setPassed(loadPassed());
-    setIntro(localStorage.getItem(INTRO_KEY) ? null : 0);
+    if (localStorage.getItem(INTRO_KEY)) setIntro(null);
+    else
+      void probeIntro(prefersReducedMotion()).then((mode) => {
+        if (mode) {
+          setIntroMode(mode);
+          setIntro(null);
+        } else setIntro(0);
+      });
     try {
       const raw = localStorage.getItem(TROPHY_KEY);
       if (raw) {
@@ -1160,6 +692,17 @@ export function GameFlow() {
     phaseRef.current = state.phase;
     logRef.current = logLine;
     if (state.screen !== "play") return;
+    const pf = pendingFriend.current;
+    if (pf && state.phase !== "card") {
+      pendingFriend.current = null;
+      const after = state.players.find((p) => p.id === pf.before.id);
+      const joined = after?.friends.find((f) => f.id === pf.friendId);
+      if (after && joined && !pf.before.friends.some((f) => f.id === pf.friendId)) {
+        setOutcome(null);
+        setFriendEv({ ...pf, after, role: joined.role === "partner" ? "partner" : "friend" });
+        return;
+      }
+    }
     if (prevPhase === "card" && (state.phase === "idle" || state.phase === "pass") && logLine && logLine !== prevLog) {
       const p = state.players[state.current];
       if (!p) return;
@@ -1193,7 +736,20 @@ export function GameFlow() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const s = stateRef.current;
+      if (friendEv || introMode) return;
+      if (gateOpenRef.current && !rules && !optionsOpen) {
+        if (e.key === "Escape") dismissGateRef.current();
+        return;
+      }
       if (e.key === "Escape") {
+        if (ledgerOpen) {
+          setLedgerOpen(false);
+          return;
+        }
+        if (legendOpen) {
+          setLegendOpen(false);
+          return;
+        }
         if (typeof intro === "number") {
           localStorage.setItem(INTRO_KEY, "1");
           setIntro(null);
@@ -1288,7 +844,7 @@ export function GameFlow() {
         });
         return;
       }
-      if (outcome || statusFor || historyOpen || friendId || circleOpen || confirmNew || dayOpen || wardrobeOpen || shopOpen || chat) {
+      if (outcome || statusFor || historyOpen || friendId || circleOpen || confirmNew || dayOpen || wardrobeOpen || shopOpen || chat || ledgerOpen || legendOpen || rules || optionsOpen || bioId || trophyId) {
         if (e.key === "Enter" || e.key === " ") setOutcome(null);
         return;
       }
@@ -1307,11 +863,45 @@ export function GameFlow() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [rules, tutorial, bioId, optionsOpen, trophyId, outcome, statusFor, historyOpen, friendId, circleOpen, confirmNew, dayOpen, wardrobeOpen, shopOpen, chat, intro]);
+  }, [rules, tutorial, bioId, optionsOpen, trophyId, outcome, statusFor, historyOpen, friendId, circleOpen, confirmNew, dayOpen, wardrobeOpen, shopOpen, chat, intro, friendEv, introMode, ledgerOpen, legendOpen]);
 
   const go = (action: Action) => {
     unlockAudio();
+    const s = stateRef.current;
+    if (action.type === "CHOICE" && (action.id === "friend" || action.id === "biz") && s.phase === "card" && s.card?.payload.t === "friend") {
+      const p = cur(s);
+      const space = trackSpaces(p)[p.position];
+      pendingFriend.current = { before: p, friendId: s.card.payload.id, role: action.id === "biz" ? "partner" : "friend", speech: s.card.speech ?? s.card.story, space: space?.label ?? "Social", turn: s.turn };
+    }
     dispatch(action);
+  };
+  const continueSave = () => {
+    unlockAudio();
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) return;
+    try {
+      const saved = JSON.parse(raw) as GameState;
+      if (saved.version === 1 && saved.players?.length) go({ type: "CONTINUE", saved });
+    } catch {
+      setHasSave(false);
+    }
+  };
+  const startGame = (picks: Pick[]) => {
+    setPendingPicks(null);
+    setConfirmNew(false);
+    go({ type: "NEW", picks });
+    if (!localStorage.getItem(TUTORIAL_KEY)) setTutorial(0);
+  };
+  const replayIntro = () => {
+    void probeIntro(prefersReducedMotion()).then((mode) => {
+      if (mode) setIntroMode(mode);
+      else setIntro(0);
+    });
+  };
+  const closeFriend = useCallback(() => setFriendEv(null), []);
+  const closeIntro = () => {
+    localStorage.setItem(INTRO_KEY, "1");
+    setIntroMode(null);
   };
   const saveNow = () => {
     if (!persistGame(stateRef.current)) return;
@@ -1320,179 +910,223 @@ export function GameFlow() {
   };
   const beginNew = () => {
     setConfirmNew(false);
-    setSetup(true);
+    if (pendingPicks) {
+      startGame(pendingPicks);
+      return;
+    }
     if (stateRef.current.screen !== "menu") dispatch({ type: "MENU" });
   };
 
   const player = state.players.length ? cur(state) : null;
   const shownDie = state.phase === "rolling" ? flicker : state.die;
+  const viewState = state.phase === "rolling" ? { ...state, die: shownDie } : state;
+  const passiveHistory = usePassiveHistory(state);
+  const points: Point[] = player ? (passiveHistory[player.id] ?? []) : [];
+  const isMobile = useIsMobile();
+  const otherOverlay = !!(outcome || friendEv || statusFor || historyOpen || friendId || circleOpen || dayOpen || shopOpen || wardrobeOpen || chat || ledgerOpen || legendOpen || rules || tutorial !== null || confirmNew || introMode || typeof intro === "number");
+  const gateOpen = !!player && state.screen === "play" && state.phase === "idle" && player.track === "grind" && player.level < 2 && unlocked(player) && !gateSeen[player.id] && !otherOverlay;
+  const dismissGate = () => {
+    if (player) setGateSeen((g) => ({ ...g, [player.id]: true }));
+  };
+  const gateOpenRef = useRef(gateOpen);
+  gateOpenRef.current = gateOpen;
+  const dismissGateRef = useRef(dismissGate);
+  dismissGateRef.current = dismissGate;
+  useEffect(() => {
+    // the Gate scene shows again if the player falls back below the line
+    if (!player || !gateSeen[player.id] || unlocked(player)) return;
+    setGateSeen((g) => ({ ...g, [player.id]: false }));
+  }, [player, gateSeen]);
+  const dream = player ? dreamOf(player) : null;
+  const ctxButtons = player && state.phase === "idle" && (
+    <>
+      {player.track === "grind" && unlocked(player) && (
+        <button type="button" className="btn gold" onClick={() => go({ type: "ENTER" })}>
+          <Ico name="door" />
+          {statement(player).passive >= PASSIVE_WIN ? t("The goal is met — step out") : t("Board the express")}
+        </button>
+      )}
+      {player.track === "freedom" && !player.dreamBought && dream && (
+        <button type="button" className="btn gold" onClick={() => go({ type: "DREAM" })}>
+          <Ico name="star" />
+          {t("Buy dream")} · <span className="num">{fmtMoney(lang, dream.cost)}</span>
+        </button>
+      )}
+      {player.level >= 2 && (
+        <button type="button" className="btn" onClick={() => go({ type: "RETIRE" })}>
+          {t("Retire from the table")}
+        </button>
+      )}
+    </>
+  );
+  const hasCtx = !!player && state.phase === "idle" && ((player.track === "grind" && unlocked(player)) || (player.track === "freedom" && !player.dreamBought) || player.level >= 2);
+  const idle = state.phase === "idle";
+
+  const topSub =
+    state.screen === "play" && player
+      ? `${t("Turn {turn}", { turn: state.turn })} · ${nameOf(player)} · ${lineName(player, t)}${player.level >= 2 ? ` · ${t("Level 2")}` : ""}`
+      : t("A board game about cash flow");
 
   return (
-    <div className="gf-app">
+    <div className={`gf-app ${state.screen === "play" ? "is-play" : ""}`}>
+      <IconDefs />
       <div className="gf-shell">
-        <header className="gf-top">
+        <header className="top">
+          <div className="lid" aria-hidden="true">
+            <Ico name="coin" />
+          </div>
           <div className="brand">
-            <img src="/game/art/crest.jpg" alt="" />
-            <div>
-              <h1>GameFlow</h1>
-              <p>{state.screen === "play" && player ? `${t("Turn {turn} · {name}", { turn: state.turn, name: nameOf(player) })}${player.level >= 2 ? ` · ${t("Level 2")}` : ""}` : t("A ledger you can walk")}</p>
-            </div>
+            <h1>GameFlow</h1>
+            <p>{topSub}</p>
           </div>
-          <div className="top-actions">
-            <button className="btn btn-ghost" onClick={() => setRules(true)}>{t("Rules")}</button>
-            {state.screen === "menu" && !setup && (
-              <button className="btn btn-ghost" onClick={() => setOptionsOpen(true)}>{t("Options")}</button>
-            )}
-            {(state.screen === "play" || state.screen === "win") && (
-              <button className="btn btn-ghost" onClick={saveNow}>{savedFlash ? t("Saved") : t("Save")}</button>
-            )}
-            <button className="btn btn-ghost" onClick={() => go({ type: "MUTE" })} aria-label={state.muted ? t("Unmute") : t("Mute")}>
-              {state.muted ? <VolumeX size={18} /> : <Volume2 size={18} />}
+          <div className="sp" />
+          <button type="button" className="chipbtn d-only" onClick={() => setRules(true)}>
+            <Ico name="book" />
+            {t("Rules")}
+          </button>
+          {state.screen === "menu" && (
+            <button type="button" className="chipbtn" onClick={() => { setOptTab("lang"); setOptionsOpen(true); }}>
+              {t("Options")}
             </button>
-            {state.screen !== "menu" && (
-              <button className="btn btn-ghost" onClick={() => { setSetup(false); go({ type: "MENU" }); }}>{t("Menu")}</button>
-            )}
-          </div>
+          )}
+          {(state.screen === "play" || state.screen === "win") && (
+            <button type="button" className="chipbtn d-only" onClick={saveNow} aria-live="polite">
+              <Ico name={savedFlash ? "check" : "save"} />
+              {savedFlash ? t("Saved") : t("Save")}
+            </button>
+          )}
+          <button type="button" className="chipbtn" onClick={() => go({ type: "MUTE" })} aria-label={state.muted ? t("Unmute") : t("Mute")} aria-pressed={!state.muted}>
+            <Ico name={state.muted ? "mute" : "sound"} />
+          </button>
+          {state.screen !== "menu" && (
+            <button type="button" className="chipbtn" onClick={() => go({ type: "MENU" })}>
+              {t("Menu")}
+            </button>
+          )}
         </header>
 
-        {state.screen === "menu" && !setup && (
-          <section className="menu-hero">
-            <div>
-              <p className="kicker">{t("Original manga board")}</p>
-              <h2>GameFlow</h2>
-              <p className="lede">
-                {t("Walk The Grind until your assets pay the month. Clear level 1 by buying your dream or reaching fifty thousand a month in passive income — then found a business, or keep that revenue and play on.")}
-              </p>
-              <div className="menu-actions">
-                <button className="btn btn-gold" onClick={() => { unlockAudio(); if (hasSave) setConfirmNew(true); else setSetup(true); }}>{t("New game")}</button>
-                <button
-                  className="btn btn-ghost"
-                  disabled={!hasSave}
-                  onClick={() => {
-                    unlockAudio();
-                    const raw = localStorage.getItem(SAVE_KEY);
-                    if (!raw) return;
-                    try {
-                      const saved = JSON.parse(raw) as GameState;
-                      if (saved.version === 1 && saved.players?.length) {
-                        setSetup(false);
-                        go({ type: "CONTINUE", saved });
-                      }
-                    } catch {
-                      setHasSave(false);
-                    }
-                  }}
-                >
-                  {t("Continue")}
-                </button>
-                <button className="btn btn-ghost" onClick={() => go({ type: "RULES" })}>{t("Rules")}</button>
-                <button className="btn btn-ghost" onClick={() => go({ type: "CREDITS" })}>{t("Credits")}</button>
-                <button className="btn btn-ghost" onClick={() => setOptionsOpen(true)}>{t("Options")}</button>
-              </div>
-              <p className="cast-hint">{t("Tap a portrait to read their story.")}</p>
-              <div className="cast">
-                {CHARACTERS.map((c) => {
-                  const open = unlockedIds(passed).includes(c.id);
-                  return (
-                    <button key={c.id} type="button" className={`cast-face ${open ? "" : "is-locked"}`} onClick={() => setBioId(c.id)}>
-                      <img src={c.portrait} alt="" />
-                      <strong>{c.name}</strong>
-                      <span>{open ? t("Biography") : t("Locked")}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-            <div className="hero-art">
-              <img src="/game/art/cafe.jpg" alt={t("Seaside café-gallery")} />
-              <div className="hero-caption">
-                <strong className="display" style={{ fontSize: "1.8rem" }}>{t("Two rings. One way out.")}</strong>
-                <p>{t("Inner Grind. Outer Freedom. Deals, dinners, and the people who change the math.")}</p>
-              </div>
-            </div>
-          </section>
-        )}
-
-        {state.screen === "menu" && setup && (
-          <Setup
+        {state.screen === "menu" && (
+          <MenuScreen
+            state={state}
             t={t}
+            lang={lang}
             unlocked={unlockedIds(passed)}
             canCreate={trophies.peak.cash >= CREATE_CASH}
-            onCancel={() => setSetup(false)}
+            hasSave={hasSave}
+            onContinue={continueSave}
             onStart={(picks) => {
-              setSetup(false);
-              go({ type: "NEW", picks });
-              if (!localStorage.getItem(TUTORIAL_KEY)) setTutorial(0);
+              unlockAudio();
+              if (hasSave) {
+                setPendingPicks(picks);
+                setConfirmNew(true);
+              } else startGame(picks);
             }}
+            onQuiz={() => {
+              setOptTab("quiz");
+              setQuizId(null);
+              setQuizDone(false);
+              setOptionsOpen(true);
+            }}
+            onBio={setBioId}
           />
         )}
 
         {(state.screen === "rules" || state.screen === "credits") && (
-          <section className="rules-sheet menu-hero" style={{ display: "block" }}>
+          <section className="box rules-page">
             {state.screen === "rules" ? (
               <RulesBody t={t} />
             ) : (
               <div className="rules-copy">
                 <p className="kicker">{t("Credits")}</p>
-                <h2 className="display" style={{ fontSize: "2.6rem", marginTop: 0 }}>{t("Made for this table")}</h2>
+                <h2 className="display">{t("Made for this table")}</h2>
                 <p>{t("GameFlow is an original game. It is not Monopoly, and it is not the Cashflow board. Characters, dreams, jobs, and the two rings were drawn for this ledger.")}</p>
                 <p>{t("Aoi, Ren, Mio, and Sora, plus the people who might share their month, are original faces. Sound is synthesized in the browser. Progress stays on this device.")}</p>
               </div>
             )}
-            <button className="btn btn-gold" style={{ marginTop: "0.8rem" }} onClick={() => go({ type: "MENU" })}>{t("Back")}</button>
+            <button type="button" className="btn btn-gold" onClick={() => go({ type: "MENU" })}>{t("Back")}</button>
           </section>
         )}
 
         {state.screen === "play" && player && (
-          <div className="gf-play">
-            <Board state={{ ...state, die: shownDie }} t={t} onStatus={setStatusFor} />
-            <div className="play-dock">
-              <div className="dock-face-col">
-                <button type="button" className="dock-face" onClick={() => setStatusFor(player)} aria-label={t("Status")}>
-                  <img src={dressedPortrait(player, player.reaction)} alt="" onError={(e) => { (e.currentTarget as HTMLImageElement).src = portraitOf(player); }} />
+          <main className="screen s-play">
+            <MobileHud player={player} state={state} t={t} lang={lang} onStatus={() => setStatusFor(player)} />
+            <section className="board-wrap">
+              <div className={`board-sheet ${zoom ? "is-zoom" : ""}`}>
+                <MetroBoard state={viewState} t={t} lang={lang} />
+                <span className="youare m-only">{hereLabel(player, t)}</span>
+                <button type="button" className="zoom m-only" aria-pressed={zoom} aria-label={zoom ? t("Zoom out of the map") : t("Zoom into the map")} onClick={() => setZoom((z) => !z)}>
+                  <Ico name={zoom ? "unzoom" : "zoom"} />
                 </button>
-                <VitalsBars vitals={player.vitals} t={t} />
               </div>
-              <div className="dock-actions">
-                {state.phase === "idle" && (
-                  <button className="btn btn-gold" onClick={() => go({ type: "ROLL" })}>{t("Roll")}</button>
-                )}
-                {state.phase === "rolling" && <button className="btn btn-ghost" disabled>{t("The die is thinking")}</button>}
-                {state.phase === "moving" && <button className="btn btn-ghost" disabled>{t("Walking the ring")}</button>}
-                {state.phase === "idle" && (
-                  <button className="btn btn-ghost" onClick={() => go({ type: "BORROW" })}>{t("Borrow $1,000")}</button>
-                )}
-                {state.phase === "idle" && (
-                  <button className="btn btn-ghost" onClick={() => setDayOpen(true)}>{t("Day")}</button>
-                )}
-                {state.phase === "idle" && (
-                  <button className="btn btn-ghost" onClick={() => setShopOpen(true)}>{t("Shop")}</button>
-                )}
-                {(player.friends.length > 0 || player.partner) && (
-                  <button type="button" className="btn btn-ghost" onClick={() => setCircleOpen(true)}>{t("Circle")}</button>
-                )}
-                <button type="button" className="btn btn-ghost" onClick={() => setHistoryOpen(true)}>{t("Decisions")}</button>
-              </div>
-              <div className="dock-flow">
-                <span>{t("Monthly cash flow")}</span>
-                <strong className={statement(player).cashFlow >= 0 ? "" : "down"}>
-                  <Ticker value={statement(player).cashFlow} signed />
-                </strong>
-              </div>
-            </div>
-            <Statement
-              player={player}
-              state={{ ...state, die: shownDie }}
-              dispatch={go}
-              t={t}
-              onStatus={() => setStatusFor(player)}
-              onHistory={() => setHistoryOpen(true)}
-              onFriend={setFriendId}
-              onCircle={() => setCircleOpen(true)}
-              onDay={() => setDayOpen(true)}
-              onShop={() => setShopOpen(true)}
-            />
-          </div>
+            </section>
+            <StationStrip player={player} t={t} />
+            {!isMobile && (
+              <aside className="mat d-only">
+                <WhoBox player={player} state={state} t={t} lang={lang} onStatus={() => setStatusFor(player)} />
+                <FlowBox player={player} t={t} lang={lang} />
+                <GateBox player={player} t={t} lang={lang} points={points} />
+                <Dock
+                  state={viewState}
+                  die={shownDie}
+                  t={t}
+                  onRoll={() => go({ type: "ROLL" })}
+                  ctx={hasCtx ? ctxButtons : undefined}
+                  actions={
+                    <>
+                      <button type="button" className="btn" disabled={!idle} onClick={() => setDayOpen(true)}>
+                        <Ico name="sun" />
+                        {t("Day")}
+                      </button>
+                      <button type="button" className="btn" onClick={() => setShopOpen(true)}>
+                        <Ico name="bag" />
+                        {t("Shop")}
+                      </button>
+                      {(player.friends.length > 0 || player.partner) && (
+                        <button type="button" className="btn" onClick={() => setCircleOpen(true)}>
+                          <Ico name="people" />
+                          {t("Circle")}
+                        </button>
+                      )}
+                      <button type="button" className="btn" onClick={() => setLedgerOpen(true)}>
+                        <Ico name="ledger" />
+                        {t("Ledger")}
+                      </button>
+                    </>
+                  }
+                />
+              </aside>
+            )}
+            {isMobile && (
+              <nav className="mdock m-only" aria-label={t("Actions")}>
+                {hasCtx && <div className="ctx">{ctxButtons}</div>}
+                <div className="row">
+                  <BoxDie value={shownDie} rolling={state.phase === "rolling"} t={t} />
+                  <button type="button" className="btn gold roll" disabled={!idle} onClick={() => go({ type: "ROLL" })}>
+                    <Ico name="dice" />
+                    {rollLabel(viewState, t)}
+                  </button>
+                </div>
+                <div className="sec">
+                  <button type="button" className="btn" disabled={!idle} onClick={() => setDayOpen(true)}>
+                    <Ico name="sun" />
+                    {t("Day")}
+                  </button>
+                  <button type="button" className="btn" onClick={() => setShopOpen(true)}>
+                    <Ico name="bag" />
+                    {t("Shop")}
+                  </button>
+                  <button type="button" className="btn" onClick={() => setLedgerOpen(true)}>
+                    <Ico name="coin" />
+                    {t("Ledger")}
+                  </button>
+                  <button type="button" className="btn" onClick={() => setLegendOpen(true)}>
+                    <Ico name="key" />
+                    {t("Legend")}
+                  </button>
+                </div>
+              </nav>
+            )}
+          </main>
         )}
 
         {state.screen === "win" && player && (
@@ -1530,7 +1164,7 @@ export function GameFlow() {
             </p>
             <p className="muted">{t("Cash left {cash} · Turn {turn}", { cash: money(state.players[state.winner]!.cash), turn: state.turn })}</p>
             <div className="menu-actions" style={{ justifyContent: "center" }}>
-              <button className="btn btn-gold" onClick={() => { if (hasSave) setConfirmNew(true); else beginNew(); }}>{t("Play again")}</button>
+              <button className="btn btn-gold" onClick={() => go({ type: "MENU" })}>{t("Play again")}</button>
               <button className="btn btn-ghost" onClick={() => go({ type: "MENU" })}>{t("Menu")}</button>
             </div>
           </section>
@@ -1538,7 +1172,64 @@ export function GameFlow() {
       </div>
 
       {state.screen === "play" && state.phase === "card" && state.card && player && (
-        <CardModal card={state.card} player={player} turn={state.turn} t={t} onChoose={(id) => go({ type: "CHOICE", id })} />
+        state.card.payload.t === "deal" ? (
+          <DealSheet card={state.card} player={player} t={t} lang={lang} onChoose={(id) => go({ type: "CHOICE", id })} />
+        ) : (
+          <CardModal card={state.card} player={player} turn={state.turn} t={t} onChoose={(id) => go({ type: "CHOICE", id })} />
+        )
+      )}
+
+      {gateOpen && player && (
+        <>
+          {!prefersReducedMotion() && <CoinRain />}
+          <GateScene
+            player={player}
+            turn={state.turn}
+            t={t}
+            lang={lang}
+            onBoard={() => {
+              dismissGate();
+              go({ type: "ENTER" });
+            }}
+            onStay={dismissGate}
+          />
+        </>
+      )}
+
+      {friendEv && <FriendScene ev={friendEv} t={t} lang={lang} onDone={closeFriend} />}
+
+      {ledgerOpen && player && state.screen === "play" && (
+        <div className="overlay" onClick={() => setLedgerOpen(false)}>
+          <article className="rules-sheet ledger-sheet" role="dialog" aria-modal="true" aria-labelledby="ledger-title" onClick={(e) => e.stopPropagation()}>
+            <p className="kicker">{nameOf(player)}</p>
+            <h2 id="ledger-title" className="display">{t("Ledger")}</h2>
+            <LedgerBody
+              player={player}
+              state={state}
+              dispatch={go}
+              t={t}
+              lang={lang}
+              points={points}
+              onHistory={() => { setLedgerOpen(false); setHistoryOpen(true); }}
+              onFriend={(id) => { setLedgerOpen(false); setFriendId(id); }}
+            />
+            <button type="button" className="btn btn-gold" onClick={() => setLedgerOpen(false)}>{t("Close")}</button>
+          </article>
+        </div>
+      )}
+
+      {legendOpen && (
+        <div className="overlay" onClick={() => setLegendOpen(false)}>
+          <article className="rules-sheet" role="dialog" aria-modal="true" aria-labelledby="legend-title" onClick={(e) => e.stopPropagation()}>
+            <p className="kicker">{t("NETWORK MAP")}</p>
+            <h2 id="legend-title" className="display">{t("Legend")}</h2>
+            <LegendBody t={t} />
+            <div className="card-actions">
+              <button type="button" className="btn btn-ghost" onClick={() => { setLegendOpen(false); setRules(true); }}>{t("Rules")}</button>
+              <button type="button" className="btn btn-gold" onClick={() => setLegendOpen(false)}>{t("Close")}</button>
+            </div>
+          </article>
+        </div>
       )}
 
       {state.screen === "play" && state.phase === "pass" && player && (
@@ -1662,9 +1353,14 @@ export function GameFlow() {
                     </button>
                   ))}
                 </div>
-                <button type="button" className="btn btn-ghost" style={{ marginTop: "0.9rem" }} onClick={() => { setOptionsOpen(false); setIntro(0); }}>
-                  {t("See the introduction again")}
-                </button>
+                <div className="chip-row" style={{ marginTop: "0.9rem" }}>
+                  <button type="button" className="btn btn-ghost" onClick={() => { setOptionsOpen(false); replayIntro(); }}>
+                    {t("See the introduction again")}
+                  </button>
+                  <button type="button" className="btn btn-ghost" onClick={() => { setOptionsOpen(false); go({ type: "CREDITS" }); }}>
+                    {t("Credits")}
+                  </button>
+                </div>
               </>
             )}
             {optTab === "rewards" && (
@@ -1833,7 +1529,7 @@ export function GameFlow() {
             <h2 className="display" style={{ marginTop: 0 }}>{t("New game")}</h2>
             <p>{t("Start a new game? The saved table will be replaced.")}</p>
             <div className="menu-actions">
-              <button type="button" className="btn btn-ghost" onClick={() => setConfirmNew(false)}>{t("Keep the save")}</button>
+              <button type="button" className="btn btn-ghost" onClick={() => { setConfirmNew(false); setPendingPicks(null); }}>{t("Keep the save")}</button>
               <button type="button" className="btn btn-gold" onClick={beginNew}>{t("Start anyway")}</button>
             </div>
           </article>
@@ -2106,6 +1802,7 @@ export function GameFlow() {
           </article>
         </div>
       )}
+      {introMode && <IntroVideo pick={introMode} lang={lang} t={t} onLang={(l) => { setLang(l); localStorage.setItem(LANG_KEY, l); }} onDone={closeIntro} />}
       {intro === "boot" && <div className="intro-frame intro-boot" />}
       {typeof intro === "number" && (
         <div className="intro-frame" role="dialog" aria-modal="true">
