@@ -1217,6 +1217,10 @@ const long: Record<Lang, Record<string, string>> = {
       "Sora casse des jeux pour vivre et rédige la preuve avec tant de douceur que les producteurs oublient d’être en colère. Ils ont grandi en partageant une console et une heure de coucher, et pensent encore qu’une bonne nuit est une version qui échoue de façon intéressante. Le loyer est un boss qu’ils n’ont pas corrigé. Sous les blagues, une ambition précise : cesser de classer les plantages des autres et financer une porte qui se ferme quand le travail est fini. Ils veulent bien la corvée. Ils voudraient seulement qu’elle leur appartienne.",
     "from.sora": "Un plateau de test qui oublie que le soleil existe",
     "wants.sora": "Une chose qui porte encore leur nom quand le service se termine.",
+    "blurb.aoi": "Peint des menus le jour et des fresques quand le café ferme. Un espoir tranquille et têtu.",
+    "blurb.ren": "Compte chaque pièce deux fois et veut quand même une pièce plus grande que ce que les chiffres permettent.",
+    "blurb.mio": "Connaît la fleur de chaque habitué et l’ardoise qu’il fait semblant d’oublier.",
+    "blurb.sora": "Casse des jeux pour vivre et veut en sortir un qui compte.",
   },
   es: {
     "bio.aoi":
@@ -1235,6 +1239,10 @@ const long: Record<Lang, Record<string, string>> = {
       "Sora rompe juegos para vivir y escribe la prueba con tanta amabilidad que los productores olvidan enfadarse. Creció compartiendo una consola y una hora de dormir, y todavía cree que una buena noche es una versión que falla de un modo interesante. El alquiler es un jefe que no ha parcheado. Bajo los chistes hay una ambición precisa: dejar de archivar los fallos de otros y pagar una puerta que se cierre cuando el turno termina. Aceptan la faena. Solo querrían que les perteneciera.",
     "from.sora": "Una sala de pruebas que olvida que el sol existe",
     "wants.sora": "Algo que siga llevando su nombre cuando acaba el turno.",
+    "blurb.aoi": "Pinta menús de día y murales cuando cierra el café. Una esperanza callada y terca.",
+    "blurb.ren": "Cuenta cada moneda dos veces y aun así quiere una habitación más grande de lo que permiten los números.",
+    "blurb.mio": "Conoce la flor de cada habitual y la cuenta que finge olvidar.",
+    "blurb.sora": "Rompe juegos para vivir y quiere sacar uno que importe.",
   },
 };
 

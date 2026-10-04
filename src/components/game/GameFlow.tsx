@@ -12,7 +12,6 @@ import {
   blankMenu,
   cur,
   dreamOf,
-  money,
   nameOf,
   portraitOf,
   reduce,
@@ -29,11 +28,11 @@ import {
 } from "@/game/engine";
 import { arrivalLine, arrivalMood, bodyPortrait, dressedPortrait, expressionOf, outcomeLine, phraseSalt, speakerIsNpc } from "@/game/speech";
 import { DealSheet } from "./boite/DealSheet";
-import { fmtMoney } from "./boite/format";
+import { fmtMoney, localizeMoney } from "./boite/format";
 import { FriendScene, type FriendEvent } from "./boite/FriendScene";
 import { CoinRain, GateScene } from "./boite/GateScene";
 import { usePassiveHistory, type Point } from "./boite/history";
-import { prefersReducedMotion, useIsMobile } from "./boite/hooks";
+import { prefersReducedMotion, useIsMobile, useModalFocus } from "./boite/hooks";
 import { FAMILIES, IconDefs, Ico, type Family } from "./boite/icons";
 import { IntroVideo, probeIntro, type IntroPick } from "./boite/IntroVideo";
 import { MenuScreen } from "./boite/MenuScreen";
@@ -84,7 +83,7 @@ function ChoiceButtons({ card, onChoose, t }: { card: CardView; onChoose: (id: s
 
 /** Money is never shown by colour alone: amounts on green/red rows always carry a sign. */
 function signedRow(v: string, tone?: string): string {
-  if (!/^\$\d/.test(v)) return v;
+  if (!/^(\$\d|\d[\d\u202f.]*\u00a0\$)/.test(v)) return v;
   if (tone === "up") return `+${v}`;
   if (tone === "down") return `−${v}`;
   return v;
@@ -547,6 +546,9 @@ export function GameFlow() {
   const [introMode, setIntroMode] = useState<IntroPick | null>(null);
   const [pendingPicks, setPendingPicks] = useState<Pick[] | null>(null);
   const pendingFriend = useRef<Omit<FriendEvent, "after"> | null>(null);
+  // Every game action (clicks *and* keyboard shortcuts) goes through go(), which arms the friend scene.
+  const goRef = useRef<(action: Action) => void>(() => {});
+  useModalFocus();
   const [hasSave, setHasSave] = useState(false);
   const [rules, setRules] = useState(false);
   const [tutorial, setTutorial] = useState<number | null>(null);
@@ -582,7 +584,8 @@ export function GameFlow() {
   const logRef = useRef(state.log[0] ?? "");
   const stateRef = useRef(state);
   stateRef.current = state;
-  const t: TFn = (text, vars) => tr(lang, text, vars);
+  const t: TFn = (text, vars) => localizeMoney(lang, tr(lang, text, vars));
+  const money = (n: number, signed = false) => fmtMoney(lang, n, signed);
   const coach = coachView(state, tut);
   const coachRef = useRef(coach);
   coachRef.current = coach;
@@ -851,9 +854,9 @@ export function GameFlow() {
         if (s.phase === "card" && card) {
           const decline = card.choices.find((c) => c.id === "decline");
           const only = card.choices.length === 1 ? card.choices[0] : undefined;
-          if (decline) dispatch({ type: "CHOICE", id: decline.id });
+          if (decline) goRef.current({ type: "CHOICE", id: decline.id });
           else if (only && (only.id === "ok" || card.payload.t === "start" || card.payload.t === "skip")) {
-            dispatch({ type: "CHOICE", id: only.id });
+            goRef.current({ type: "CHOICE", id: only.id });
           }
         }
         return;
@@ -885,7 +888,7 @@ export function GameFlow() {
         const kind = s.card.payload.t;
         if (kind === "ascent" || kind === "summit" || kind === "exit" || kind === "rate" || kind === "life") return;
         const confirm = s.card.choices.find((c) => c.confirm) ?? s.card.choices.find((c) => c.tone === "gold");
-        if (confirm) dispatch({ type: "CHOICE", id: confirm.id });
+        if (confirm) goRef.current({ type: "CHOICE", id: confirm.id });
       }
     };
     window.addEventListener("keydown", onKey);
@@ -902,6 +905,7 @@ export function GameFlow() {
     }
     dispatch(action);
   };
+  goRef.current = go;
   const continueSave = () => {
     unlockAudio();
     const raw = localStorage.getItem(SAVE_KEY);
@@ -1958,7 +1962,7 @@ export function GameFlow() {
           </article>
         </div>
       )}
-      {introMode && <IntroVideo pick={introMode} lang={lang} t={t} onLang={(l) => { setLang(l); localStorage.setItem(LANG_KEY, l); }} onDone={closeIntro} />}
+      {introMode && <IntroVideo pick={introMode} lang={lang} t={t} onLang={(l) => { setLang(l); localStorage.setItem(LANG_KEY, l); }} onDone={closeIntro} onFail={() => { setIntroMode(null); setIntro(0); }} />}
       {intro === "boot" && <div className="intro-frame intro-boot" />}
       {typeof intro === "number" && (
         <div className="intro-frame" role="dialog" aria-modal="true">

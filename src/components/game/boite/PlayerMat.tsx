@@ -4,7 +4,7 @@
  * gauge, passive income per turn, and the dock (die + roll + secondary actions).
  */
 import type { ReactNode } from "react";
-import { FRIEND_SOCIAL_BONUS, GRIND, PASSIVE_WIN } from "@/game/data";
+import { GRIND, PASSIVE_WIN } from "@/game/data";
 import { dreamOf, nameOf, portraitOf, statement, type GameState, type Player } from "@/game/engine";
 import type { Lang } from "@/game/i18n";
 import { dressedPortrait } from "@/game/speech";
@@ -60,8 +60,10 @@ export function lineName(p: Player, t: TFn): string {
 export function SocialChip({ player, state, t, onlyFresh = false }: { player: Player; state: GameState; t: TFn; onlyFresh?: boolean }) {
   const social = player.vitals?.social;
   if (social === undefined) return null;
-  const fresh = player.friends.filter((f) => f.sinceTurn >= state.turn - 1).length;
-  const bonus = fresh ? FRIEND_SOCIAL_BONUS * fresh : 0;
+  // Joined since this player's previous turn (turn counts every player's turn), badge = Social actually gained
+  // (clamped at 100). Older saves carry no socialGain, so they show no badge rather than a made-up +10.
+  const since = state.turn - Math.max(1, state.players.length);
+  const bonus = player.friends.filter((f) => f.sinceTurn >= since).reduce((sum, f) => sum + (f.socialGain ?? 0), 0);
   if (onlyFresh && !bonus) return null;
   return (
     <span className="socialchip" title={t("Social")}>
@@ -325,7 +327,9 @@ export function StationStrip({ player, t }: { player: Player; t: TFn }) {
         {title}
         <span className="r">{t("die: 1 to 6")}</span>
       </h3>
-      <ol className="track">{stops}</ol>
+      <ol className="track" tabIndex={0} aria-label={title}>
+        {stops}
+      </ol>
     </section>
   );
 }

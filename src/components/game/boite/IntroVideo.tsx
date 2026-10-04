@@ -5,7 +5,7 @@
  * The first variant that exists wins. The desktop frame follows the real video ratio.
  * Overlay text is HTML, translated through the game's i18n. Tap advances; Skip / Escape follow SKIP_TO.
  * Reduced motion: no autoplay, the poster is shown and the text fades in.
- * If no video (or poster) exists, the caller falls back to the illustrated slides.
+ * If no video (or poster) exists, or it cannot be decoded, the caller falls back to the illustrated slides.
  */
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import type { Lang } from "@/game/i18n";
@@ -41,7 +41,11 @@ const INTRO_END = "Choose a life. The month begins.";
 
 export type IntroPick = { kind: "video" | "poster"; src: string };
 
+/** Static (Pages) builds list the files of public/intro at build time; elsewhere (dev) we probe. */
+const SHIPPED: string[] | null = typeof import.meta.env.VITE_INTRO_FILES === "string" ? String(import.meta.env.VITE_INTRO_FILES).split(",") : null;
+
 async function exists(url: string, kind: "video" | "image"): Promise<boolean> {
+  if (SHIPPED && !SHIPPED.includes(url.split("/").pop() ?? "")) return false;
   try {
     const res = await fetch(url, { method: "HEAD", cache: "no-store" });
     // dev servers answer unknown paths with the SPA page (200 text/html): reject HTML.
@@ -56,6 +60,8 @@ async function exists(url: string, kind: "video" | "image"): Promise<boolean> {
 /** Resolves what the intro can show: the best video for this screen, the poster (reduced motion), or null. */
 export async function probeIntro(reduced: boolean): Promise<IntroPick | null> {
   if (reduced) return (await exists(INTRO_FILES.poster, "image")) ? { kind: "poster", src: INTRO_FILES.poster } : null;
+  // No H.264 decoder (e.g. some Chromium builds): don't pick a video we can't play — the slides take over.
+  if (typeof document !== "undefined" && !document.createElement("video").canPlayType('video/mp4; codecs="avc1.42E01E"')) return null;
   const wide = typeof window !== "undefined" && window.matchMedia("(min-width: 760px) and (orientation: landscape)").matches;
   for (const src of [wide ? INTRO_FILES.landscape : INTRO_FILES.portrait, INTRO_FILES.fallback]) {
     if (await exists(src, "video")) return { kind: "video", src };
@@ -94,7 +100,8 @@ function Words({ text, base = 0 }: { text: string; base?: number }) {
   );
 }
 
-export function IntroVideo({ pick, lang, t, onLang, onDone }: { pick: IntroPick; lang: Lang; t: TFn; onLang: (l: Lang) => void; onDone: () => void }) {
+/** `onFail`: the video can't be played (codec, network) — the caller shows the slide intro instead, without marking it seen. */
+export function IntroVideo({ pick, lang, t, onLang, onDone, onFail }: { pick: IntroPick; lang: Lang; t: TFn; onLang: (l: Lang) => void; onDone: () => void; onFail?: () => void }) {
   const mode = pick.kind;
   const [ar, setAr] = useState<string | null>(null);
   const reduced = useReducedMotion();
@@ -181,7 +188,7 @@ export function IntroVideo({ pick, lang, t, onLang, onDone }: { pick: IntroPick;
                 const v = e.currentTarget;
                 if (v.videoWidth && v.videoHeight) setAr(`${v.videoWidth} / ${v.videoHeight}`);
               }}
-              onError={onDone}
+              onError={onFail ?? onDone}
             />
           ) : (
             <img

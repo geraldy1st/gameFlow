@@ -7,7 +7,7 @@
 import { useState } from "react";
 import { CHARACTERS, DREAMS } from "@/game/data";
 import { customPortrait, type CustomLook, type GameState, type Pick } from "@/game/engine";
-import type { Lang } from "@/game/i18n";
+import { trKey, type Lang } from "@/game/i18n";
 import { colon, fmtMoney } from "./format";
 import { Ico } from "./icons";
 import { MetroBoard } from "./MetroBoard";
@@ -235,13 +235,13 @@ export function MenuScreen({
                 </b>
                 <p>
                   <strong>{t("From")}{c2}</strong>
-                  {t(shown.from)}
+                  {trKey(lang, `from.${shown.id}`, shown.from)}
                 </p>
                 <p>
                   <strong>{t("Wants")}{c2}</strong>
-                  {t(shown.wants)}
+                  {trKey(lang, `wants.${shown.id}`, shown.wants)}
                 </p>
-                <p>{t(shown.blurb)}</p>
+                <p>{trKey(lang, `blurb.${shown.id}`, shown.blurb)}</p>
                 <button type="button" className="linkish" onClick={() => onBio(shown.id)}>
                   {t("Read their story")}
                 </button>

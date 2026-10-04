@@ -73,14 +73,14 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .brand h1 { font: 700 26px/1 var(--display); letter-spacing: .01em; margin: 0; }
 .brand p { margin: 2px 0 0; font-size: 13px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--cream); }
 .top .sp { flex: 1; }
-.chipbtn { height: 42px; padding: 0 16px; border-radius: 999px; background: var(--cream); color: var(--navy); border: var(--line); box-shadow: 0 4px 0 var(--navy); font: 600 15px var(--display); display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+.chipbtn { height: 44px; min-width: 44px; justify-content: center; padding: 0 16px; border-radius: 999px; background: var(--cream); color: var(--navy); border: var(--line); box-shadow: 0 4px 0 var(--navy); font: 600 15px var(--display); display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
 .chipbtn svg { width: 18px; height: 18px; }
 .chipbtn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--navy); }
 .chipbtn.is-on { background: var(--gold); }
 .chipbtn:disabled { background: var(--locked); color: var(--navy-soft); cursor: not-allowed; }
 
 /* ---------- buttons ---------- */
-.btn { border: var(--line); border-radius: var(--r-md); box-shadow: 0 5px 0 var(--navy); font: 600 16px/1.15 var(--display); padding: 9px 12px; min-width: 0; display: inline-flex; align-items: center; justify-content: center; gap: 8px; background: var(--cream); color: var(--navy); transition: transform .12s, box-shadow .12s; text-align: center; }
+.btn { min-height: 44px; border: var(--line); border-radius: var(--r-md); box-shadow: 0 5px 0 var(--navy); font: 600 16px/1.15 var(--display); padding: 9px 12px; min-width: 0; display: inline-flex; align-items: center; justify-content: center; gap: 8px; background: var(--cream); color: var(--navy); transition: transform .12s, box-shadow .12s; text-align: center; }
 .btn svg { width: 19px; height: 19px; flex: none; }
 .btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 0 var(--navy); }
 .btn:active:not(:disabled) { transform: translateY(4px); box-shadow: 0 1px 0 var(--navy); }
@@ -337,7 +337,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .howto .bio b { font: 700 20px var(--display); display: block; }
 .howto .bio p { font-size: 14px; font-weight: 700; color: var(--navy-soft); margin: 6px 0 0; line-height: 1.4; }
 .howto .bio p strong { color: var(--navy); }
-.howto .linkish { margin-top: 6px; }
+.howto .linkish { margin-top: 6px; min-height: 44px; display: inline-flex; align-items: center; }
 .steps { display: flex; flex-direction: column; gap: 8px; }
 .step { display: grid; grid-template-columns: 40px 1fr; gap: 10px; align-items: center; padding: 7px 10px; border: 2.5px solid var(--navy); border-radius: 14px; background: var(--paper); font-size: 14px; font-weight: 700; }
 .step i { width: 36px; height: 36px; border-radius: 10px; border: 2.5px solid var(--navy); display: grid; place-items: center; font: 700 17px var(--display); font-style: normal; }
@@ -556,7 +556,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .ev-root .matrow .p { color: var(--green-ink); }
 .ev-root .matrow .e { color: var(--brick); }
 .ev-root .ctl { position: absolute; display: flex; gap: 12px; z-index: 5; left: 50%; bottom: 24px; }
-.ev-root .ctl .btn { font-size: 19px; padding: 11px 20px; white-space: nowrap; }
+.ev-root .ctl .btn { font-size: 19px; padding: 11px 20px; white-space: nowrap; min-height: 48px; }
 .ev-root .ctl .btn span { display: inline-flex; }
 .ev-root .skiphint { right: 22px; top: 18px; font: 800 13px var(--body); color: var(--cream); background: rgba(27,42,65,.8); padding: 6px 12px; border-radius: 999px; }
 .ev-root .fx { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
@@ -599,11 +599,11 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .intro-v .top { position: absolute; left: 0; right: 0; top: 0; height: auto; display: flex; justify-content: space-between; align-items: center; padding: max(14px, env(safe-area-inset-top)) 14px 0; pointer-events: none; }
 .intro-v .top > * { pointer-events: auto; }
 .intro-v .langs { display: flex; gap: 4px; background: rgba(27,42,65,.8); border-radius: 999px; padding: 4px; }
-.intro-v .langs button { border: 0; background: transparent; color: var(--cream); font: 800 12px var(--body); letter-spacing: .06em; padding: 6px 9px; border-radius: 999px; }
+.intro-v .langs button { min-width: 44px; min-height: 44px; border: 0; background: transparent; color: var(--cream); font: 800 12px var(--body); letter-spacing: .06em; padding: 6px 9px; border-radius: 999px; }
 .intro-v .langs button[aria-pressed="true"] { background: var(--cream); color: var(--navy); }
 .intro-v .right { display: flex; gap: 8px; }
-.intro-v .ib, .intro-v .pill { background: var(--cream); color: var(--navy); border: 3px solid var(--navy); box-shadow: 0 4px 0 var(--navy); height: 42px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; }
-.intro-v .ib { width: 42px; }
+.intro-v .ib, .intro-v .pill { background: var(--cream); color: var(--navy); border: 3px solid var(--navy); box-shadow: 0 4px 0 var(--navy); height: 44px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; }
+.intro-v .ib { width: 44px; }
 .intro-v .ib svg { width: 20px; height: 20px; }
 .intro-v .pill { padding: 0 16px; font: 600 16px var(--display); gap: 6px; }
 .intro-v .pill svg { width: 16px; height: 16px; }
@@ -679,7 +679,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   .brand p { display: none; }
   .lid { width: 38px; height: 38px; }
   .lid svg { width: 24px; height: 24px; }
-  .chipbtn { height: 38px; padding: 0 12px; font-size: 14px; }
+  .chipbtn { height: 44px; padding: 0 12px; font-size: 14px; }
   .gf-app.is-play .gf-shell { height: auto; }
   .s-play { flex-direction: column; padding: 0 12px 196px; gap: 10px; }
   .mhud { display: block; padding: 10px 12px; }
@@ -710,6 +710,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   .zoom svg { width: 20px; height: 20px; }
   .strip { display: block; padding: 12px 0 10px; overflow: hidden; }
   .strip .h3 { padding: 0 14px; margin-bottom: 0; }
+  .track:focus-visible { outline: 4px solid var(--gold); outline-offset: -4px; border-radius: 12px; }
   .track { display: flex; gap: 0; overflow-x: auto; padding: 46px 14px 4px; margin: 0; list-style: none; scroll-snap-type: x mandatory; scrollbar-width: none; position: relative; }
   .tstop { flex: none; width: 82px; display: flex; flex-direction: column; align-items: center; position: relative; scroll-snap-align: start; }
   .tstop::before { content: ""; position: absolute; top: 30px; left: 0; right: 0; height: 12px; background: var(--navy); z-index: 0; }
@@ -723,7 +724,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   .tstop.here .tile { outline: 4px solid var(--gold); outline-offset: 3px; }
   .tstop .mpawn { position: absolute; top: -44px; z-index: 3; width: 34px; height: 34px; border-radius: 50%; border: 3px solid var(--navy); overflow: hidden; background: var(--coral); }
   .tstop .mpawn img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 12%; }
-  .tstop.past { opacity: .55; }
+  /* passed stop: fade the tile and rail only (non-text, ≥ 3:1); the label stays readable (navy-soft on cream ≈ 7.6:1) */
+  .tstop.past .tile, .tstop.past::before { opacity: .55; }
+  .tstop.past b { color: var(--navy-soft); }
   .mdock { display: block; position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; padding: 10px 12px calc(14px + env(safe-area-inset-bottom)); background: var(--felt-2); border-top: 3px solid var(--navy); box-shadow: 0 -8px 20px rgba(0,0,0,.2); }
   .mdock .ctx { margin-bottom: 10px; }
   .mdock .row { display: grid; grid-template-columns: 74px 1fr; gap: 10px; align-items: center; }
@@ -885,7 +888,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .tut button:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; box-shadow: 0 0 0 6px var(--navy); }
 .tut-link { margin-top: 12px; background: none; border: 0; font: 800 15px var(--body); color: var(--navy); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; padding: 6px; }
 
-.tut-skip { position: absolute; top: 11px; right: 22px; height: 42px; padding: 0 16px; border-radius: 999px; background: var(--cream); border: 3px solid var(--navy); cursor: pointer;
+.tut-skip { position: absolute; top: 11px; right: 22px; height: 44px; padding: 0 16px; border-radius: 999px; background: var(--cream); border: 3px solid var(--navy); cursor: pointer;
   box-shadow: 0 4px 0 var(--navy); font: 600 15px var(--display); color: var(--navy); display: inline-flex; align-items: center; gap: 7px; z-index: 3; }
 .tut-skip svg { width: 16px; height: 16px; }
 .gf-app.tuto-on .top .chipbtn { visibility: hidden; }
@@ -981,3 +984,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   .tdone .row2 .tut-btn { height: 50px; font-size: 19px; padding: 0 18px; }
 }
 @media (prefers-reduced-motion: reduce) { .tut-cf, .tut-coin { display: none; } }
+
+/* modal containers receive programmatic focus (DEF-GF-03); their buttons keep the gold focus ring */
+[role="dialog"][tabindex="-1"]:focus { outline: none; }

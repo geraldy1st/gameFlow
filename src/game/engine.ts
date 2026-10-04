@@ -134,6 +134,8 @@ export interface FriendState {
   loyalty: number;
   role?: "friend" | "partner";
   sinceTurn: number;
+  /** Social actually gained when they joined (bonus clamped at 100). Absent on older saves. */
+  socialGain?: number;
   earned: number;
   spent: number;
   likes: number;
@@ -2224,12 +2226,11 @@ function doChoice(s: GameState, id: string): GameState {
     const role = id === "biz" ? "partner" : "friend";
     const name = friendDef(payload.id).name;
     return finish(
-      withP(s, (pl) => ({
-        ...pl,
-        friends: [...pl.friends, blankFriend(payload.id, role, s.turn)],
-        calm: 2,
-        vitals: bumpVitals(pl.vitals, { social: FRIEND_SOCIAL_BONUS }),
-      })),
+      withP(s, (pl) => {
+        const vitals = bumpVitals(pl.vitals, { social: FRIEND_SOCIAL_BONUS });
+        const socialGain = Math.max(0, vitals.social - (pl.vitals?.social ?? 50));
+        return { ...pl, friends: [...pl.friends, { ...blankFriend(payload.id, role, s.turn), socialGain }], calm: 2, vitals };
+      }),
       role === "partner" ? `${name} joins as a business partner. +$${ALLY_INCOME}/mo.` : `${name} joins your circle.`,
       role === "partner" ? "proud" : "happy",
     );
@@ -3196,7 +3197,12 @@ function hydratePlayer(raw: Player): Player {
     goalReason,
     capstone,
     custom: raw.custom ?? null,
-    friends: (raw.friends ?? []).map((f) => ({
+    // DEF-GF-04: tolerate partial saves (missing arrays / cash, unknown friend ids) instead of crashing.
+    cash: Number.isFinite(Number(raw.cash)) ? Number(raw.cash) : 0,
+    children: Array.isArray(raw.children) ? raw.children : [],
+    assets: Array.isArray(raw.assets) ? raw.assets : [],
+    liabilities: Array.isArray(raw.liabilities) ? raw.liabilities : [],
+    friends: (Array.isArray(raw.friends) ? raw.friends : []).filter((f) => FRIENDS.some((d) => d.id === f?.id)).map((f) => ({
       ...f,
       role: f.role === "partner" ? "partner" : f.role ?? "friend",
       sinceTurn: typeof f.sinceTurn === "number" ? f.sinceTurn : 1,
