@@ -424,21 +424,26 @@ export function FriendScene({ ev, t, lang, onDone }: { ev: FriendEvent; t: TFn; 
     let raf = 0;
     let scene: ReturnType<typeof build> = null;
     let finished = false;
+    let gen = 0; // bumps on every (re)play so a stale `finished` promise can't end a newer run
     const finish = () => {
-      if (!scene) return;
+      if (!scene || finished) return;
       finished = true;
+      cancelAnimationFrame(raf);
+      raf = 0;
       scene.update(scene.total);
       setDone(true);
       window.setTimeout(() => stageRef.current?.querySelector<HTMLButtonElement>(".js-next")?.focus({ preventScroll: true }), 0);
     };
+    // Drive the counters from the scene clock (the longest-running animation), not anims[0],
+    // which ends long before the scene does. Completion itself comes from Animation.finished.
     const tick = () => {
-      if (!scene) return;
-      const tm = Number(scene.anims[0]?.currentTime ?? 0);
+      if (!scene || finished) return;
+      const tm = Math.max(0, ...scene.anims.map((a) => Number(a.currentTime ?? 0)));
       scene.update(tm);
-      if (tm < scene.total) raf = requestAnimationFrame(tick);
-      else finish();
+      raf = requestAnimationFrame(tick);
     };
     const skip = () => {
+      if (finished) return;
       cancelAnimationFrame(raf);
       scene?.anims.forEach((a) => a.finish());
       finish();
@@ -448,12 +453,19 @@ export function FriendScene({ ev, t, lang, onDone }: { ev: FriendEvent; t: TFn; 
       scene?.cancel();
       finished = false;
       setDone(false);
+      const my = ++gen;
       scene = buildRef.current();
       if (!scene) return;
-      if (prefersReducedMotion()) {
+      if (prefersReducedMotion() || scene.anims.length === 0) {
         skip();
         return;
       }
+      Promise.all(scene.anims.map((a) => a.finished)).then(
+        () => {
+          if (my === gen) finish();
+        },
+        () => {}, // cancelled (replay / unmount)
+      );
       raf = requestAnimationFrame(tick);
     };
     ctl.current = { skip, play, done: () => finished };
@@ -468,6 +480,7 @@ export function FriendScene({ ev, t, lang, onDone }: { ev: FriendEvent; t: TFn; 
     const fallback = window.setTimeout(start, 400);
     return () => {
       window.clearTimeout(fallback);
+      gen++;
       cancelAnimationFrame(raf);
       scene?.cancel();
     };
@@ -520,8 +533,7 @@ export function FriendScene({ ev, t, lang, onDone }: { ev: FriendEvent; t: TFn; 
             className="btn gold js-next"
             onClick={(e) => {
               e.stopPropagation();
-              if (ctl.current && !ctl.current.done()) ctl.current.skip();
-              else onDone();
+              onDone(); // "Continue" always closes in one action, even mid-animation
             }}
           >
             {t("Continue")}
