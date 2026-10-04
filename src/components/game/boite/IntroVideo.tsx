@@ -41,7 +41,11 @@ const INTRO_END = "Choose a life. The month begins.";
 
 export type IntroPick = { kind: "video" | "poster"; src: string };
 
+/** Static (Pages) builds list the files of public/intro at build time; elsewhere (dev) we probe. */
+const SHIPPED: string[] | null = typeof import.meta.env.VITE_INTRO_FILES === "string" ? String(import.meta.env.VITE_INTRO_FILES).split(",") : null;
+
 async function exists(url: string, kind: "video" | "image"): Promise<boolean> {
+  if (SHIPPED && !SHIPPED.includes(url.split("/").pop() ?? "")) return false;
   try {
     const res = await fetch(url, { method: "HEAD", cache: "no-store" });
     // dev servers answer unknown paths with the SPA page (200 text/html): reject HTML.

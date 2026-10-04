@@ -5,7 +5,7 @@
  * the Vercel build are unchanged. Sets VITE_STATIC=1 and serves under
  * PAGES_BASE (default `/gameFlow/`, matching https://<user>.github.io/gameFlow/).
  */
-import { copyFileSync, existsSync } from "node:fs";
+import { copyFileSync, existsSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import type { Plugin } from "vite";
 import { defineConfig } from "vite";
@@ -14,6 +14,14 @@ import tailwindcss from "@tailwindcss/vite";
 
 const base = process.env.PAGES_BASE ?? "/gameFlow/";
 const outDir = resolve(import.meta.dirname, "dist-pages");
+/** Intro media actually shipped, so the client never HEAD-probes a missing variant (no console 404). */
+const introFiles = (() => {
+  try {
+    return readdirSync(resolve(import.meta.dirname, "public/intro")).join(",");
+  } catch {
+    return "";
+  }
+})();
 
 /**
  * Game code references public assets as root-absolute strings ("/game/…").
@@ -50,7 +58,7 @@ export default defineConfig({
   envDir: import.meta.dirname,
   base,
   resolve: { tsconfigPaths: true },
-  define: { "import.meta.env.VITE_STATIC": JSON.stringify("1") },
+  define: { "import.meta.env.VITE_STATIC": JSON.stringify("1"), "import.meta.env.VITE_INTRO_FILES": JSON.stringify(introFiles) },
   plugins: [basePublicAssets(), tailwindcss(), viteReact(), spaFallback()],
   build: { outDir, emptyOutDir: true },
 });
