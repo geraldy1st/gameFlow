@@ -1,3 +1,5 @@
+import { UI_FR, UI_ES } from "./i18n-ui";
+
 export type Lang = "en" | "fr" | "es";
 export const LANG_KEY = "gameflow-lang";
 
@@ -1236,6 +1238,9 @@ const long: Record<Lang, Record<string, string>> = {
   },
 };
 
+const FR: Record<string, string> = { ...UI_FR, ...fr };
+const ES: Record<string, string> = { ...UI_ES, ...es };
+
 export function readLang(): Lang {
   try {
     const v = localStorage.getItem(LANG_KEY);
@@ -1247,7 +1252,7 @@ export function readLang(): Lang {
 }
 
 export function tr(lang: Lang, text: string, vars?: Record<string, string | number>): string {
-  const table = lang === "fr" ? fr : lang === "es" ? es : null;
+  const table = lang === "fr" ? FR : lang === "es" ? ES : null;
   let s = (table && table[text]) || text;
   if (vars) {
     for (const [k, v] of Object.entries(vars)) s = s.split(`{${k}}`).join(String(v));
