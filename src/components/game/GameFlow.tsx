@@ -1805,7 +1805,7 @@ export function GameFlow() {
           </article>
         </div>
       )}
-      {introMode && <IntroVideo pick={introMode} lang={lang} t={t} onLang={(l) => { setLang(l); localStorage.setItem(LANG_KEY, l); }} onDone={closeIntro} />}
+      {introMode && <IntroVideo pick={introMode} lang={lang} t={t} onLang={(l) => { setLang(l); localStorage.setItem(LANG_KEY, l); }} onDone={closeIntro} onFail={() => { setIntroMode(null); setIntro(0); }} />}
       {intro === "boot" && <div className="intro-frame intro-boot" />}
       {typeof intro === "number" && (
         <div className="intro-frame" role="dialog" aria-modal="true">
