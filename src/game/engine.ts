@@ -3062,7 +3062,12 @@ function hydratePlayer(raw: Player): Player {
     goalReason,
     capstone,
     custom: raw.custom ?? null,
-    friends: (raw.friends ?? []).map((f) => ({
+    // DEF-GF-04: tolerate partial saves (missing arrays / cash, unknown friend ids) instead of crashing.
+    cash: Number.isFinite(Number(raw.cash)) ? Number(raw.cash) : 0,
+    children: Array.isArray(raw.children) ? raw.children : [],
+    assets: Array.isArray(raw.assets) ? raw.assets : [],
+    liabilities: Array.isArray(raw.liabilities) ? raw.liabilities : [],
+    friends: (Array.isArray(raw.friends) ? raw.friends : []).filter((f) => FRIENDS.some((d) => d.id === f?.id)).map((f) => ({
       ...f,
       role: f.role === "partner" ? "partner" : f.role ?? "friend",
       sinceTurn: typeof f.sinceTurn === "number" ? f.sinceTurn : 1,
