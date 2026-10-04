@@ -724,7 +724,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   .tstop.here .tile { outline: 4px solid var(--gold); outline-offset: 3px; }
   .tstop .mpawn { position: absolute; top: -44px; z-index: 3; width: 34px; height: 34px; border-radius: 50%; border: 3px solid var(--navy); overflow: hidden; background: var(--coral); }
   .tstop .mpawn img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 12%; }
-  .tstop.past { opacity: .55; }
+  /* passed stop: fade the tile and rail only (non-text, ≥ 3:1); the label stays readable (navy-soft on cream ≈ 7.6:1) */
+  .tstop.past .tile, .tstop.past::before { opacity: .55; }
+  .tstop.past b { color: var(--navy-soft); }
   .mdock { display: block; position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; padding: 10px 12px calc(14px + env(safe-area-inset-bottom)); background: var(--felt-2); border-top: 3px solid var(--navy); box-shadow: 0 -8px 20px rgba(0,0,0,.2); }
   .mdock .ctx { margin-bottom: 10px; }
   .mdock .row { display: grid; grid-template-columns: 74px 1fr; gap: 10px; align-items: center; }
