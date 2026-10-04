@@ -189,7 +189,12 @@ describe("training mode (tutorial/RULES.md §13)", () => {
       expect(t).toBeNull();
       return rest;
     };
-    const stripVitals = (s: GameState) => ({ ...strip(s), players: s.players.map(({ vitals: _v, ...p }) => p) });
+    // main@4803db0 reference: drop what the redesign intentionally adds (vitals with the Social bonus, and the
+    // per-friend socialGain record used by the mat badge, DEF-GF-05)
+    const stripVitals = (s: GameState) => ({
+      ...strip(s),
+      players: s.players.map(({ vitals: _v, ...p }) => ({ ...p, friends: p.friends.map(({ socialGain: _g, ...f }) => f) })),
+    });
     for (const [name, picks] of Object.entries(rosters)) {
       for (const seed of REGRESSION_SEEDS) {
         const key = `${name}:${seed}` as keyof typeof fixture.full;
