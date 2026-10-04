@@ -31,7 +31,7 @@ import { fmtMoney, localizeMoney } from "./boite/format";
 import { FriendScene, type FriendEvent } from "./boite/FriendScene";
 import { CoinRain, GateScene } from "./boite/GateScene";
 import { usePassiveHistory, type Point } from "./boite/history";
-import { prefersReducedMotion, useIsMobile } from "./boite/hooks";
+import { prefersReducedMotion, useIsMobile, useModalFocus } from "./boite/hooks";
 import { FAMILIES, IconDefs, Ico, type Family } from "./boite/icons";
 import { IntroVideo, probeIntro, type IntroPick } from "./boite/IntroVideo";
 import { MenuScreen } from "./boite/MenuScreen";
@@ -539,6 +539,7 @@ export function GameFlow() {
   const pendingFriend = useRef<Omit<FriendEvent, "after"> | null>(null);
   // Every game action (clicks *and* keyboard shortcuts) goes through go(), which arms the friend scene.
   const goRef = useRef<(action: Action) => void>(() => {});
+  useModalFocus();
   const [hasSave, setHasSave] = useState(false);
   const [rules, setRules] = useState(false);
   const [tutorial, setTutorial] = useState<number | null>(null);

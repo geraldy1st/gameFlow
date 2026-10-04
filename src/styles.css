@@ -838,3 +838,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 @media (prefers-reduced-motion: reduce) {
   .intro-v .cap-in > div > .kicker, .intro-v .w, .intro-v .endc > * { animation: intro-fade .32s ease-out both !important; }
 }
+
+/* modal containers receive programmatic focus (DEF-GF-03); their buttons keep the gold focus ring */
+[role="dialog"][tabindex="-1"]:focus { outline: none; }
