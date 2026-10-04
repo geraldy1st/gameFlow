@@ -538,6 +538,8 @@ export function GameFlow() {
   const [introMode, setIntroMode] = useState<IntroPick | null>(null);
   const [pendingPicks, setPendingPicks] = useState<Pick[] | null>(null);
   const pendingFriend = useRef<Omit<FriendEvent, "after"> | null>(null);
+  // Every game action (clicks *and* keyboard shortcuts) goes through go(), which arms the friend scene.
+  const goRef = useRef<(action: Action) => void>(() => {});
   const [hasSave, setHasSave] = useState(false);
   const [rules, setRules] = useState(false);
   const [tutorial, setTutorial] = useState<number | null>(null);
@@ -824,9 +826,9 @@ export function GameFlow() {
         if (s.phase === "card" && card) {
           const decline = card.choices.find((c) => c.id === "decline");
           const only = card.choices.length === 1 ? card.choices[0] : undefined;
-          if (decline) dispatch({ type: "CHOICE", id: decline.id });
+          if (decline) goRef.current({ type: "CHOICE", id: decline.id });
           else if (only && (only.id === "ok" || card.payload.t === "start" || card.payload.t === "skip")) {
-            dispatch({ type: "CHOICE", id: only.id });
+            goRef.current({ type: "CHOICE", id: only.id });
           }
         }
         return;
@@ -858,7 +860,7 @@ export function GameFlow() {
         const kind = s.card.payload.t;
         if (kind === "ascent" || kind === "summit" || kind === "exit" || kind === "rate" || kind === "life") return;
         const confirm = s.card.choices.find((c) => c.confirm) ?? s.card.choices.find((c) => c.tone === "gold");
-        if (confirm) dispatch({ type: "CHOICE", id: confirm.id });
+        if (confirm) goRef.current({ type: "CHOICE", id: confirm.id });
       }
     };
     window.addEventListener("keydown", onKey);
@@ -875,6 +877,7 @@ export function GameFlow() {
     }
     dispatch(action);
   };
+  goRef.current = go;
   const continueSave = () => {
     unlockAudio();
     const raw = localStorage.getItem(SAVE_KEY);
