@@ -8,7 +8,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { LIFESTYLE, SMALL_DEALS, TRAINING_COMPARE, TRAINING_DEAL, TRAINING_DEAL_CAP, TRAINING_MONTHLY_CAP, TRAINING_SPEND, TRAINING_TURNS } from "@/game/data";
 import { cur, nameOf, portraitOf, statement, type GameState, type Player } from "@/game/engine";
-import type { Lang } from "@/game/i18n";
+import { tr, type Lang } from "@/game/i18n";
 import { dressedPortrait } from "@/game/speech";
 import { fmtMoney } from "./format";
 import { Ico } from "./icons";
@@ -157,7 +157,7 @@ export function TrainingCoach(props: TrainingCoachProps) {
     if (id.endsWith("roll")) return props.onRoll();
     if (id === "t1pawn") return props.onChoose("rest");
     if (id === "t2pay") return props.onChoose("ok");
-    if (id === "t3deal") return props.onChoose("accept", { id: "t3asset", turn: 3 });
+    // t3deal: no default action. The player must pick "Buy it" or "Decline" on the card itself.
     if (id === "t3asset") return props.onPostDone();
     if (id === "t4life") return props.onChoose("decline");
     if (id === "t5gate") return props.onFinish();
@@ -338,6 +338,18 @@ export function TrainingCoach(props: TrainingCoachProps) {
     });
   };
 
+  // Deal choice: focus lands on "Buy it", but a keyboard activation only counts once the card has been
+  // on screen for a moment, so an Enter / Space carried over from the previous step can never buy by accident.
+  const dealShownAt = useRef(0);
+  useEffect(() => {
+    if (view.k === "bubble" && view.id === "t3deal") dealShownAt.current = performance.now();
+  }, [stepKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const dealPick = (e: React.MouseEvent, id: "accept" | "decline") => {
+    const keyboard = e.detail === 0;
+    if (keyboard && performance.now() - dealShownAt.current < 700) return;
+    props.onChoose(id, id === "accept" ? { id: "t3asset", turn: 3 } : undefined);
+  };
+
   const blockClick = (e: React.MouseEvent) => {
     if (view.k !== "bubble" || !view.id.endsWith("roll") || !layout?.spot) return;
     const s = layout.spot;
@@ -378,11 +390,16 @@ export function TrainingCoach(props: TrainingCoachProps) {
                     <div className="row nomob"><span>{T.deal.note}</span><span className="num">{T.deal.none}</span></div>
                   </div>
                   <div className="cap"><Ico name="lock" />{fill(T.deal.cap, { cap: m(TRAINING_DEAL_CAP) })}</div>
-                  <div className="choice">
-                    <button type="button" className="tut-btn" onClick={() => props.onChoose("accept", { id: "t3asset", turn: 3 })}>
-                      {T.deal.buy} · <span className="num">{m(down)}</span>
+                  <div className="choice" role="group" aria-label={fill(T.pill, { n: 3 })}>
+                    <button
+                      type="button"
+                      className="tut-btn"
+                      ref={primaryRef}
+                      onClick={(e) => dealPick(e, "accept")}
+                    >
+                      {tr(lang, "Buy it")} · <span className="num">{m(down)}</span>
                     </button>
-                    <button type="button" className="tut-btn ghost" onClick={() => props.onChoose("decline")}>{T.deal.decline}</button>
+                    <button type="button" className="tut-btn ghost" onClick={(e) => dealPick(e, "decline")}>{tr(lang, "Decline")}</button>
                   </div>
                 </div>
               </article>
@@ -489,7 +506,9 @@ export function TrainingCoach(props: TrainingCoachProps) {
                 <b key={i} className={i + 1 < turnNo ? "on" : i + 1 === turnNo ? "cur" : ""} />
               ))}
             </div>
-            <button type="button" className="tut-btn" ref={primaryRef} onClick={primary}>{btnLabel}</button>
+            {view.id !== "t3deal" && (
+              <button type="button" className="tut-btn" ref={primaryRef} onClick={primary}>{btnLabel}</button>
+            )}
           </div>
           {view.id === "t5gate" && (
             <div className="tut-note"><Ico name="replay" /><span>{T.replayNote}</span></div>
