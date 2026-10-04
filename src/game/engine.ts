@@ -16,6 +16,7 @@ import {
   LOAN_PAYMENT,
   MAX_CHILDREN,
   MAX_FRIENDS,
+  FRIEND_SOCIAL_BONUS,
   PARTNERS,
   PASSIVE_WIN,
   PREMIUM_DEALS,
@@ -2089,7 +2090,12 @@ function doChoice(s: GameState, id: string): GameState {
     const role = id === "biz" ? "partner" : "friend";
     const name = friendDef(payload.id).name;
     return finish(
-      withP(s, (pl) => ({ ...pl, friends: [...pl.friends, blankFriend(payload.id, role, s.turn)], calm: 2 })),
+      withP(s, (pl) => ({
+        ...pl,
+        friends: [...pl.friends, blankFriend(payload.id, role, s.turn)],
+        calm: 2,
+        vitals: bumpVitals(pl.vitals, { social: FRIEND_SOCIAL_BONUS }),
+      })),
       role === "partner" ? `${name} joins as a business partner. +$${ALLY_INCOME}/mo.` : `${name} joins your circle.`,
       role === "partner" ? "proud" : "happy",
     );

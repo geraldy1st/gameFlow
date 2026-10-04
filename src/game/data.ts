@@ -118,6 +118,8 @@ export const LOAN_PAYMENT = 100;
 export const CHILD_COST = 480;
 export const MAX_CHILDREN = 3;
 export const MAX_FRIENDS = 5;
+/** Social gained when someone joins your circle (friend or business partner). Same size as a meetup. */
+export const FRIEND_SOCIAL_BONUS = 10;
 
 export const CHARACTERS: CharacterDef[] = [
   {
