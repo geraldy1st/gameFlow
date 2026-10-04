@@ -327,7 +327,9 @@ export function StationStrip({ player, t }: { player: Player; t: TFn }) {
         {title}
         <span className="r">{t("die: 1 to 6")}</span>
       </h3>
-      <ol className="track">{stops}</ol>
+      <ol className="track" tabIndex={0} aria-label={title}>
+        {stops}
+      </ol>
     </section>
   );
 }
