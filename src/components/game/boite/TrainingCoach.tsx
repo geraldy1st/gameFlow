@@ -124,6 +124,8 @@ export function TrainingCoach(props: TrainingCoachProps) {
   const primaryRef = useRef<HTMLButtonElement>(null);
   const [layout, setLayout] = useState<Layout | null>(null);
   const [tick, setTick] = useState(0);
+  /** Mobile, short screens: the card drops its secondary lines so its buttons stay above the bubble (DEF-TUT-05). */
+  const [tight, setTight] = useState<string | null>(null);
   const stepKey = view.k === "bubble" ? `${view.id}` : view.k === "nod" ? "nod" : view.k;
   const isCard = view.k === "bubble" && (view.id === "t3deal" || view.id === "t4life");
   const showHost = isCard || view.k === "nod";
@@ -177,7 +179,20 @@ export function TrainingCoach(props: TrainingCoachProps) {
       const hw = hostRef.current.offsetWidth;
       const hh = hostRef.current.offsetHeight;
       const left = mobile ? (W - hw) / 2 : Math.max(16, Math.min(W - hw - 30, W / 2 - hw / 2 + 210));
-      const top = mobile ? 66 : Math.max(84, (H - hh) / 2 - 10);
+      let top = mobile ? 66 : Math.max(84, (H - hh) / 2 - 10);
+      if (mobile && view.k === "bubble" && bubbleRef.current) {
+        // DEF-TUT-05: the bottom-sheet bubble must never cover the card's buttons. First drop the card's secondary
+        // lines, then lift the card (down to 8 px from the top) so it ends above the bubble.
+        // What must stay clear is the card's choice row (the impact panel under the deal card may slide below).
+        const limit = H - bubbleRef.current.offsetHeight - 8;
+        const row = hostRef.current.querySelector<HTMLElement>(".choice") ?? hostRef.current;
+        const need = row.getBoundingClientRect().bottom - hostRef.current.getBoundingClientRect().top;
+        if (top + need > limit && tight !== stepKey) {
+          setTight(stepKey);
+          return;
+        }
+        top = Math.max(8, Math.min(top, limit - need));
+      }
       host = { left, top };
       rect = { left, top, width: hw, height: hh };
     } else if (view.k === "bubble") {
@@ -240,7 +255,7 @@ export function TrainingCoach(props: TrainingCoachProps) {
       }
     }
     setLayout({ spot, bubble, tail, side, lifted, host });
-  }, [stepKey, mobile, tick, showHost, view.k, lang, p.cash, p.position]);
+  }, [stepKey, mobile, tick, showHost, view.k, lang, p.cash, p.position, tight]);
 
   // Re-measure on resize and once the board has settled (pawn hop, sheet transitions).
   useEffect(() => {
@@ -375,7 +390,7 @@ export function TrainingCoach(props: TrainingCoachProps) {
       )}
 
       {showHost && (
-        <div className="tut-cardhost" ref={hostRef} style={layout?.host ?? { visibility: "hidden" }} key={`host-${stepKey}`}>
+        <div className={`tut-cardhost ${tight === stepKey ? "tight" : ""}`} ref={hostRef} style={layout?.host ?? { visibility: "hidden" }} key={`host-${stepKey}`}>
           {view.k === "bubble" && view.id === "t3deal" && (
             <>
               <article className="tcard deal" aria-labelledby="tcard-h">

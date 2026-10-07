@@ -979,6 +979,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   .tcard.deal .story, .tcard .row.nomob { display: none; } .tcard.deal .bd { padding-top: 10px; } .tcard .row { padding: 4px 10px; } .tcard .choice { margin-top: 10px; }
   .tcard .choice .tut-btn { height: 42px; }
   .impact2 { width: 300px; padding: 8px 12px; } .impact2 h5 { font-size: 16px; margin-bottom: 2px; } .impact2 .dl { padding: 4px 0; font-size: 13px; }
+  /* DEF-TUT-05: short screens, the card sheds its secondary lines so its buttons clear the bubble */
+  .tut-cardhost.tight .tcard .story, .tut-cardhost.tight .tcard .cmp .sub { display: none; }
+  .tut-cardhost.tight .tcard .hd { padding: 8px 14px; } .tut-cardhost.tight .tcard .bd { padding-top: 8px; }
+  .tut-cardhost.tight .impact2 .dl { padding: 2px 0; }
   .tdone { padding: 22px 18px 18px; }
   .tdone h2 { font-size: 36px; } .tdone li { font-size: 14.5px; }
   .tdone .row2 .tut-btn { height: 50px; font-size: 19px; padding: 0 18px; }
