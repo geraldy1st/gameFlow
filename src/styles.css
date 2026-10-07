@@ -973,11 +973,11 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   .tut-head { padding-left: 70px; margin-top: -4px; }
   .tut-bubble h3 { font-size: 22px; margin-top: 8px; }
   .tut-bubble p { font-size: 15px; }
-  .tut-skip { top: 12px; right: 10px; height: 40px; padding: 0 12px; font-size: 14px; }
+  .tut-skip { top: 10px; right: 10px; height: 44px; padding: 0 12px; font-size: 14px; }
   .tcard { width: 300px; } .tcard h4 { font-size: 22px; }
   .tut-cardhost { flex-direction: column; gap: 10px; align-items: center; }
   .tcard.deal .story, .tcard .row.nomob { display: none; } .tcard.deal .bd { padding-top: 10px; } .tcard .row { padding: 4px 10px; } .tcard .choice { margin-top: 10px; }
-  .tcard .choice .tut-btn { height: 42px; }
+  .tcard .choice .tut-btn { height: 44px; } /* DEF-TUT-07: 44 px touch targets */
   .impact2 { width: 300px; padding: 8px 12px; } .impact2 h5 { font-size: 16px; margin-bottom: 2px; } .impact2 .dl { padding: 4px 0; font-size: 13px; }
   /* DEF-TUT-05: short screens, the card sheds its secondary lines so its buttons clear the bubble */
   .tut-cardhost.tight .tcard .story, .tut-cardhost.tight .tcard .cmp .sub { display: none; }
