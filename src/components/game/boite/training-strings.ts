@@ -31,7 +31,11 @@ export interface TrainingStrings {
   };
   nod: { tag: string; title: string; story: string };
   done: { kicker: string; title: string; r1: string; r2: string; r3: string; play: string; replay: string; restore: string };
-  replay: { title: string; body: string; go: string; cancel: string };
+  /**
+   * body: the current game is set aside (first replay). bodyReplace: same, and it replaces the copy set aside last time.
+   * bodyKeep: the training restarts, the saved game stays set aside. bodyRestart: the training restarts (no saved game).
+   */
+  replay: { title: string; body: string; bodyReplace: string; bodyKeep: string; bodyRestart: string; go: string; cancel: string };
 }
 
 const fr: TrainingStrings = {
@@ -77,6 +81,9 @@ const fr: TrainingStrings = {
   replay: {
     title: "Revoir le tutoriel",
     body: "Une partie d’entraînement de 5 tours démarre avec le même personnage et le même rêve. Ta partie en cours est mise de côté : tu pourras la reprendre à la fin ou depuis Options.",
+    bodyReplace: "Une partie d’entraînement de 5 tours démarre avec le même personnage et le même rêve. Ta partie en cours est mise de côté à la place de celle gardée la dernière fois : tu pourras la reprendre à la fin ou depuis Options.",
+    bodyKeep: "L’entraînement de 5 tours recommence au tour 1. Ta partie sauvegardée reste de côté : tu pourras la reprendre à la fin ou depuis Options.",
+    bodyRestart: "L’entraînement de 5 tours recommence au tour 1. La partie d’entraînement actuelle sera remplacée.",
     go: "Lancer l’entraînement", cancel: "Annuler",
   },
 };
@@ -124,6 +131,9 @@ const en: TrainingStrings = {
   replay: {
     title: "Replay the tutorial",
     body: "A 5-turn training game starts with the same character and dream. Your current game is set aside: you can pick it up again at the end or from Options.",
+    bodyReplace: "A 5-turn training game starts with the same character and dream. Your current game is set aside, in place of the one kept last time: you can pick it up again at the end or from Options.",
+    bodyKeep: "The 5-turn training starts again from turn 1. Your saved game stays set aside: you can pick it up again at the end or from Options.",
+    bodyRestart: "The 5-turn training starts again from turn 1. The current training game will be replaced.",
     go: "Start training", cancel: "Cancel",
   },
 };
@@ -171,6 +181,9 @@ const es: TrainingStrings = {
   replay: {
     title: "Ver el tutorial otra vez",
     body: "Empieza una partida de entrenamiento de 5 turnos con el mismo personaje y el mismo sueño. Tu partida actual queda apartada: podrás retomarla al final o desde Opciones.",
+    bodyReplace: "Empieza una partida de entrenamiento de 5 turnos con el mismo personaje y el mismo sueño. Tu partida actual queda apartada en lugar de la que se guardó la última vez: podrás retomarla al final o desde Opciones.",
+    bodyKeep: "El entrenamiento de 5 turnos vuelve a empezar en el turno 1. Tu partida guardada sigue apartada: podrás retomarla al final o desde Opciones.",
+    bodyRestart: "El entrenamiento de 5 turnos vuelve a empezar en el turno 1. La partida de entrenamiento actual se sustituirá.",
     go: "Empezar el entrenamiento", cancel: "Cancelar",
   },
 };

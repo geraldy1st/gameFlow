@@ -38,6 +38,7 @@ import { IntroVideo, probeIntro, type IntroPick } from "./boite/IntroVideo";
 import { MenuScreen } from "./boite/MenuScreen";
 import { MetroBoard, trackSpaces } from "./boite/MetroBoard";
 import { TrainingCoach, coachView, type TutLocal } from "./boite/TrainingCoach";
+import { TRAINING_BACKUP_KEY, backupBeforeReplay, hasBackup as backupExists, replayAsk as replayAskFor, type ReplayAsk } from "@/game/tutorial-save";
 import { TRAINING_STRINGS, fill } from "./boite/training-strings";
 import { BoxDie, Dock, FlowBox, GateBox, MobileHud, PassiveChart, StationStrip, WhoBox, hereLabel, lineName, rollLabel } from "./boite/PlayerMat";
 
@@ -526,8 +527,6 @@ function QuizDesk({
   );
 }
 
-/** The save set aside while "Replay the tutorial" runs (restored from the done card or Options). */
-const TRAINING_BACKUP_KEY = `${SAVE_KEY}:before-training`;
 const FRESH_TUT: TutLocal = { post: null, done: false };
 
 function persistGame(s: GameState): boolean {
@@ -577,7 +576,7 @@ export function GameFlow() {
   const [intro, setIntro] = useState<number | "boot" | null>("boot");
   const [tut, setTut] = useState<TutLocal | null>(null);
   const [toast, setToast] = useState<string | null>(null);
-  const [replayAsk, setReplayAsk] = useState(false);
+  const [replayAsk, setReplayAsk] = useState<ReplayAsk>(null);
   const [hasBackup, setHasBackup] = useState(false);
   const [outcome, setOutcome] = useState<{ mood: Reaction; line: string; fact: string; portrait: string; fallback: string; name: string } | null>(null);
   const phaseRef = useRef(state.phase);
@@ -593,7 +592,7 @@ export function GameFlow() {
 
   useEffect(() => {
     setHasSave(!!localStorage.getItem(SAVE_KEY));
-    setHasBackup(!!localStorage.getItem(TRAINING_BACKUP_KEY));
+    setHasBackup(backupExists(localStorage));
     setLang(readLang());
     setPassed(loadPassed());
     if (localStorage.getItem(INTRO_KEY)) setIntro(null);
@@ -655,6 +654,15 @@ export function GameFlow() {
   useEffect(() => {
     if (persistGame(state)) setHasSave(true);
   }, [state]);
+
+  useEffect(() => {
+    if (!replayAsk) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setReplayAsk(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [replayAsk]);
 
   useEffect(() => {
     if (!toast) return;
@@ -944,27 +952,29 @@ export function GameFlow() {
     return { characterId: CHARACTERS[0]!.id, dreamId: DREAMS[0]!.id };
   };
   const startTraining = (pick: Pick) => {
-    setReplayAsk(false);
+    setReplayAsk(null);
     setOptionsOpen(false);
     unlockAudio();
     go({ type: "NEW", picks: [pick], training: true });
     setTut(FRESH_TUT);
   };
+  /**
+   * "Replay the tutorial" (Options). DEF-TUT-02: ask every time a game would be replaced, not only the first time,
+   * and set the current real game aside every time (never a training state), so no game in progress is ever lost.
+   */
   const replayTutorial = () => {
     setOptionsOpen(false);
-    if (hasSave && !localStorage.getItem(TRAINING_BACKUP_KEY)) {
-      setReplayAsk(true);
+    const ask = replayAskFor(localStorage);
+    if (ask) {
+      setReplayAsk(ask);
       return;
     }
-    startTraining(tutorialPick());
+    confirmReplay();
   };
   const confirmReplay = () => {
     const pick = tutorialPick();
-    const raw = localStorage.getItem(SAVE_KEY);
-    if (raw && !localStorage.getItem(TRAINING_BACKUP_KEY)) {
-      localStorage.setItem(TRAINING_BACKUP_KEY, raw);
-      setHasBackup(true);
-    }
+    backupBeforeReplay(localStorage);
+    setHasBackup(backupExists(localStorage));
     startTraining(pick);
   };
   const restoreBackup = () => {
@@ -974,6 +984,7 @@ export function GameFlow() {
     if (!raw) return;
     localStorage.removeItem(TRAINING_BACKUP_KEY);
     setHasBackup(false);
+    setReplayAsk(null);
     try {
       const saved = JSON.parse(raw) as GameState;
       localStorage.setItem(SAVE_KEY, raw);
@@ -1329,12 +1340,20 @@ export function GameFlow() {
       )}
 
       {replayAsk && (
-        <div className="overlay" onClick={() => setReplayAsk(false)}>
-          <div className="rules-sheet" role="dialog" aria-modal="true" aria-labelledby="replay-title" onClick={(e) => e.stopPropagation()}>
+        <div className="overlay tut-confirm" onClick={() => setReplayAsk(null)}>
+          <div className="rules-sheet" role="dialog" aria-modal="true" aria-labelledby="replay-title" aria-describedby="replay-body" onClick={(e) => e.stopPropagation()}>
             <h2 id="replay-title" className="display">{TS.replay.title}</h2>
-            <p>{TS.replay.body}</p>
+            <p id="replay-body">
+              {replayAsk === "set-aside-replace"
+                ? TS.replay.bodyReplace
+                : replayAsk === "restart-keep"
+                  ? TS.replay.bodyKeep
+                  : replayAsk === "restart"
+                    ? TS.replay.bodyRestart
+                    : TS.replay.body}
+            </p>
             <div className="card-actions">
-              <button type="button" className="btn btn-ghost" onClick={() => setReplayAsk(false)}>{TS.replay.cancel}</button>
+              <button type="button" className="btn btn-ghost" data-autofocus onClick={() => setReplayAsk(null)}>{TS.replay.cancel}</button>
               <button type="button" className="btn btn-gold" onClick={confirmReplay}>{TS.replay.go}</button>
             </div>
           </div>

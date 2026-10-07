@@ -987,3 +987,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 
 /* modal containers receive programmatic focus (DEF-GF-03); their buttons keep the gold focus ring */
 [role="dialog"][tabindex="-1"]:focus { outline: none; }
+
+/* "Replay the tutorial" confirmation: above the coach and its done card (DEF-TUT-02 / 03) */
+.overlay.tut-confirm { z-index: 60; }
