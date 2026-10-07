@@ -395,7 +395,7 @@ export function TrainingCoach(props: TrainingCoachProps) {
         <div className={`tut-cardhost ${tight === stepKey ? "tight" : ""}`} ref={hostRef} style={layout?.host ?? { visibility: "hidden" }} key={`host-${stepKey}`}>
           {view.k === "bubble" && view.id === "t3deal" && (
             <>
-              <article className="tcard deal" aria-labelledby="tcard-h">
+              <article className="tcard deal" aria-labelledby="tcard-h" aria-describedby="tut-p">
                 <div className="hd" style={{ background: "var(--mint)" }}>
                   <b><Ico name="up" />{T.deal.tag}</b>
                   <span className="pill">{T.deal.kind}</span>
@@ -442,7 +442,7 @@ export function TrainingCoach(props: TrainingCoachProps) {
             </>
           )}
           {view.k === "bubble" && view.id === "t4life" && (
-            <article className="tcard" aria-labelledby="tcard-h">
+            <article className="tcard" aria-labelledby="tcard-h" aria-describedby="tut-p">
               <div className="hd" style={{ background: "var(--coral)" }}>
                 <b><Ico name="bag" />{T.life.tag}</b>
                 <span className="pill">{T.life.kind}</span>
@@ -537,6 +537,15 @@ export function TrainingCoach(props: TrainingCoachProps) {
       )}
 
       {fx}
+
+      {/* DEF-TUT-09: every instruction is announced, including when focus sits on a card button (t3deal, t4life). */}
+      <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {view.k === "bubble" && stepCopy
+          ? `${fill(T.pill, { n: turnNo })}. ${fill(stepCopy[0], vars)}. ${fill(stepCopy[1], vars)}`
+          : view.k === "nod"
+            ? `${fill(T.pill, { n: turnNo })}. ${T.nod.title}. ${T.nod.story}`
+            : ""}
+      </div>
 
       {view.k === "done" && (
         <DoneCard
