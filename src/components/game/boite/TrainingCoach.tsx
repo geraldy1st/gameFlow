@@ -89,7 +89,8 @@ function union(els: (HTMLElement | null)[]): Rect | null {
 
 function targets(id: StepId, mobile: boolean): string[] {
   if (id.endsWith("roll")) return mobile ? [".mdock .row"] : [".dock .dicecell", ".dock .roll"];
-  if (id === "t1pawn") return mobile ? [".tstop.here"] : ["svg.metro .pawn"];
+  // DEF-TUT-06: on phones the station strip sits below the fixed dock; the pawn on the map is on screen.
+  if (id === "t1pawn") return ["svg.metro .pawn"];
   if (id === "t2pay") return mobile ? [".mhud"] : [".mat > .box:nth-of-type(1)", ".mat > .box:nth-of-type(2)"];
   if (id === "t3asset") return mobile ? [".mflow"] : [".eqrow.in", ".eqtotal"];
   if (id === "t5gate") return mobile ? [".mhud .gauge", ".mhud .hint"] : [".gatebox"];
@@ -197,6 +198,7 @@ export function TrainingCoach(props: TrainingCoachProps) {
       rect = { left, top, width: hw, height: hh };
     } else if (view.k === "bubble") {
       rect = union(targets(view.id, mobile).map(visible));
+      if (mobile && view.id === "t1pawn" && (!rect || rect.top + rect.height > H)) rect = union([visible(".tstop.here")]);
     }
     const pad = showHost ? 10 : 8;
     const spot = rect && view.k === "bubble" ? { left: rect.left - pad, top: rect.top - pad, width: rect.width + pad * 2, height: rect.height + pad * 2 } : null;
