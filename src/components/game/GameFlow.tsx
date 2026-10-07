@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
-import { CHARACTERS, DREAMS, FORTUNE_CASH, FORTUNE_PASSIVE, FRIENDS, INTRO_KEY, PARTNERS, PASSIVE_WIN, SAVE_KEY, TUTORIAL_KEY, TUTORIAL_SEEN_VALUE, VENTURE_GOAL } from "@/game/data";
+import { CHARACTERS, DREAMS, FORTUNE_CASH, FORTUNE_PASSIVE, FRIENDS, INTRO_KEY, PARTNERS, PASSIVE_WIN, SAVE_KEY, TRAINING_TURNS, TUTORIAL_KEY, TUTORIAL_SEEN_VALUE, VENTURE_GOAL } from "@/game/data";
 import { playSfx, resumeAudio, setMuted, unlockAudio } from "@/game/audio";
 import { LANG_KEY, readLang, tr, trKey, type Lang } from "@/game/i18n";
 import { CHATS, chatText } from "@/game/chats";
@@ -38,7 +38,16 @@ import { IntroVideo, probeIntro, type IntroPick } from "./boite/IntroVideo";
 import { MenuScreen } from "./boite/MenuScreen";
 import { MetroBoard, trackSpaces } from "./boite/MetroBoard";
 import { TrainingCoach, coachView, type TutLocal } from "./boite/TrainingCoach";
-import { TRAINING_BACKUP_KEY, backupBeforeReplay, hasBackup as backupExists, replayAsk as replayAskFor, type ReplayAsk } from "@/game/tutorial-save";
+import {
+  TRAINING_BACKUP_KEY,
+  backupBeforeReplay,
+  clearTutorialResult,
+  hasBackup as backupExists,
+  isTutorialResult,
+  markTutorialResult,
+  replayAsk as replayAskFor,
+  type ReplayAsk,
+} from "@/game/tutorial-save";
 import { TRAINING_STRINGS, fill } from "./boite/training-strings";
 import { BoxDie, Dock, FlowBox, GateBox, MobileHud, PassiveChart, StationStrip, WhoBox, hereLabel, lineName, rollLabel } from "./boite/PlayerMat";
 
@@ -528,6 +537,8 @@ function QuizDesk({
 }
 
 const FRESH_TUT: TutLocal = { post: null, done: false };
+/** Coach state when the scripted turns are over: the Gate coachmark, then the done card. */
+const GATE_TUT: TutLocal = { post: { id: "t5gate", turn: TRAINING_TURNS }, done: false };
 
 function persistGame(s: GameState): boolean {
   if ((s.screen !== "play" && s.screen !== "win") || s.players.length === 0) return false;
@@ -654,6 +665,15 @@ export function GameFlow() {
   useEffect(() => {
     if (persistGame(state)) setHasSave(true);
   }, [state]);
+
+  // DEF-TUT-01: the 5 scripted turns are over as soon as the Gate coachmark shows. Write the "tutorial seen" flag
+  // right away (RULES §8: at the end or on Skip), and fingerprint this save so a reload brings the coach back.
+  const gateStep = tut?.post?.id === "t5gate" || !!tut?.done;
+  useEffect(() => {
+    if (!gateStep || state.training || state.screen !== "play" || !state.players.length) return;
+    localStorage.setItem(TUTORIAL_KEY, TUTORIAL_SEEN_VALUE);
+    markTutorialResult(localStorage, state);
+  }, [gateStep, state]);
 
   useEffect(() => {
     if (!replayAsk) return;
@@ -922,7 +942,8 @@ export function GameFlow() {
       const saved = JSON.parse(raw) as GameState;
       if (saved.version === 1 && saved.players?.length) {
         go({ type: "CONTINUE", saved });
-        setTut(saved.training && !saved.training.skipped ? FRESH_TUT : null);
+        // DEF-TUT-01: a reload on the Gate coachmark / done card comes back to it (the engine's training is already over).
+        setTut(saved.training && !saved.training.skipped ? FRESH_TUT : isTutorialResult(localStorage, saved) ? GATE_TUT : null);
       }
     } catch {
       setHasSave(false);
@@ -933,6 +954,7 @@ export function GameFlow() {
     setConfirmNew(false);
     // First sitting on this device: the 5-turn training replaces the old rules slideshow (still in Rules).
     const training = !localStorage.getItem(TUTORIAL_KEY);
+    clearTutorialResult(localStorage);
     go({ type: "NEW", picks, training });
     setTut(training ? FRESH_TUT : null);
   };
@@ -985,6 +1007,7 @@ export function GameFlow() {
     localStorage.removeItem(TRAINING_BACKUP_KEY);
     setHasBackup(false);
     setReplayAsk(null);
+    clearTutorialResult(localStorage);
     try {
       const saved = JSON.parse(raw) as GameState;
       localStorage.setItem(SAVE_KEY, raw);
@@ -997,6 +1020,7 @@ export function GameFlow() {
   const skipTraining = () => {
     go({ type: "SKIP_TRAINING" });
     markTutorialSeen();
+    clearTutorialResult(localStorage);
     setTut(null);
     setToast(TS.skipToast);
   };
@@ -1333,7 +1357,11 @@ export function GameFlow() {
             setTut({ post: null, done: true });
           }}
           onSkip={skipTraining}
-          onPlay={() => setTut(null)}
+          onPlay={() => {
+            // From here on the tutorial's game is the player's real game.
+            clearTutorialResult(localStorage);
+            setTut(null);
+          }}
           onReplay={() => startTraining(tutorialPick())}
           onRestore={restoreBackup}
         />
