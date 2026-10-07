@@ -267,7 +267,7 @@ export function TrainingCoach(props: TrainingCoachProps) {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Enter" && e.key !== " ") return;
       if (e.target instanceof HTMLElement && e.target.closest("button, a, input, textarea, summary")) return;
-      if (view.k === "wait") return;
+      if (view.k === "wait" || document.querySelector(".tut-confirm")) return;
       e.preventDefault();
       primary();
     };
@@ -349,6 +349,9 @@ export function TrainingCoach(props: TrainingCoachProps) {
     if (keyboard && performance.now() - dealShownAt.current < 700) return;
     props.onChoose(id, id === "accept" ? { id: "t3asset", turn: 3 } : undefined);
   };
+
+  // DEF-TUT-03: a double click on one step's button must not also answer the next step.
+  const stepArmed = useArmed(stepKey);
 
   const blockClick = (e: React.MouseEvent) => {
     if (view.k !== "bubble" || !view.id.endsWith("roll") || !layout?.spot) return;
@@ -507,7 +510,7 @@ export function TrainingCoach(props: TrainingCoachProps) {
               ))}
             </div>
             {view.id !== "t3deal" && (
-              <button type="button" className="tut-btn" ref={primaryRef} onClick={primary}>{btnLabel}</button>
+              <button type="button" className="tut-btn" ref={primaryRef} onClick={() => stepArmed() && primary()}>{btnLabel}</button>
             )}
           </div>
           {view.id === "t5gate" && (
@@ -567,6 +570,17 @@ function FlyCoin({ from, to, delay, lift }: { from: [number, number]; to: [numbe
   return <div ref={ref} className="tut-coin" aria-hidden="true">$</div>;
 }
 
+/** Ignore activations for a moment after a step appears, so the second click of a double click aimed at the previous
+ * step's button (or a held Enter) never lands on whatever replaced it (DEF-TUT-03). */
+const ARM_MS = 450;
+function useArmed(key: unknown): () => boolean {
+  const shownAt = useRef(0);
+  useEffect(() => {
+    shownAt.current = performance.now();
+  }, [key]);
+  return () => performance.now() - shownAt.current >= ARM_MS;
+}
+
 function DoneCard(props: {
   face: string;
   fallback: string;
@@ -583,6 +597,10 @@ function DoneCard(props: {
   const T = TRAINING_STRINGS[props.lang];
   const D = T.done;
   const [src, setSrc] = useState(props.face);
+  const armed = useArmed("done");
+  const guard = (fn: () => void) => () => {
+    if (armed()) fn();
+  };
   return (
     <>
       {!props.reduced && <Confetti count={props.mobile ? 16 : 26} />}
@@ -596,11 +614,11 @@ function DoneCard(props: {
           <li><i style={{ background: "var(--mint)" }}><Ico name="door" /></i>{D.r3}</li>
         </ul>
         <div className="row2">
-          <button type="button" className="tut-btn" ref={props.primaryRef} onClick={props.onPlay}>{D.play} →</button>
-          <button type="button" className="tut-btn ghost" onClick={props.onReplay}><Ico name="replay" />{D.replay}</button>
+          <button type="button" className="tut-btn" ref={props.primaryRef} onClick={guard(props.onPlay)}>{D.play} →</button>
+          <button type="button" className="tut-btn ghost" onClick={guard(props.onReplay)}><Ico name="replay" />{D.replay}</button>
         </div>
         {props.hasBackup && (
-          <button type="button" className="tut-link" onClick={props.onRestore}>{D.restore}</button>
+          <button type="button" className="tut-link" onClick={guard(props.onRestore)}>{D.restore}</button>
         )}
         <div className="tut-note"><Ico name="repeat" /><span>{T.replayNote}</span></div>
       </div>

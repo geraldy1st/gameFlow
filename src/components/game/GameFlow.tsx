@@ -993,6 +993,10 @@ export function GameFlow() {
     }
     confirmReplay();
   };
+  /** DEF-TUT-03: the done card's "Replay" replaces the tutorial's game too, so it asks first, like Options. */
+  const replayFromDone = () => {
+    setReplayAsk(replayAskFor(localStorage, { fromDoneCard: true }) ?? "restart");
+  };
   const confirmReplay = () => {
     const pick = tutorialPick();
     backupBeforeReplay(localStorage);
@@ -1354,7 +1358,8 @@ export function GameFlow() {
           onPostDone={() => setTut((x) => (x ? { ...x, post: null } : x))}
           onFinish={() => {
             markTutorialSeen();
-            setTut({ post: null, done: true });
+            // DEF-TUT-03: idempotent, a double click on "Got it" opens the done card once.
+            setTut((x) => (x?.done ? x : { post: null, done: true }));
           }}
           onSkip={skipTraining}
           onPlay={() => {
@@ -1362,7 +1367,7 @@ export function GameFlow() {
             clearTutorialResult(localStorage);
             setTut(null);
           }}
-          onReplay={() => startTraining(tutorialPick())}
+          onReplay={replayFromDone}
           onRestore={restoreBackup}
         />
       )}
