@@ -2,6 +2,7 @@ import {
   BIG_DEALS,
   BOOMS,
   CAREERS,
+  CHARACTERS,
   CHILD_COST,
   CHILD_NAMES,
   DREAMS,
@@ -3203,7 +3204,30 @@ function ownedOutfitsOf(raw: Player): OutfitId[] {
   return [...set];
 }
 
-function hydratePlayer(raw: Player): Player {
+/**
+ * DEF-GF-04 (remaining case): a save whose player lacks core fields (position, track, reaction, vitals...) used to
+ * crash the board ("reading 'x'") and ask for portraits/expr/aoi-undefined.jpg. Every missing or invalid field now
+ * falls back to a fresh player of the same character, dream and career; fields that are present are kept as they are.
+ */
+function withPlayerDefaults(raw0: Player): Player {
+  const raw = (raw0 && typeof raw0 === "object" ? raw0 : {}) as Partial<Player>;
+  const custom = raw.custom ?? null;
+  const characterId = raw.characterId === "custom" && custom ? "custom" : CHARACTERS.some((c) => c.id === raw.characterId) ? raw.characterId! : CHARACTERS[0]!.id;
+  const dreamId = DREAMS.some((d) => d.id === raw.dreamId) ? raw.dreamId! : DREAMS[0]!.id;
+  const base = createMatch([{ characterId, dreamId, ...(custom ? { custom } : {}) }], 1, false).players[0]!;
+  const defined = Object.fromEntries(Object.entries(raw).filter(([, v]) => v !== undefined)) as Partial<Player>;
+  const p: Player = { ...base, ...defined, characterId, dreamId };
+  if (!CAREERS.some((c) => c.id === p.careerId)) p.careerId = base.careerId;
+  if (p.track !== "grind" && p.track !== "freedom" && p.track !== "venture") p.track = "grind";
+  const len = trackOf(p.track).length;
+  if (typeof p.position !== "number" || !Number.isInteger(p.position) || p.position < 0 || p.position >= len) p.position = p.track === "grind" ? base.position : 0;
+  if (typeof p.reaction !== "string") p.reaction = "idle";
+  if (typeof p.id !== "string") p.id = base.id;
+  return p;
+}
+
+function hydratePlayer(raw0: Player): Player {
+  const raw = withPlayerDefaults(raw0);
   const level = raw.level === 2 ? 2 : 1;
   const goalReason = raw.goalReason === "dream" || raw.goalReason === "flow" ? raw.goalReason : null;
   const capstone = raw.capstone === "exit" || raw.capstone === "venture" || raw.capstone === "fortune" ? raw.capstone : null;
