@@ -2062,7 +2062,26 @@ export type Action =
   | { type: "SKIP_TRAINING" }
   | { type: "CONTINUE"; saved: GameState };
 
+/**
+ * Actions the scripted turns are made of (plus navigation and settings). Anything else — shop, wardrobe, day
+ * activities, loans, selling, the Gate, the dream, household... — is refused while the training player follows the
+ * script, so the engine itself guarantees the training's caps (RULES §0 and §7, DEF-TUT-04).
+ */
+const TRAINING_ALLOWED: ReadonlySet<Action["type"]> = new Set<Action["type"]>([
+  "MENU", "RULES", "CREDITS", "MUTE", "NEW", "SKIP_TRAINING", "CONTINUE", "ROLL", "REVEAL", "STEP", "CHOICE", "READY", "BREATHE",
+]);
+
+/** True when `action` must be refused because the training script is running for the current player. */
+export function trainingRefuses(state: GameState, action: Action): boolean {
+  const t = trainingFor(state);
+  if (!t || t.skipped || state.screen !== "play") return false;
+  if (!TRAINING_ALLOWED.has(action.type)) return true;
+  // Only the choices the scripted card offers (no hidden "borrow" & co.).
+  return action.type === "CHOICE" && !(state.phase === "card" && !!state.card?.choices.some((c) => c.id === action.id));
+}
+
 export function reduce(state: GameState, action: Action): GameState {
+  if (trainingRefuses(state, action)) return state;
   switch (action.type) {
     case "MENU":
       return { ...state, screen: "menu" };

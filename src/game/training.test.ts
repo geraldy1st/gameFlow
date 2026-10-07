@@ -210,3 +210,71 @@ describe("training mode (tutorial/RULES.md §13)", () => {
     }
   });
 });
+
+describe("DEF-TUT-04: engine guard while the script runs", () => {
+  const OFF_SCRIPT = [
+    { type: "BUY_CLOTH", outfit: "tee" },
+    { type: "WEAR", outfit: "jeans" },
+    { type: "LIFE", kind: "gym" },
+    { type: "BORROW" },
+    { type: "REPAY", id: "x" },
+    { type: "SELL", id: "x" },
+    { type: "ENTER" },
+    { type: "DREAM" },
+    { type: "HOUSE" },
+    { type: "RETIRE" },
+    { type: "CIRCLE", friendId: "jun" },
+    { type: "BUY_HOME", id: "x" },
+    { type: "TOGGLE_HOME", id: "x" },
+  ] as const;
+
+  it("refuses every non-scripted action at each step of the 5 turns (state unchanged)", () => {
+    for (const seed of SEEDS.slice(0, 20)) {
+      let s = training(seed);
+      for (let t = 1; t <= TRAINING_TURNS; t++) {
+        for (const a of OFF_SCRIPT) expect(E.reduce(s, a as never)).toBe(s);
+        const moved = rollAndMove(E, s);
+        if (moved.phase === "card") {
+          for (const a of OFF_SCRIPT) expect(E.reduce(moved, a as never)).toBe(moved);
+          // a choice the scripted card does not offer is refused too
+          expect(E.reduce(moved, { type: "CHOICE", id: "borrow" })).toBe(moved);
+          expect(E.reduce(moved, { type: "CHOICE", id: "nope" })).toBe(moved);
+        }
+        s = turn(s).s;
+      }
+    }
+  });
+
+  it("probe-shop: buying a T-shirt at t1roll leaves cash at its start value", () => {
+    const s = training(SEEDS[0]!);
+    const cash = cur(s).cash;
+    const after = E.reduce(s, { type: "BUY_CLOTH", outfit: "tee" });
+    expect(cur(after).cash).toBe(cash);
+    expect(cur(after).ownedOutfits).toEqual(cur(s).ownedOutfits);
+  });
+
+  it("the guard does not block the scripted path (all 5 turns complete, both T3/T4 answers)", () => {
+    for (const seed of SEEDS.slice(0, 20)) {
+      for (const policy of [{ 3: "accept", 4: "pay" }, { 3: "decline", 4: "decline" }]) {
+        const { s, logs } = playScript(seed, policy);
+        expect(s.training).toBeNull();
+        expect(logs.map((l) => l.die)).toEqual([...TRAINING_DICE]);
+      }
+    }
+  });
+
+  it("after Skip, normal rules come back (the shop works again)", () => {
+    const s = E.reduce(training(SEEDS[1]!), { type: "SKIP_TRAINING" });
+    const after = E.reduce({ ...s, players: s.players.map((p) => ({ ...p, cash: 5000 })) }, { type: "BUY_CLOTH", outfit: "tee" });
+    expect(cur(after).ownedOutfits).toContain("tee");
+  });
+
+  it("player 2 of a hot-seat training game plays with normal rules", () => {
+    let s = training(SEEDS[2]!, [AOI, REN]);
+    s = turn(s).s; // player 1, scripted turn 1 → pass → READY
+    expect(s.current).toBe(1);
+    const rich = { ...s, players: s.players.map((p) => ({ ...p, cash: 5000 })) };
+    const after = E.reduce(rich, { type: "BUY_CLOTH", outfit: "tee" });
+    expect(after).not.toBe(rich);
+  });
+});

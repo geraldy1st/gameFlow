@@ -1192,7 +1192,8 @@ export function GameFlow() {
         )}
 
         {state.screen === "play" && player && (
-          <main className="screen s-play">
+          // DEF-TUT-04: while the coach runs, the board and the dock behind it are inert (no Tab, no click).
+          <main className="screen s-play" inert={!!coach || undefined}>
             <MobileHud player={player} state={state} t={t} lang={lang} onStatus={() => setStatusFor(player)} />
             <section className="board-wrap">
               <div className={`board-sheet ${zoom ? "is-zoom" : ""}`}>
