@@ -296,6 +296,12 @@ export interface GameState {
   };
   /** Training mode (scripted tutorial). null = normal rules, exactly as before. Absent in old saves → null. */
   training: TrainingState | null;
+  /**
+   * DEF-TUT-10/11/12: true for the whole life of a tutorial game (scripted turns *and* the recap after them).
+   * Such a game is a throw-away: it never becomes the player's real game, and it never feeds the records
+   * (trophies) nor the passive-income chart history. Absent in normal games and old saves.
+   */
+  practice?: boolean;
 }
 
 export interface TrainingState {
@@ -305,6 +311,11 @@ export interface TrainingState {
   player: number;
   /** True after "Skip the tutorial": normal rules from the next turn. */
   skipped: boolean;
+}
+
+/** DEF-TUT-10/11/12: true for a tutorial (throw-away) game, during and after its scripted turns. */
+export function isPractice(s: { practice?: unknown }): boolean {
+  return s.practice === true;
 }
 
 /** Training state when it applies to the current player, else null. */
@@ -739,6 +750,7 @@ export function createMatch(picks: Pick[], seed: number, muted: boolean, opts?: 
     turn: 1,
     phase: "card",
     training: training ? { turn: 1, player: 0, skipped: false } : null,
+    ...(training ? { practice: true } : {}),
   };
   state = blip(state, "card");
   state.card = startCard(state.players[0]!);
@@ -2093,7 +2105,9 @@ export function reduce(state: GameState, action: Action): GameState {
     case "MUTE":
       return { ...state, muted: !state.muted };
     case "NEW":
-      return createMatch(action.picks, (Date.now() ^ (state.seed + 17)) >>> 0, state.muted, { training: !!action.training });
+      // A tutorial game gets its own seed even when it is created in the same millisecond as the real game it
+      // stands in front of (DEF-TUT-10/11), so the two never share a seed.
+      return createMatch(action.picks, (Date.now() ^ (state.seed + 17) ^ (action.training ? 0x5bd1e995 : 0)) >>> 0, state.muted, { training: !!action.training });
     case "SKIP_TRAINING":
       if (!state.training || state.training.skipped) return state;
       return log({ ...state, training: { ...state.training, skipped: true } }, "Training skipped: normal rules from the next turn.");
@@ -3281,6 +3295,9 @@ export function hydrate(saved: GameState): GameState {
     history: Array.isArray(saved.history) ? saved.history : saved.log ?? [],
     training: hydrateTraining(saved.training, players.length),
   };
+  // A save from before DEF-TUT-10 whose script is still running is a tutorial game too.
+  if (saved.practice === true || (s.training && !s.training.skipped)) s.practice = true;
+  else delete s.practice;
   if (!players.length) return { ...blankMenu(), muted: !!saved.muted };
   if (s.screen === "win" || s.phase === "win") {
     const idx = Math.min(Math.max(s.winner ?? 0, 0), players.length - 1);

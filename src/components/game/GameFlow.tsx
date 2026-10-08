@@ -14,6 +14,7 @@ import {
   dreamOf,
   nameOf,
   portraitOf,
+  isPractice,
   reduce,
   statement,
   trainingFor,
@@ -47,6 +48,8 @@ import {
   markTutorialResult,
   replayAsk as replayAskFor,
   type ReplayAsk,
+  setAsideFreshGame,
+  tutorialExit,
 } from "@/game/tutorial-save";
 import { TRAINING_STRINGS, fill } from "./boite/training-strings";
 import { BoxDie, Dock, FlowBox, GateBox, MobileHud, PassiveChart, StationStrip, WhoBox, hereLabel, lineName, rollLabel } from "./boite/PlayerMat";
@@ -648,7 +651,8 @@ export function GameFlow() {
   }, [lang]);
 
   useEffect(() => {
-    if (!state.players.length) return;
+    // DEF-TUT-12: a tutorial game never feeds the records.
+    if (!state.players.length || isPractice(state)) return;
     setTrophies((prev) => {
       const next = mergeTrophies(prev.ids, prev.peak, state.players);
       const same =
@@ -955,8 +959,19 @@ export function GameFlow() {
     // First sitting on this device: the 5-turn training replaces the old rules slideshow (still in Rules).
     const training = !localStorage.getItem(TUTORIAL_KEY);
     clearTutorialResult(localStorage);
-    go({ type: "NEW", picks, training });
-    setTut(training ? FRESH_TUT : null);
+    if (!training) {
+      go({ type: "NEW", picks, training: false });
+      setTut(null);
+      return;
+    }
+    // DEF-TUT-10: the real game is dealt now, at its true initial state (every player, random career, turn 1), and
+    // set aside like "Replay the tutorial" does. The tutorial then runs on a throw-away solo game for player 1, and
+    // Play / Skip bring the real game back untouched.
+    setAsideFreshGame(localStorage, reduce(stateRef.current, { type: "NEW", picks, training: false }));
+    setHasBackup(true);
+    unlockAudio();
+    go({ type: "NEW", picks: [picks[0]!], training: true });
+    setTut(FRESH_TUT);
   };
   /** Player 1's character and dream, from the running game, the save, or the menu default. */
   const tutorialPick = (): Pick => {
@@ -1021,11 +1036,23 @@ export function GameFlow() {
     }
   };
   const markTutorialSeen = () => localStorage.setItem(TUTORIAL_KEY, TUTORIAL_SEEN_VALUE);
-  const skipTraining = () => {
-    go({ type: "SKIP_TRAINING" });
+  /**
+   * DEF-TUT-10: leaving the tutorial (Play on the done card, or Skip) always throws the tutorial game away: back to
+   * the real game set aside, or, when there is none, a new game at its initial state with the same character.
+   */
+  const leaveTutorial = () => {
     markTutorialSeen();
     clearTutorialResult(localStorage);
     setTut(null);
+    if (tutorialExit(localStorage) === "restore") {
+      restoreBackup();
+      return;
+    }
+    const pick = tutorialPick();
+    go({ type: "NEW", picks: [pick], training: false });
+  };
+  const skipTraining = () => {
+    leaveTutorial();
     setToast(TS.skipToast);
   };
   const replayIntro = () => {
@@ -1350,7 +1377,8 @@ export function GameFlow() {
           lang={lang}
           mobile={isMobile}
           reduced={prefersReducedMotion()}
-          hasBackup={hasBackup}
+          // DEF-TUT-10: "Play" already leads back to the game set aside, no separate "back to my game" link.
+          hasBackup={false}
           onRoll={() => go({ type: "ROLL" })}
           onChoose={(id, post) => {
             go({ type: "CHOICE", id });
@@ -1363,11 +1391,7 @@ export function GameFlow() {
             setTut((x) => (x?.done ? x : { post: null, done: true }));
           }}
           onSkip={skipTraining}
-          onPlay={() => {
-            // From here on the tutorial's game is the player's real game.
-            clearTutorialResult(localStorage);
-            setTut(null);
-          }}
+          onPlay={leaveTutorial}
           onReplay={replayFromDone}
           onRestore={restoreBackup}
         />

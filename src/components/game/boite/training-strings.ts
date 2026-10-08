@@ -44,7 +44,7 @@ const fr: TrainingStrings = {
   next: "Suivant",
   skip: "Passer le tutoriel",
   replayNote: "Rejouable à tout moment : Options › Revoir le tutoriel.",
-  skipToast: "Entraînement arrêté : règles normales dès le prochain tour. Rejouable depuis Options.",
+  skipToast: "Tutoriel passé : place à ta vraie partie, intacte. Rejouable depuis Options.",
   topSub: "Entraînement · Tour {n}/5 · {name}",
   passNote: "Tour d’entraînement de {name} terminé — au joueur suivant (règles normales).",
   steps: {
@@ -94,7 +94,7 @@ const en: TrainingStrings = {
   next: "Next",
   skip: "Skip the tutorial",
   replayNote: "Replay any time: Options › Replay the tutorial.",
-  skipToast: "Training stopped: normal rules from the next turn. Replay it from Options.",
+  skipToast: "Tutorial skipped: on to your real game, untouched. Replay it from Options.",
   topSub: "Training · Turn {n}/5 · {name}",
   passNote: "{name}’s training turn is done — next player (normal rules).",
   steps: {
@@ -144,7 +144,7 @@ const es: TrainingStrings = {
   next: "Siguiente",
   skip: "Saltar el tutorial",
   replayNote: "Puedes repetirlo cuando quieras: Opciones › Ver el tutorial otra vez.",
-  skipToast: "Entrenamiento detenido: reglas normales desde el próximo turno. Repítelo desde Opciones.",
+  skipToast: "Tutorial saltado: pasas a tu partida real, intacta. Repítelo desde Opciones.",
   topSub: "Entrenamiento · Turno {n}/5 · {name}",
   passNote: "Turno de entrenamiento de {name} terminado — siguiente jugador (reglas normales).",
   steps: {

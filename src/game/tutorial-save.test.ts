@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { SAVE_KEY } from "./data";
 import { answer, firstChoice } from "./__tests__/drive";
-import { createMatch, reduce, type GameState } from "./engine";
+import { blankMenu, createMatch, hydrate, isPractice, reduce, statement, type GameState, type Pick } from "./engine";
 import {
   TRAINING_BACKUP_KEY,
   TUTORIAL_RESULT_KEY,
@@ -11,6 +11,8 @@ import {
   isTutorialResult,
   markTutorialResult,
   replayAsk,
+  setAsideFreshGame,
+  tutorialExit,
   type KV,
 } from "./tutorial-save";
 
@@ -51,7 +53,8 @@ describe("Replay the tutorial: confirmation and backup (DEF-TUT-02 / 03)", () =>
     expect(classifySave(kv)).toBe("training");
     const skipped = reduce(training(), { type: "SKIP_TRAINING" });
     put(kv, skipped);
-    expect(classifySave(kv)).toBe("real");
+    // DEF-TUT-10 (new rule): a tutorial game is a throw-away even once skipped, never a real game.
+    expect(classifySave(kv)).toBe("training");
   });
 
   it("asks for confirmation every time a real game exists, first replay or not", () => {
@@ -118,5 +121,87 @@ describe("Replay the tutorial: confirmation and backup (DEF-TUT-02 / 03)", () =>
     const kv = new Mem();
     kv.setItem(TRAINING_BACKUP_KEY, "{nope");
     expect(hasBackup(kv)).toBe(false);
+  });
+});
+
+/** Plays the 5 scripted turns of a tutorial game, buying the T3 deal and paying the T4 subscription. */
+function playTutorial(s0: GameState): GameState {
+  let s = s0;
+  for (let i = 0; i < 400 && s.training; i++) {
+    if (s.phase === "card" && s.card) {
+      const ids = s.card.choices.map((c) => c.id);
+      const id = ["ok", "rest", "accept", "pay", "buy"].find((x) => ids.includes(x)) ?? ids[0]!;
+      s = E.reduce(s, { type: "CHOICE", id });
+    } else if (s.phase === "idle") s = E.reduce(s, { type: "ROLL" });
+    else if (s.phase === "rolling") s = E.reduce(s, { type: "REVEAL" });
+    else if (s.phase === "moving") s = E.reduce(s, { type: "STEP" });
+    else if (s.phase === "pass") s = E.reduce(s, { type: "READY" });
+    else break;
+  }
+  return s;
+}
+
+describe("DEF-TUT-10: the first-game tutorial never touches the real game", () => {
+  const AOI: Pick = { characterId: "aoi", dreamId: "cafe" };
+  const REN: Pick = { characterId: "ren", dreamId: "studio" };
+  for (const picks of [[AOI], [AOI, REN]]) {
+    for (const exit of ["finish", "skip"] as const) {
+      it(`${picks.length} player(s), tutorial ${exit === "finish" ? "finished" : "skipped"}: the real game starts at its initial state`, () => {
+        const kv = new Mem();
+        // startGame(): the real game is dealt first and set aside, then the throw-away tutorial runs for player 1 only.
+        const fresh = reduce(blankMenu(), { type: "NEW", picks, training: false });
+        setAsideFreshGame(kv, fresh);
+        let tut = reduce(fresh, { type: "NEW", picks: [picks[0]!], training: true });
+        expect(tut.players).toHaveLength(1);
+        expect(isPractice(tut)).toBe(true);
+        expect(tut.seed).not.toBe(fresh.seed);
+        tut = exit === "finish" ? playTutorial(tut) : reduce(tut, { type: "SKIP_TRAINING" });
+        put(kv, tut);
+        if (exit === "finish") expect(tut.players[0]!.assets.length).toBe(1); // the tutorial did buy the sublet
+        // The tutorial game is never set aside over the real one, and Play / Skip lead back to it.
+        expect(backupBeforeReplay(kv)).toBe(false);
+        expect(tutorialExit(kv)).toBe("restore");
+        const back = reduce(blankMenu(), { type: "CONTINUE", saved: JSON.parse(kv.getItem(TRAINING_BACKUP_KEY)!) as GameState });
+        expect(back.turn).toBe(1);
+        expect(back.training).toBeNull();
+        expect(isPractice(back)).toBe(false);
+        expect(back.players).toHaveLength(picks.length);
+        expect(back.log).toEqual(["The board is set. First career dealt."]);
+        expect(back.card?.payload?.t).toBe("start");
+        for (const [i, p] of back.players.entries()) {
+          const f = fresh.players[i]!;
+          expect(p.careerId).toBe(f.careerId);
+          expect(p.cash).toBe(f.cash);
+          expect(p.assets).toEqual([]);
+          expect(p.expenseMods).toBe(0);
+          expect(p.position).toBe(11);
+          expect(statement(p).passive).toBe(0);
+        }
+      });
+    }
+  }
+
+  it("the career of the real game is not forced to the tutorial's barista", () => {
+    const careers = new Set<string>();
+    for (let seed = 1; seed < 60; seed++) careers.add(createMatch([{ characterId: "aoi", dreamId: "cafe" }], seed * 7919, false).players[0]!.careerId);
+    expect(careers.size).toBeGreaterThan(1);
+  });
+
+  it("with nothing set aside (Replay from the menu, no game), leaving the tutorial deals a fresh game", () => {
+    const kv = new Mem();
+    put(kv, training());
+    expect(tutorialExit(kv)).toBe("fresh");
+  });
+
+  it("a tutorial game stays a practice game after its script, across save / reload", () => {
+    const done = playTutorial(createMatch([{ characterId: "aoi", dreamId: "cafe" }], 5, false, { training: true }));
+    expect(done.training).toBeNull();
+    expect(isPractice(done)).toBe(true);
+    expect(isPractice(hydrate(JSON.parse(JSON.stringify(done)) as GameState))).toBe(true);
+    // A pre-fix save of a running script (no flag yet) is still recognised.
+    const old = { ...createMatch([{ characterId: "aoi", dreamId: "cafe" }], 5, false, { training: true }) } as GameState;
+    delete old.practice;
+    expect(isPractice(hydrate(old))).toBe(true);
+    expect(isPractice(hydrate(createMatch([{ characterId: "aoi", dreamId: "cafe" }], 5, false)))).toBe(false);
   });
 });

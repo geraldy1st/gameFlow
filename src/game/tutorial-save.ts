@@ -30,6 +30,7 @@ interface SaveLike {
   version?: unknown;
   players?: unknown;
   training?: { skipped?: unknown } | null;
+  practice?: unknown;
   seed?: unknown;
   turn?: unknown;
   moveSerial?: unknown;
@@ -68,6 +69,8 @@ export function classifyRaw(raw: string | null, resultMarker: string | null): Sa
   if (s.training && typeof s.training === "object" && !s.training.skipped) return "training";
   const marker = parse(resultMarker) as SaveFingerprint | null;
   if (marker && sameMoment(fingerprint(s), marker)) return "tutorial-result";
+  // DEF-TUT-10: a tutorial game stays a throw-away after its scripted turns (it is never the real game).
+  if (s.practice === true) return "training";
   return "real";
 }
 
@@ -125,4 +128,24 @@ export function isTutorialResult(store: KV, s: SaveLike): boolean {
 
 export function clearTutorialResult(store: KV): void {
   store.removeItem(TUTORIAL_RESULT_KEY);
+}
+
+/**
+ * DEF-TUT-10: the automatic tutorial of the very first game never touches the real game. The real game is created
+ * at its true initial state (all players, random career, turn 1) and set aside *before* the throw-away tutorial
+ * starts, exactly like "Replay the tutorial" sets the game in progress aside. Leaving the tutorial (Play or Skip)
+ * brings it back untouched.
+ */
+export function setAsideFreshGame(store: KV, fresh: SaveLike): void {
+  store.removeItem(TUTORIAL_RESULT_KEY);
+  store.setItem(TRAINING_BACKUP_KEY, JSON.stringify(fresh));
+}
+
+/**
+ * DEF-TUT-10: where "Play" / "Skip the tutorial" lead. The tutorial game is always thrown away:
+ * - "restore": back to the real game set aside (first game on the device, or the game in progress before Replay);
+ * - "fresh": nothing was set aside (Replay from the menu with no game): a new game at its initial state.
+ */
+export function tutorialExit(store: KV): "restore" | "fresh" {
+  return hasBackup(store) ? "restore" : "fresh";
 }
