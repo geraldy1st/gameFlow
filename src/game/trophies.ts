@@ -1,5 +1,5 @@
 import { FORTUNE_CASH, PASSIVE_WIN, VENTURE_GOAL } from "./data";
-import { statement, type Player } from "./engine";
+import { isPractice, statement, type GameState, type Player } from "./engine";
 
 export const TROPHY_KEY = "gameflow-trophies-v1";
 
@@ -37,4 +37,13 @@ export function mergeTrophies(ids: string[], peak: TrophyPeak, players: Player[]
   if (cash >= 50_000) set.add("beach");
   if (cash >= FORTUNE_CASH) set.add("cliffs");
   return { ids: [...set], peak: { cash, passive } };
+}
+
+/**
+ * DEF-TUT-12: records for the game on screen, or null when it must not count. A tutorial (practice) game never
+ * raises peak.cash / peak.passive nor unlocks a trophy, whether it runs from the first game or from Replay.
+ */
+export function recordsFor(ids: string[], peak: TrophyPeak, state: GameState): { ids: string[]; peak: TrophyPeak } | null {
+  if (!state.players.length || isPractice(state)) return null;
+  return mergeTrophies(ids, peak, state.players);
 }

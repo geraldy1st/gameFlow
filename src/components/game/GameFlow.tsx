@@ -7,7 +7,7 @@ import { BIRTHDAY_COST, MUSEUM_COST, OUTFITS, clothDelta, type OutfitId, type Vi
 import { CREATE_CASH, QUIZ_UNLOCK, loadPassed, savePassed, unlockedIds } from "@/game/meta";
 import { PASS_AT, QUIZZES } from "@/game/quizzes";
 import { CLOTH_PRICE, HOME_LEVEL, HOME_SHOP } from "@/game/shop";
-import { TROPHIES, TROPHY_KEY, mergeTrophies, type TrophyPeak } from "@/game/trophies";
+import { TROPHIES, TROPHY_KEY, recordsFor, type TrophyPeak } from "@/game/trophies";
 import {
   blankMenu,
   cur,
@@ -654,7 +654,8 @@ export function GameFlow() {
     // DEF-TUT-12: a tutorial game never feeds the records.
     if (!state.players.length || isPractice(state)) return;
     setTrophies((prev) => {
-      const next = mergeTrophies(prev.ids, prev.peak, state.players);
+      const next = recordsFor(prev.ids, prev.peak, state);
+      if (!next) return prev;
       const same =
         next.peak.cash === prev.peak.cash &&
         next.peak.passive === prev.peak.passive &&
