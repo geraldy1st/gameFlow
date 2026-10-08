@@ -1,4 +1,5 @@
 import { UI_FR, UI_ES } from "./i18n-ui";
+import { fillVars, parseText } from "./text";
 
 export type Lang = "en" | "fr" | "es";
 export const LANG_KEY = "gameflow-lang";
@@ -617,6 +618,51 @@ const fr: Record<string, string> = {
   "Noa funds small runs and writes the terms where you can see them. She likes a clear no more than a muddy yes. If she tips a share, she has already done the boring reading, and she will not pretend the risk is a favor.":
     "Noa finance les petits coups et écrit les clauses là où tu peux les lire. Elle préfère un non clair à un oui trouble. Si elle te souffle une part, elle a déjà fait la lecture ennuyeuse, et elle ne fera pas semblant que le risque est un service.",
   "Paintings you earn stay under Options, then Rewards.": "Les tableaux gagnés restent dans Options, puis Récompenses.",
+  // DEF-I18N-01..04: journal, card and data strings (engine.ts / data.ts)
+  "Passed payday {amount}.": "Jour de paie passé : {amount}.",
+  "Founded {biz}. Opening revenue {amount}/mo.": "Fondation de {biz}. Revenu de départ {amount}/mois.",
+  "First books {amount}.": "Premiers comptes : {amount}.",
+  "{name} faded from your circle.": "{name} n’est plus dans ton cercle.",
+  "{asset} loses a payer.": "{asset} perd un payeur.",
+  "{asset} catches a wave. +$220/mo.": "{asset} surfe sur la vague. +$220/mois.",
+  "{asset} is marked down.": "{asset} : valeur dépréciée.",
+  "You prepay {amount} against a tax rumor.": "Tu prépaies {amount} face à une rumeur fiscale.",
+  "You and {partner} start a household.": "{partner} et toi fondez un foyer.",
+  "{name} joins the family. +{amount}/mo.": "{name} rejoint la famille. +{amount}/mois.",
+  "{name} joins as a business partner. +{amount}/mo.": "{name} te rejoint comme associé. +{amount}/mois.",
+  "{name} joins your circle.": "{name} rejoint ton cercle.",
+  "Tax paid {amount}.": "Impôt payé : {amount}.",
+  "A mentor lifts your salary +{amount}/mo.": "Un mentor augmente ton salaire de +{amount}/mois.",
+  "Passed on {title}.": "Tu passes ton tour sur {title}.",
+  "Bought {title}. {cf}/mo passive.": "Achat : {title}. {cf}/mois de passif.",
+  "Took {title}. {cf}/mo earned.": "Accepté : {title}. {cf}/mois gagnés.",
+  "Paid {title}. {amount}.": "Payé : {title}. {amount}.",
+  "Promoted. Salary +{amount}/mo, expenses +$140.": "Promotion. Salaire +{amount}/mois, dépenses +$140.",
+  "Layoff. You start as a {career}. +$600 severance. Clothes {clothes}/mo.": "Licenciement. Nouveau métier : {career}. +$600 d’indemnité. Vêtements {clothes}/mois.",
+  "New career: {career}. Clothes {clothes}/mo.": "Nouveau métier : {career}. Vêtements {clothes}/mois.",
+  "Bought clothes for {amount}. They are in the wardrobe.": "Vêtements achetés pour {amount}. Ils sont dans la garde-robe.",
+  "Bought {item} for {amount}. It is in the house.": "Acheté : {item}, pour {amount}. C’est dans la maison.",
+  "{who}'s birthday costs {amount}. Happiness and social rise.": "L’anniversaire de {who} coûte {amount}. Bonheur et vie sociale augmentent.",
+  "The museum costs {amount}. Intelligence rises.": "Le musée coûte {amount}. L’intelligence augmente.",
+  "{who}'s birthday costs {amount}.": "L’anniversaire de {who} coûte {amount}.",
+  "Movies with {who} cost {amount}.": "Le cinéma avec {who} coûte {amount}.",
+  "{who} gives you {amount}.": "{who} te donne {amount}.",
+  "{who} pays {amount} for the mission.": "{who} paie {amount} pour la mission.",
+  "{who}'s tip: {asset} pays {cf}/mo.": "Le tuyau de {who} : {asset} rapporte {cf}/mois.",
+  "{asset} opens with {who}. {cf}/mo.": "{asset} ouvre avec {who}. {cf}/mois.",
+  "You liked the time with {who}.": "Tu as aimé ce moment avec {who}.",
+  "You disliked the time with {who}.": "Tu n’as pas aimé ce moment avec {who}.",
+  "A night out costs {amount}.": "Une soirée dehors coûte {amount}.",
+  "{title} pays {cf}/mo.": "{title} rapporte {cf}/mois.",
+  "You bought {dream}.": "Tu as acheté {dream}.",
+  "Repair paid. {amount}.": "Réparation payée. {amount}.",
+  "A kind feature. Revenue +{amount}/mo.": "Un article bienveillant. Revenu +{amount}/mois.",
+  "Sold {biz} for {amount}. Back on the Freedom Track, still in the game.": "Vente de {biz} pour {amount}. De retour sur la Piste de la liberté, toujours dans la partie.",
+  "You sat out and still paid {amount}.": "Tu as passé ton tour et payé quand même {amount}.",
+  "Repaid {loan}.": "Remboursé : {loan}.",
+  "Sold {asset} for {amount}.": "Vendu : {asset}, pour {amount}.",
+  "The gate opens. Stipend {amount}.": "La porte s’ouvre. Allocation {amount}.",
+  "You step onto the Freedom Track. {story}": "Tu poses le pied sur la Piste de la liberté. {story}",
 };
 
 const es: Record<string, string> = {
@@ -1232,6 +1278,51 @@ const es: Record<string, string> = {
   "Noa funds small runs and writes the terms where you can see them. She likes a clear no more than a muddy yes. If she tips a share, she has already done the boring reading, and she will not pretend the risk is a favor.":
     "Noa financia los golpes pequeños y escribe las cláusulas donde puedes leerlas. Prefiere un no claro a un sí turbio. Si te sopla una participación, ya hizo la lectura aburrida, y no fingirá que el riesgo es un favor.",
   "Paintings you earn stay under Options, then Rewards.": "Los cuadros que ganas viven en Opciones, luego Recompensas.",
+  // DEF-I18N-01..04: journal, card and data strings (engine.ts / data.ts)
+  "Passed payday {amount}.": "Día de pago superado: {amount}.",
+  "Founded {biz}. Opening revenue {amount}/mo.": "{biz} queda fundada. Ingresos iniciales {amount}/mes.",
+  "First books {amount}.": "Primeras cuentas: {amount}.",
+  "{name} faded from your circle.": "{name} se alejó de tu círculo.",
+  "{asset} loses a payer.": "{asset} pierde un pagador.",
+  "{asset} catches a wave. +$220/mo.": "{asset} se sube a la ola. +$220/mes.",
+  "{asset} is marked down.": "{asset} se deprecia.",
+  "You prepay {amount} against a tax rumor.": "Pagas por adelantado {amount} ante un rumor fiscal.",
+  "You and {partner} start a household.": "{partner} y tú formáis un hogar.",
+  "{name} joins the family. +{amount}/mo.": "{name} se une a la familia. +{amount}/mes.",
+  "{name} joins as a business partner. +{amount}/mo.": "{name} se une como socio. +{amount}/mes.",
+  "{name} joins your circle.": "{name} se une a tu círculo.",
+  "Tax paid {amount}.": "Impuesto pagado: {amount}.",
+  "A mentor lifts your salary +{amount}/mo.": "Un mentor te sube el sueldo +{amount}/mes.",
+  "Passed on {title}.": "Dejas pasar {title}.",
+  "Bought {title}. {cf}/mo passive.": "Compraste {title}. {cf}/mes de pasivo.",
+  "Took {title}. {cf}/mo earned.": "Aceptaste {title}. {cf}/mes ganados.",
+  "Paid {title}. {amount}.": "Pagaste {title}. {amount}.",
+  "Promoted. Salary +{amount}/mo, expenses +$140.": "Ascenso. Sueldo +{amount}/mes, gastos +$140.",
+  "Layoff. You start as a {career}. +$600 severance. Clothes {clothes}/mo.": "Despido. Nuevo oficio: {career}. +$600 de indemnización. Ropa {clothes}/mes.",
+  "New career: {career}. Clothes {clothes}/mo.": "Oficio nuevo: {career}. Ropa {clothes}/mes.",
+  "Bought clothes for {amount}. They are in the wardrobe.": "Ropa comprada por {amount}. Está en el armario.",
+  "Bought {item} for {amount}. It is in the house.": "Compraste {item} por {amount}. Está en la casa.",
+  "{who}'s birthday costs {amount}. Happiness and social rise.": "El cumpleaños de {who} cuesta {amount}. Suben la felicidad y la vida social.",
+  "The museum costs {amount}. Intelligence rises.": "El museo cuesta {amount}. Sube la inteligencia.",
+  "{who}'s birthday costs {amount}.": "El cumpleaños de {who} cuesta {amount}.",
+  "Movies with {who} cost {amount}.": "El cine con {who} cuesta {amount}.",
+  "{who} gives you {amount}.": "{who} te da {amount}.",
+  "{who} pays {amount} for the mission.": "{who} paga {amount} por el encargo.",
+  "{who}'s tip: {asset} pays {cf}/mo.": "El soplo de {who}: {asset} paga {cf}/mes.",
+  "{asset} opens with {who}. {cf}/mo.": "{asset} abre con {who}. {cf}/mes.",
+  "You liked the time with {who}.": "Te gustó el rato con {who}.",
+  "You disliked the time with {who}.": "No te gustó el rato con {who}.",
+  "A night out costs {amount}.": "Una noche fuera cuesta {amount}.",
+  "{title} pays {cf}/mo.": "{title} paga {cf}/mes.",
+  "You bought {dream}.": "Compraste {dream}.",
+  "Repair paid. {amount}.": "Reparación pagada. {amount}.",
+  "A kind feature. Revenue +{amount}/mo.": "Un reportaje amable. Ingresos +{amount}/mes.",
+  "Sold {biz} for {amount}. Back on the Freedom Track, still in the game.": "Vendiste {biz} por {amount}. De vuelta en la Pista de la libertad, todavía en la partida.",
+  "You sat out and still paid {amount}.": "Perdiste el turno y aun así pagaste {amount}.",
+  "Repaid {loan}.": "Devolviste {loan}.",
+  "Sold {asset} for {amount}.": "Vendiste {asset} por {amount}.",
+  "The gate opens. Stipend {amount}.": "La puerta se abre. Asignación {amount}.",
+  "You step onto the Freedom Track. {story}": "Pisas la Pista de la libertad. {story}",
 };
 
 const long: Record<Lang, Record<string, string>> = {
@@ -1296,12 +1387,16 @@ export function readLang(): Lang {
 }
 
 export function tr(lang: Lang, text: string, vars?: Record<string, string | number>): string {
-  const table = lang === "fr" ? FR : lang === "es" ? ES : null;
-  let s = (table && table[text]) || text;
-  if (vars) {
-    for (const [k, v] of Object.entries(vars)) s = s.split(`{${k}}`).join(String(v));
+  // DEF-I18N-01/03: engine text stored as key + variables (text.ts): translate the key and every string variable.
+  const tok = parseText(text);
+  if (tok) {
+    const own: Record<string, string> = {};
+    for (const [k, v] of Object.entries(tok.v)) own[k] = typeof v === "string" ? tr(lang, v) : String(v);
+    return tr(lang, tok.k, { ...own, ...(vars ?? {}) });
   }
-  return s;
+  const table = lang === "fr" ? FR : lang === "es" ? ES : null;
+  const s = (table && table[text]) || text;
+  return vars ? fillVars(s, vars) : s;
 }
 
 export function trKey(lang: Lang, key: string, fallback: string): string {

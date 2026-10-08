@@ -770,7 +770,7 @@ export function GameFlow() {
       if (!p) return;
       setOutcome({
         mood: p.reaction,
-        line: outcomeLine(p.reaction, phraseSalt(state.turn, p.position, logLine.length)),
+        line: outcomeLine(p.reaction, phraseSalt(state.turn, p.position, tr("en", logLine).length)),
         fact: logLine,
         portrait: dressedPortrait(p, p.reaction),
         fallback: portraitOf(p),

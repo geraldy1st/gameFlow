@@ -1,3 +1,4 @@
+import { tl } from "./text";
 import {
   BIG_DEALS,
   BOOMS,
@@ -767,7 +768,7 @@ function collect(s: GameState, index: number, finalSpace: boolean): GameState {
   const amount = statement(p).cashFlow;
   const next = withP(s, (pl) => ({ ...pl, position: index, cash: pl.cash + amount }));
   if (finalSpace) return { ...next, passedPay: s.passedPay + amount };
-  return log({ ...next, passedPay: next.passedPay + amount }, `Passed payday ${money(amount, true)}.`);
+  return log({ ...next, passedPay: next.passedPay + amount }, tl("Passed payday {amount}.", { amount: money(amount, true) }));
 }
 
 function landing(s: GameState): GameState {
@@ -1446,8 +1447,8 @@ function foundBusiness(s: GameState, reason: GoalReason): GameState {
   const books = Math.max(0, statement(draft).cashFlow);
   const seated = { ...draft, cash: draft.cash + books };
   let n = withP(s, () => seated);
-  n = log(n, `Founded ${idea.name}. Opening revenue ${money(revenue)}/mo.`);
-  if (books > 0) n = log(n, `First books ${money(books, true)}.`);
+  n = log(n, tl("Founded {biz}. Opening revenue {amount}/mo.", { biz: idea.name, amount: money(revenue) }));
+  if (books > 0) n = log(n, tl("First books {amount}.", { amount: money(books, true) }));
   return blip(
     {
       ...n,
@@ -1942,7 +1943,7 @@ function beginTurn(s0: GameState, first = false): GameState {
     }
     return { ...p, turns, calm, friends, householdIn: Math.max(0, p.householdIn - 1), reaction: "idle", vitals: driftVitals(p.vitals ?? startingVitals(p.characterId), turns) };
   });
-  for (const name of faded) n = log(n, `${name} faded from your circle.`);
+  for (const name of faded) n = log(n, tl("{name} faded from your circle.", { name }));
   const p = cur(n);
   if (p.brokeTurns > 0) return { ...n, phase: "broke", card: null };
   if (p.skipTurns > 0) {
@@ -1979,13 +1980,13 @@ function applyMarket(p: Player, id: string): { player: Player; note: string; rea
     if (!assets.length) return { player: { ...p, cash: p.cash - 150 }, note: "No tenant to lose. A fee still finds you.", reaction: "stressed" };
     const i = assets.reduce((bi, a, idx) => (a.cashFlow > assets[bi]!.cashFlow ? idx : bi), 0);
     assets[i] = { ...assets[i]!, cashFlow: Math.max(40, assets[i]!.cashFlow - 180) };
-    return { player: { ...p, assets }, note: `${assets[i]!.name} loses a payer.`, reaction: "stressed" };
+    return { player: { ...p, assets }, note: tl("{asset} loses a payer.", { asset: assets[i]!.name }), reaction: "stressed" };
   }
   if (id === "viral") {
     if (!assets.length) return { player: { ...p, cash: p.cash + 300 }, note: "You go slightly viral. +$300.", reaction: "proud" };
     const i = 0;
     assets[i] = { ...assets[i]!, cashFlow: assets[i]!.cashFlow + 220 };
-    return { player: { ...p, assets }, note: `${assets[i]!.name} catches a wave. +$220/mo.`, reaction: "proud" };
+    return { player: { ...p, assets }, note: tl("{asset} catches a wave. +$220/mo.", { asset: assets[i]!.name }), reaction: "proud" };
   }
   if (id === "rates") {
     if (!p.liabilities.length) return { player: { ...p, cash: p.cash - 100 }, note: "Rates rise, but you owe no notes. A fee still stings.", reaction: "stressed" };
@@ -1999,11 +2000,11 @@ function applyMarket(p: Player, id: string): { player: Player; note: string; rea
   if (id === "crash") {
     if (!assets.length) return { player: { ...p, cash: Math.max(0, p.cash - 200) }, note: "The crash barely knows your name. −$200.", reaction: "stressed" };
     assets[0] = { ...assets[0]!, cashFlow: Math.max(30, Math.round(assets[0]!.cashFlow * 0.7)) };
-    return { player: { ...p, assets }, note: `${assets[0]!.name} is marked down.`, reaction: "stressed" };
+    return { player: { ...p, assets }, note: tl("{asset} is marked down.", { asset: assets[0]!.name }), reaction: "stressed" };
   }
   if (id === "glut") return { player: { ...p, nextDownCut: true }, note: "Your next down payment is 20% lighter.", reaction: "happy" };
   const due = Math.max(50, Math.round(p.cash * 0.08));
-  return { player: { ...p, cash: p.cash - due }, note: `You prepay ${money(due)} against a tax rumor.`, reaction: "stressed" };
+  return { player: { ...p, cash: p.cash - due }, note: tl("You prepay {amount} against a tax rumor.", { amount: money(due) }), reaction: "stressed" };
 }
 
 function applyBoom(p: Player, id: string, _seq: number): { player: Player; note: string; reaction: Reaction } {
@@ -2222,7 +2223,7 @@ function doChoice(s: GameState, id: string): GameState {
   if (payload.t === "career") return resolveCareer(s, payload, id);
   if (payload.t === "partner") {
     if (id !== "accept") return finish(s, "You kept your evenings.", "idle");
-    return finish(withP(s, (pl) => ({ ...pl, partner: { id: payload.id, helped: false } })), `You and ${partnerName(payload.id)} start a household.`, "love");
+    return finish(withP(s, (pl) => ({ ...pl, partner: { id: payload.id, helped: false } })), tl("You and {partner} start a household.", { partner: partnerName(payload.id) }), "love");
   }
   if (payload.t === "help") {
     if (id !== "accept" || !p.partner) return finish(s, "The venture waits.", "idle");
@@ -2249,7 +2250,7 @@ function doChoice(s: GameState, id: string): GameState {
         ...pl,
         children: [...pl.children, { id: `c${s.seq}`, name: payload.name }],
       })),
-      `${payload.name} joins the family. +$${CHILD_COST}/mo.`,
+      tl("{name} joins the family. +{amount}/mo.", { name: payload.name, amount: money(CHILD_COST) }),
       "love",
     );
   }
@@ -2265,7 +2266,7 @@ function doChoice(s: GameState, id: string): GameState {
         const socialGain = Math.max(0, vitals.social - (pl.vitals?.social ?? 50));
         return { ...pl, friends: [...pl.friends, { ...blankFriend(payload.id, role, s.turn), socialGain }], calm: 2, vitals };
       }),
-      role === "partner" ? `${name} joins as a business partner. +$${ALLY_INCOME}/mo.` : `${name} joins your circle.`,
+      role === "partner" ? tl("{name} joins as a business partner. +{amount}/mo.", { name, amount: money(ALLY_INCOME) }) : tl("{name} joins your circle.", { name }),
       role === "partner" ? "proud" : "happy",
     );
   }
@@ -2278,7 +2279,7 @@ function doChoice(s: GameState, id: string): GameState {
   }
   if (payload.t === "tax") {
     if (id === "borrow") return doChoice(s, "borrow");
-    return finish(withP(s, (pl) => ({ ...pl, cash: pl.cash - payload.amount })), `Tax paid ${money(payload.amount)}.`, "stressed");
+    return finish(withP(s, (pl) => ({ ...pl, cash: pl.cash - payload.amount })), tl("Tax paid {amount}.", { amount: money(payload.amount) }), "stressed");
   }
   if (payload.t === "health") {
     if (id === "rest") return finish(withP(s, (pl) => ({ ...pl, skipTurns: pl.skipTurns + 1 })), "You will skip your next turn to recover.", "idle");
@@ -2305,7 +2306,7 @@ function doChoice(s: GameState, id: string): GameState {
   if (payload.t === "mentor") {
     if (id === "raise") {
       const bonus = hasTrait(p, "Mentor") ? 350 : 150;
-      return finish(withP(s, (pl) => ({ ...pl, salaryBonus: pl.salaryBonus + bonus })), `A mentor lifts your salary +$${bonus}/mo.`, "proud");
+      return finish(withP(s, (pl) => ({ ...pl, salaryBonus: pl.salaryBonus + bonus })), tl("A mentor lifts your salary +{amount}/mo.", { amount: money(bonus) }), "proud");
     }
     if (id === "eye") return finish(withP(s, (pl) => ({ ...pl, nextCfBoost: true })), "The next asset you buy will pay more.", "proud");
     return finish(withP(s, (pl) => ({ ...pl, cash: pl.cash + 250 })), "Mentorship comes with $250.", "happy");
@@ -2434,15 +2435,15 @@ function rebuild(s: GameState, payload: Payload): GameState {
 }
 
 function resolveDeal(s: GameState, payload: Extract<Payload, { t: "deal" }>, id: string): GameState {
-  if (id === "decline") return finish(s, `Passed on ${dealById(payload.dealId).title}.`, "idle");
+  if (id === "decline") return finish(s, tl("Passed on {title}.", { title: dealById(payload.dealId).title }), "idle");
   if (id !== "accept") return s;
   const deal = dealById(payload.dealId);
   const p = cur(s);
   if (p.cash < payload.down) return s;
   const next = takeDeal(p, deal, payload.down, payload.cashFlow, s.seq);
   const note = deal.passive
-    ? `Bought ${deal.title}. ${money(payload.cashFlow, true)}/mo passive.`
-    : `Took ${deal.title}. ${money(payload.cashFlow, true)}/mo earned.`;
+    ? tl("Bought {title}. {cf}/mo passive.", { title: deal.title, cf: money(payload.cashFlow, true) })
+    : tl("Took {title}. {cf}/mo earned.", { title: deal.title, cf: money(payload.cashFlow, true) });
   return finish(withP({ ...s, seq: s.seq + 1 }, () => next), note, "proud");
 }
 
@@ -2461,7 +2462,7 @@ function resolveSpend(s: GameState, payload: Extract<Payload, { t: "spend" }>, i
   if (cur(s).cash < payload.amount) return s;
   return finish(
     withP(s, (p) => ({ ...p, cash: p.cash - payload.amount, expenseMods: p.expenseMods + (spend.monthly ?? 0) })),
-    `Paid ${spend.title}. ${money(payload.amount)}.`,
+    tl("Paid {title}. {amount}.", { title: spend.title, amount: money(payload.amount) }),
     "stressed",
   );
 }
@@ -2485,7 +2486,7 @@ function resolveCareer(s: GameState, payload: Extract<Payload, { t: "career" }>,
     const extra = hasTrait(p, "Mentor") ? 200 : 0;
     return finish(
       withP(s, (pl) => ({ ...pl, salaryBonus: pl.salaryBonus + 650 + extra, expenseMods: pl.expenseMods + 140 })),
-      `Promoted. Salary +$${650 + extra}/mo, expenses +$140.`,
+      tl("Promoted. Salary +{amount}/mo, expenses +$140.", { amount: money(650 + extra) }),
       "proud",
     );
   }
@@ -2522,8 +2523,8 @@ function resolveCareer(s: GameState, payload: Extract<Payload, { t: "career" }>,
         cash: pl.cash + (payload.kind === "layoff" ? 600 : 0),
       })),
       payload.kind === "layoff"
-        ? `Layoff. You start as a ${title}. +$600 severance. Clothes ${money(clothDelta(p.outfit), true)}/mo.`
-        : `New career: ${title}. Clothes ${money(clothDelta(p.outfit), true)}/mo.`,
+        ? tl("Layoff. You start as a {career}. +$600 severance. Clothes {clothes}/mo.", { career: title, clothes: money(clothDelta(p.outfit), true) })
+        : tl("New career: {career}. Clothes {clothes}/mo.", { career: title, clothes: money(clothDelta(p.outfit), true) }),
       payload.kind === "layoff" ? "stressed" : "proud",
     );
   }
@@ -2547,7 +2548,7 @@ function doBuyCloth(s: GameState, outfit: OutfitId): GameState {
   if (owned.includes(outfit) || p.cash < cost) return s;
   return log(
     withP(s, (pl) => ({ ...pl, cash: pl.cash - cost, ownedOutfits: [...owned, outfit] })),
-    `Bought clothes for ${money(cost)}. They are in the wardrobe.`,
+    tl("Bought clothes for {amount}. They are in the wardrobe.", { amount: money(cost) }),
   );
 }
 
@@ -2566,7 +2567,7 @@ function doBuyHome(s: GameState, id: string): GameState {
       homeOn: [...(pl.homeOn ?? []), id],
       vitals: bumpVitals(pl.vitals, item.bump),
     })),
-    `Bought ${item.name} for ${money(item.cost)}. It is in the house.`,
+    tl("Bought {item} for {amount}. It is in the house.", { item: item.name, amount: money(item.cost) }),
   );
 }
 
@@ -2655,7 +2656,7 @@ function resolveLife(s: GameState, kind: "birthday" | "museum" | "sleep", id: st
     const friend = [...p.friends].sort((a, b) => b.likes - a.likes || a.sinceTurn - b.sinceTurn)[0];
     if (!friend) return blip({ ...s, phase: "idle", card: null }, null);
     const who = friendDef(friend.id).name.split(" ")[0];
-    const n = withP(log(s, `${who}'s birthday costs ${money(cost)}. Happiness and social rise.`), (pl) => ({
+    const n = withP(log(s, tl("{who}'s birthday costs {amount}. Happiness and social rise.", { who, amount: money(cost) })), (pl) => ({
       ...pl,
       cash: pl.cash - cost,
       lifeTurn: s.turn,
@@ -2666,7 +2667,7 @@ function resolveLife(s: GameState, kind: "birthday" | "museum" | "sleep", id: st
     if (cur(n).cash < 0) return blip({ ...n, phase: "card", card: loanCard(false) }, "cash");
     return blip({ ...n, phase: "idle", card: null }, "cash");
   }
-  const n = withP(log(s, `The museum costs ${money(cost)}. Intelligence rises.`), (pl) => ({
+  const n = withP(log(s, tl("The museum costs {amount}. Intelligence rises.", { amount: money(cost) })), (pl) => ({
     ...pl,
     cash: pl.cash - cost,
     lifeTurn: s.turn,
@@ -2811,7 +2812,7 @@ function resolveCircle(s: GameState, payload: Extract<Payload, { t: "circle" }>,
   const who = friendDef(payload.friendId).name.split(" ")[0];
   if (payload.kind === "party" || payload.kind === "movies") {
     if (p.cash < payload.cost) return s;
-    const note = payload.kind === "party" ? `${who}'s birthday costs ${money(payload.cost)}.` : `Movies with ${who} cost ${money(payload.cost)}.`;
+    const note = payload.kind === "party" ? tl("{who}'s birthday costs {amount}.", { who, amount: money(payload.cost) }) : tl("Movies with {who} cost {amount}.", { who, amount: money(payload.cost) });
     return openRate(s, payload.friendId, note, "happy", (pl) => ({
       ...pl,
       cash: pl.cash - payload.cost,
@@ -2820,7 +2821,7 @@ function resolveCircle(s: GameState, payload: Extract<Payload, { t: "circle" }>,
     }));
   }
   if (payload.kind === "gift" || payload.kind === "mission") {
-    const note = payload.kind === "gift" ? `${who} gives you ${money(payload.gain)}.` : `${who} pays ${money(payload.gain)} for the mission.`;
+    const note = payload.kind === "gift" ? tl("{who} gives you {amount}.", { who, amount: money(payload.gain) }) : tl("{who} pays {amount} for the mission.", { who, amount: money(payload.gain) });
     return openRate(s, payload.friendId, note, "happy", (pl) => ({
       ...pl,
       cash: pl.cash + payload.gain,
@@ -2831,8 +2832,8 @@ function resolveCircle(s: GameState, payload: Extract<Payload, { t: "circle" }>,
   if (p.cash < payload.down) return s;
   const note =
     payload.kind === "stocks"
-      ? `${who}'s tip: ${payload.assetName} pays ${money(payload.cashFlow, true)}/mo.`
-      : `${payload.assetName} opens with ${who}. ${money(payload.cashFlow, true)}/mo.`;
+      ? tl("{who}'s tip: {asset} pays {cf}/mo.", { who, asset: payload.assetName, cf: money(payload.cashFlow, true) })
+      : tl("{asset} opens with {who}. {cf}/mo.", { who, asset: payload.assetName, cf: money(payload.cashFlow, true) });
   return openRate({ ...s, seq: s.seq + 1 }, payload.friendId, note, "proud", (pl) => ({
     ...pl,
     cash: pl.cash - payload.down,
@@ -2846,7 +2847,7 @@ function resolveRate(s: GameState, friendId: string, id: string): GameState {
   if (s.card?.payload.t !== "rate") return s;
   const like = id === "like";
   const who = friendDef(friendId).name.split(" ")[0];
-  const note = like ? `You liked the time with ${who}.` : `You disliked the time with ${who}.`;
+  const note = like ? tl("You liked the time with {who}.", { who }) : tl("You disliked the time with {who}.", { who });
   const n = withP(log(s, note), (p) => ({
     ...p,
     reaction: like ? "love" : "stressed",
@@ -2878,7 +2879,7 @@ function resolveFriendAct(s: GameState, id: string, choice: string): GameState {
         calm: 2,
         friends: p.friends.map((f) => (f.id === id ? { ...f, loyalty: Math.min(4, f.loyalty + 1) } : f)),
       })),
-      `A night out costs ${money(cost)}.`,
+      tl("A night out costs {amount}.", { amount: money(cost) }),
       "stressed",
     );
   }
@@ -2910,7 +2911,7 @@ function resolveLegacy(s: GameState, id: string, choice: string): GameState {
       cash: p.cash - item.cost,
       assets: [...p.assets, { id: `a${s.seq}`, name: item.title, cashFlow: item.cashFlow, down: item.cost, cost: item.cost }],
     })),
-    `${item.title} pays ${money(item.cashFlow, true)}/mo.`,
+    tl("{title} pays {cf}/mo.", { title: item.title, cf: money(item.cashFlow, true) }),
     "proud",
   );
 }
@@ -2920,7 +2921,7 @@ function resolveDream(s: GameState, id: string): GameState {
   const p = cur(s);
   const dream = dreamById(p.dreamId);
   if (p.track !== "freedom" || p.cash < dream.cost || p.dreamBought) return finish(s, "Not yet.", "idle");
-  return finish(withP(s, (pl) => ({ ...pl, cash: pl.cash - dream.cost, dreamBought: true })), `You bought ${dream.name}.`, "proud");
+  return finish(withP(s, (pl) => ({ ...pl, cash: pl.cash - dream.cost, dreamBought: true })), tl("You bought {dream}.", { dream: dream.name }), "proud");
 }
 
 function resolveGive(s: GameState, id: string): GameState {
@@ -3031,7 +3032,7 @@ function resolveOps(s: GameState, kind: "break" | "refund" | "smooth", id: strin
   if (p.cash < cost) return s;
   return finish(
     withP(s, (pl) => growBiz(pl, 0, 0, -cost, !!pl.business?.insured)),
-    `Repair paid. ${money(cost)}.`,
+    tl("Repair paid. {amount}.", { amount: money(cost) }),
     "stressed",
   );
 }
@@ -3047,7 +3048,7 @@ function resolvePress(s: GameState, kind: "feature" | "scandal"): GameState {
   if (!p.business) return finish(s, "No one is writing about you.", "idle");
   if (kind === "feature") {
     const bump = Math.round(p.business.revenue * 0.12);
-    return finish(withP(s, (pl) => growBiz(pl, bump, 0)), `A kind feature. Revenue +${money(bump)}/mo.`, "proud");
+    return finish(withP(s, (pl) => growBiz(pl, bump, 0)), tl("A kind feature. Revenue +{amount}/mo.", { amount: money(bump) }), "proud");
   }
   const covered = p.business.insured;
   const drop = Math.round(p.business.revenue * (covered ? 0.04 : 0.1));
@@ -3091,7 +3092,7 @@ function resolveExit(s: GameState, price: number, id: string): GameState {
       capstone: "exit",
       reaction: "proud",
     })),
-    `Sold ${name} for ${money(price)}. Back on the Freedom Track, still in the game.`,
+    tl("Sold {biz} for {amount}. Back on the Freedom Track, still in the game.", { biz: name, amount: money(price) }),
     "proud",
   );
 }
@@ -3122,7 +3123,7 @@ function doBreathe(s: GameState): GameState {
     if (cur(s).cash < due) {
       return blip({ ...s, phase: "card", card: loanCard(true) }, "card");
     }
-    return finish(withP(s, (p) => ({ ...p, cash: p.cash - due, brokeTurns: 0 })), `You sat out and still paid ${money(due)}.`, "stressed");
+    return finish(withP(s, (p) => ({ ...p, cash: p.cash - due, brokeTurns: 0 })), tl("You sat out and still paid {amount}.", { amount: money(due) }), "stressed");
   }
   return finish(withP(s, (p) => ({ ...p, brokeTurns: 0 })), "You catch your breath. No roll this turn.", "idle");
 }
@@ -3145,7 +3146,7 @@ function doRepay(s: GameState, id: string): GameState {
         cash: p.cash - loan.principal,
         liabilities: p.liabilities.filter((l) => l.id !== id),
       })),
-      `Repaid ${loan.name}.`,
+      tl("Repaid {loan}.", { loan: loan.name }),
     ),
     "cash",
   );
@@ -3164,7 +3165,7 @@ function doSell(s: GameState, id: string): GameState {
         assets: p.assets.filter((a) => a.id !== id),
         liabilities: p.liabilities.filter((l) => l.id !== `${id}:note`),
       })),
-      `Sold ${asset.name} for ${money(proceeds)}.`,
+      tl("Sold {asset} for {amount}.", { asset: asset.name, amount: money(proceeds) }),
     ),
     "cash",
   );
@@ -3176,7 +3177,7 @@ function doEnter(s: GameState): GameState {
   if (p.track !== "grind" || !unlocked(p)) return s;
   const amount = statement(p).cashFlow;
   let n = withP(s, (pl) => ({ ...pl, track: "freedom", position: 0, cash: pl.cash + amount, reaction: "proud" }));
-  n = log(n, `The gate opens. Stipend ${money(amount, true)}.`);
+  n = log(n, tl("The gate opens. Stipend {amount}.", { amount: money(amount, true) }));
   const card = buildSpace(n, "premium");
   return blip(
     {
@@ -3186,7 +3187,7 @@ function doEnter(s: GameState): GameState {
       card: {
         ...card,
         lines: [paydayLine(amount), ...card.lines],
-        story: `You step onto the Freedom Track. ${card.story}`,
+        story: tl("You step onto the Freedom Track. {story}", { story: card.story }),
       },
     },
     "win",

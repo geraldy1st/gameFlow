@@ -1,5 +1,8 @@
 /* Deterministic drivers for engine tests. Engine-agnostic so the regression fixture can be produced by another engine build. */
 
+import { tr } from "../i18n";
+import { parseText } from "../text";
+
 export interface EngineLike<S> {
   reduce: (s: S, a: { type: string; [k: string]: unknown }) => S;
 }
@@ -30,8 +33,19 @@ export function answer<S extends AnyState>(e: EngineLike<S>, s0: S, pick: (s: S)
 export const firstChoice = (s: AnyState): string => s.card!.choices[0]!.id;
 
 /** Canonical JSON (sorted keys) so snapshots don't depend on object key order. */
+const rendered = new Map<string, string>();
+function english(s: string): string {
+  let out = rendered.get(s);
+  if (out === undefined) rendered.set(s, (out = parseText(s) ? tr("en", s) : s));
+  return out;
+}
+
 export function canonical(v: unknown): string {
   return JSON.stringify(v, (_k, val) => {
+    // DEF-I18N: engine texts are stored as tl() tokens; hash their English rendering, so the fixture recorded with
+    // finished English sentences still proves the engine produces exactly the same game, word for word.
+    // (Plain strings from an older engine build are left untouched.)
+    if (typeof val === "string" && val.charCodeAt(0) === 0x2063) return english(val);
     if (val && typeof val === "object" && !Array.isArray(val)) {
       return Object.fromEntries(Object.keys(val).sort().map((k) => [k, (val as Record<string, unknown>)[k]]));
     }
