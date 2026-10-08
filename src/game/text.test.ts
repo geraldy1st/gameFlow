@@ -26,6 +26,15 @@ describe("DEF-I18N-01..04: engine text as key + variables, translated at display
     expect(show("fr", tl("Tax paid {amount}.", { amount: "$310" }))).not.toMatch(/Tax|paid|\$3/);
   });
 
+  it("[I18N-02] fixed journal and result lines are in both dictionaries", () => {
+    for (const en of ["Training complete.", "The market shrugs.", "Broke. Cash resets and you skip a turn.", "A smooth month. Payroll −$200.", "You stand on the Freedom Track."]) {
+      expect(tr("fr", en), en).not.toBe(en);
+      expect(tr("es", en), en).not.toBe(en);
+    }
+    expect(tr("fr", "The market shrugs.")).toBe("Le marché hausse les épaules.");
+    expect(tr("es", "The market shrugs.")).toBe("El mercado se encoge de hombros.");
+  });
+
   it("[I18N-01] old saves (finished English sentences) still display: exact lookup, else the English as-is", () => {
     expect(tr("fr", "Payday")).toBe("Jour de paie");
     expect(tr("fr", "Bought Corner laundromat. +$300/mo passive.")).toBe("Bought Corner laundromat. +$300/mo passive.");
