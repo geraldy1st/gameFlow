@@ -530,7 +530,7 @@ function takeDeal(p: Player, deal: DealDef, down: number, cashFlow: number, seq:
     if (deal.payment > 0) {
       next.liabilities = [
         ...p.liabilities,
-        { id: `${id}:note`, name: `${deal.title} note`, principal: Math.max(0, deal.cost - down), payment: deal.payment },
+        { id: `${id}:note`, name: tl("{title} note", { title: deal.title }), principal: Math.max(0, deal.cost - down), payment: deal.payment },
       ];
     }
   } else {
@@ -561,7 +561,7 @@ function dealCard(p: Player, deal: DealDef, pool: "small" | "big" | "premium", t
   const afford = training || p.cash >= priced.down;
   const choices: Choice[] = afford
     ? [gold(deal.passive ? "Buy it" : "Take it", "accept"), ghost("Decline", "decline")]
-    : [gold(`Borrow ${money(LOAN_CASH)}`, "borrow"), ghost("Decline", "decline")];
+    : [gold(tl("Borrow {amount}", { amount: money(LOAN_CASH) }), "borrow"), ghost("Decline", "decline")];
   if (!afford) lines.push({ k: "You are short", v: money(priced.down - p.cash), tone: "down" });
   return {
     title: deal.title,
@@ -578,8 +578,8 @@ function twoDealCard(p: Player, a: DealDef, b: DealDef): CardView {
   const pa = price(p, a);
   const pb = price(p, b);
   const choices: Choice[] = [];
-  choices.push(p.cash >= pa.down ? gold(`Take ${a.title}`, "a") : gold("Borrow, then look again", "borrow"));
-  if (p.cash >= pa.down) choices.push(p.cash >= pb.down ? gold(`Take ${b.title}`, "b") : ghost(`${b.title} — short`, "borrow"));
+  choices.push(p.cash >= pa.down ? gold(tl("Take {title}", { title: a.title }), "a") : gold("Borrow, then look again", "borrow"));
+  if (p.cash >= pa.down) choices.push(p.cash >= pb.down ? gold(tl("Take {title}", { title: b.title }), "b") : ghost(tl("{title} — short", { title: b.title }), "borrow"));
   else choices.push(ghost("Decline both", "decline"));
   if (p.cash >= pa.down) choices.push(ghost("Decline both", "decline"));
   return {
@@ -589,8 +589,8 @@ function twoDealCard(p: Player, a: DealDef, b: DealDef): CardView {
     portrait: friendDef("jun").portrait,
     tag: "Social circle",
     lines: [
-      { k: a.title, v: `${money(pa.down)} down · ${money(pa.cashFlow, true)}/mo`, tone: "gold" },
-      { k: b.title, v: `${money(pb.down)} down · ${money(pb.cashFlow, true)}/mo`, tone: "gold" },
+      { k: a.title, v: tl("{down} down · {cf}/mo", { down: money(pa.down), cf: money(pa.cashFlow, true) }), tone: "gold" },
+      { k: b.title, v: tl("{down} down · {cf}/mo", { down: money(pb.down), cf: money(pb.cashFlow, true) }), tone: "gold" },
       ...(isRealty(a.id) || isRealty(b.id) ? [clothesLine(clothDelta(p.outfit))] : []),
     ],
     choices,
@@ -626,7 +626,7 @@ function loanCard(fromBroke = false): CardView {
     title: fromBroke ? "Expenses still due" : "The ledger is red",
     story: fromBroke
       ? "Even a quiet turn has a cost of living. Borrow, or pay what cash you have and let the rest go."
-      : `Cash went negative. Borrow ${money(LOAN_CASH)} from the bank — it adds ${money(LOAN_PAYMENT)}/mo until you repay the principal — or go Broke and sit out a turn.`,
+      : tl("Cash went negative. Borrow {amount} from the bank — it adds {payment}/mo until you repay the principal — or go Broke and sit out a turn.", { amount: money(LOAN_CASH), payment: money(LOAN_PAYMENT) }),
     art: "/game/art/career.jpg",
     tag: "Bank",
     lines: [
@@ -645,7 +645,7 @@ function startCard(p: Player): CardView {
   const who = face(p);
   return {
     title: st.career.title,
-    story: `${who.name.split(" ")[0]} starts as a ${st.career.title.toLowerCase()}. ${st.career.blurb} Cash on hand is modest. The Grind is not.`,
+    story: tl("{name} starts as a {career|lower}. {blurb} Cash on hand is modest. The Grind is not.", { name: who.name.split(" ")[0]!, career: st.career.title, blurb: st.career.blurb }),
     art: "/game/art/career.jpg",
     portrait: who.portrait,
     tag: "Starting career",
@@ -852,7 +852,7 @@ function trainingCard(s: GameState, kind: string, turn: number): CardView {
     const card = dealCard(p, dealById(TRAINING_DEAL), "small", true);
     return {
       ...card,
-      lines: [...card.lines, { k: "Training price cap", v: `${money(TRAINING_DEAL_CAP)} max`, tone: "gold" }],
+      lines: [...card.lines, { k: "Training price cap", v: tl("{amount} max", { amount: money(TRAINING_DEAL_CAP) }), tone: "gold" }],
     };
   }
   if (turn === 4 && kind === "lifestyle") return trainingSpendCard(p);
@@ -886,7 +886,7 @@ function trainingSpendCard(p: Player): CardView {
       { k: "One-off", v: money(once.amount), tone: "gold" },
       { k: "Subscription over 12 months", v: money(year), tone: "down" },
     ],
-    choices: [ghost(`Pay ${money(amount)}`, "pay"), gold("Let it pass", "decline")],
+    choices: [ghost(tl("Pay {amount}", { amount: money(amount) }), "pay"), gold("Let it pass", "decline")],
     payload: { t: "spend", spendId: spend.id, amount },
   };
 }
@@ -924,7 +924,7 @@ function lifestyleCard(s: GameState): CardView {
   const choices: Choice[] =
     p.cash >= amount
       ? [gold("Pay", "pay"), ghost("Let it pass", "decline")]
-      : [gold(`Borrow ${money(LOAN_CASH)}`, "borrow"), ghost("Let it pass", "decline")];
+      : [gold(tl("Borrow {amount}", { amount: money(LOAN_CASH) }), "borrow"), ghost("Let it pass", "decline")];
   return {
     title: spend.title,
     story: spend.story,
@@ -1090,7 +1090,7 @@ function loveCard(s: GameState): CardView {
     const person = PARTNERS[Math.floor(r2.value * PARTNERS.length)]!;
     return {
       title: person.name,
-      story: `${person.blurb} They ask if this is a one-time coffee or a life.`,
+      story: tl("{blurb} They ask if this is a one-time coffee or a life.", { blurb: person.blurb }),
       art: "/game/art/love.jpg",
       portrait: person.portrait,
       tag: "Love & family",
@@ -1106,7 +1106,7 @@ function loveCard(s: GameState): CardView {
     const person = partnerDef(p)!;
     return {
       title: "A household venture",
-      story: `${person.name.split(" ")[0]} wants to run a small thing beside your life. It would pay you both.`,
+      story: tl("{name} wants to run a small thing beside your life. It would pay you both.", { name: person.name.split(" ")[0]! }),
       art: "/game/art/love.jpg",
       portrait: person.portrait,
       tag: "Household",
@@ -1121,13 +1121,13 @@ function loveCard(s: GameState): CardView {
     return {
       title: "A new name in the house",
       story: p.partner
-        ? `You and ${partnerDef(p)!.name.split(" ")[0]} choose the name ${name}. The ledger grows a line called love.`
-        : `${name} comes into your care. The month gets more expensive and much louder.`,
+        ? tl("You and {partner} choose the name {name}. The ledger grows a line called love.", { partner: partnerDef(p)!.name.split(" ")[0]!, name })
+        : tl("{name} comes into your care. The month gets more expensive and much louder.", { name }),
       art: "/game/art/love.jpg",
       portrait: partnerDef(p)?.portrait,
       tag: "Family",
       lines: [{ k: "Child expenses", v: `+${money(CHILD_COST)}/mo`, tone: "down" }],
-      choices: [gold(`Welcome ${name}`, "accept", true)],
+      choices: [gold(tl("Welcome {name}", { name }), "accept", true)],
       payload: { t: "child", name },
     };
   }
@@ -1135,7 +1135,7 @@ function loveCard(s: GameState): CardView {
     const person = partnerDef(p)!;
     return {
       title: "An argument with a view",
-      story: `${person.name.split(" ")[0]} says the spending isn’t the point. It still feels like the point.`,
+      story: tl("{name} says the spending isn’t the point. It still feels like the point.", { name: person.name.split(" ")[0]! }),
       art: "/game/art/love.jpg",
       portrait: person.portrait,
       tag: "Love & family",
@@ -1206,7 +1206,7 @@ function meetCard(person: PersonDef): CardView {
     tag: "A meeting",
     lines: [
       { k: "Trait", v: person.trait, tone: "gold" },
-      { k: "Business partner", v: `+${money(ALLY_INCOME)}/mo · ${money(ALLY_COST)}/mo costs`, tone: "up" },
+      { k: "Business partner", v: tl("+{income}/mo · {cost}/mo costs", { income: money(ALLY_INCOME), cost: money(ALLY_COST) }), tone: "up" },
     ],
     choices: [gold("Become friends", "friend"), gold("Business partner", "biz"), ghost("Ignore", "decline")],
     payload: { t: "friend", id: person.id },
@@ -1340,7 +1340,7 @@ function familyCard(p: Player): CardView {
     const who = p.partner ? partnerDef(p)!.name.split(" ")[0] : p.children[0]!.name;
     return {
       title: "Family milestone",
-      story: `${who} wants the day marked. A loud party, or a quiet gift that still counts.`,
+      story: tl("{who} wants the day marked. A loud party, or a quiet gift that still counts.", { who }),
       art: "/game/art/love.jpg",
       portrait: p.partner ? partnerDef(p)!.portrait : face(p).portrait,
       tag: "Family milestone",
@@ -1373,8 +1373,8 @@ function ascentCard(p: Player, reason: GoalReason): CardView {
   return {
     title: wonDream ? "The dream is paid for" : "The month pays itself",
     story: wonDream
-      ? `${dream.name} is yours. That was level 1. Level 2 asks what you do with a life that finally works: fold this month into a business, or keep the revenue and aim higher. The table stays set either way.`
-      : `Passive income cleared ${money(PASSIVE_WIN)} a month. That was level 1. Level 2 asks whether you build a company on it, or keep this revenue and push further. You can retire later. You do not have to stop now.`,
+      ? tl("{dream} is yours. That was level 1. Level 2 asks what you do with a life that finally works: fold this month into a business, or keep the revenue and aim higher. The table stays set either way.", { dream: dream.name })
+      : tl("Passive income cleared {amount} a month. That was level 1. Level 2 asks whether you build a company on it, or keep this revenue and push further. You can retire later. You do not have to stop now.", { amount: money(PASSIVE_WIN) }),
     art: wonDream ? dream.art : "/game/art/market.jpg",
     portrait: face(p).portrait,
     tag: "Level 2",
@@ -1382,7 +1382,7 @@ function ascentCard(p: Player, reason: GoalReason): CardView {
       { k: "Cash flow", v: `${money(st.cashFlow, true)}/mo`, tone: "gold" },
       { k: "Passive", v: `${money(st.passive)}/mo`, tone: "up" },
       { k: "Found a business", v: "New ring, seeded by this month", tone: "gold" },
-      { k: "Keep this revenue", v: `${money(FORTUNE_PASSIVE)}/mo or ${money(FORTUNE_CASH)} cash`, tone: "up" },
+      { k: "Keep this revenue", v: tl("{passive}/mo or {cash} cash", { passive: money(FORTUNE_PASSIVE), cash: money(FORTUNE_CASH) }), tone: "up" },
     ],
     choices: [gold("Found a business", "found"), ghost("Keep this revenue", "keep")],
     payload: { t: "ascent", reason },
@@ -1393,7 +1393,7 @@ function summitCard(p: Player, kind: "venture" | "fortune"): CardView {
   if (kind === "venture" && p.business) {
     return {
       title: "The company can stand",
-      story: `${p.business.name} clears ${money(VENTURE_GOAL)} a month. Retire if the story feels finished, or keep the doors open and play on.`,
+      story: tl("{biz} clears {amount} a month. Retire if the story feels finished, or keep the doors open and play on.", { biz: p.business.name, amount: money(VENTURE_GOAL) }),
       art: dreamById(p.dreamId).art,
       tag: "Level 2",
       lines: [
@@ -1455,14 +1455,14 @@ function foundBusiness(s: GameState, reason: GoalReason): GameState {
       phase: "card",
       card: {
         title: idea.name,
-        story: `${idea.blurb} The outer ring is now The Venture. Grow it toward ${money(VENTURE_GOAL)} a month, or take an exit when one is offered. You can retire whenever you like.`,
+        story: tl("{blurb} The outer ring is now The Venture. Grow it toward {amount} a month, or take an exit when one is offered. You can retire whenever you like.", { blurb: idea.blurb, amount: money(VENTURE_GOAL) }),
         art: dreamById(p.dreamId).art,
         tag: "Level 2 · Business",
         lines: [
           { k: "Stake", v: money(stake), tone: "down" },
           { k: "Revenue", v: `${money(revenue)}/mo`, tone: "up" },
           { k: "Payroll", v: `${money(payroll)}/mo`, tone: "down" },
-          { k: "Goal", v: `${money(VENTURE_GOAL)}/mo revenue`, tone: "gold" },
+          { k: "Goal", v: tl("{amount}/mo revenue", { amount: money(VENTURE_GOAL) }), tone: "gold" },
         ],
         choices: [gold("Open the doors", "ok", true)],
         payload: { t: "ok" },
@@ -1534,7 +1534,7 @@ function renderClient(p: Player, id: "retainer" | "whale" | "walkin"): CardView 
     const afford = p.cash >= cost;
     return {
       title: "A whale on the books",
-      story: `${biz.name} can land one account that changes the year. It costs to win them, and they will expect staff.`,
+      story: tl("{biz} can land one account that changes the year. It costs to win them, and they will expect staff.", { biz: biz.name }),
       art: "/game/art/market.jpg",
       tag: "Client",
       lines: [
@@ -1637,7 +1637,7 @@ function renderExpand(p: Player, id: "site" | "gear"): CardView {
     const cost = 7500;
     return {
       title: "A second site",
-      story: `${p.business!.name} could open another door. The lease is the honest part. The staff bill comes after.`,
+      story: tl("{biz} could open another door. The lease is the honest part. The staff bill comes after.", { biz: p.business!.name }),
       art: "/game/art/big.jpg",
       tag: "Expand",
       lines: [
@@ -1729,7 +1729,7 @@ function renderOps(p: Player, id: "break" | "refund" | "smooth"): CardView {
     ],
     choices:
       p.cash >= cost
-        ? [gold(`Pay ${money(cost)}`, "pay"), ghost("Improvise", "skip")]
+        ? [gold(tl("Pay {amount}", { amount: money(cost) }), "pay"), ghost("Improvise", "skip")]
         : [gold("Borrow $1,000", "borrow"), ghost("Improvise", "skip")],
     payload: { t: "ops", id: "break" },
   };
@@ -1739,7 +1739,7 @@ function pitchCard(p: Player): CardView {
   if (!p.business) return noCompany();
   return {
     title: "An angel in the doorway",
-    story: `${p.business.name} can take outside money. The check is large. So is the payroll they quietly add for 'oversight.'`,
+    story: tl("{biz} can take outside money. The check is large. So is the payroll they quietly add for 'oversight.'", { biz: p.business.name }),
     art: "/game/art/friends.jpg",
     tag: "Pitch",
     lines: [
@@ -1800,7 +1800,7 @@ function brandCard(p: Player): CardView {
   const cost = 2400;
   return {
     title: "Put the name on it",
-    story: `A proper mark for ${p.business.name}: type, a sign, a way for strangers to remember you on purpose.`,
+    story: tl("A proper mark for {biz}: type, a sign, a way for strangers to remember you on purpose.", { biz: p.business.name }),
     art: "/game/art/studio.jpg",
     tag: "Brand",
     lines: [
@@ -1845,7 +1845,7 @@ function exitCard(s: GameState): CardView {
   const price = p.business.revenue * multiple;
   return {
     title: "An exit offer",
-    story: `A buyer wants ${p.business.name}. The check is ${multiple} months of revenue. Sell and walk back to the Freedom Track with the fortune, or keep the doors and the life.`,
+    story: tl("A buyer wants {biz}. The check is {n} months of revenue. Sell and walk back to the Freedom Track with the fortune, or keep the doors and the life.", { biz: p.business.name, n: multiple }),
     art: "/game/art/big.jpg",
     tag: "Exit",
     lines: [
@@ -3324,7 +3324,7 @@ function doHouse(s: GameState): GameState {
       phase: "card",
       card: {
         title: "Household decision",
-        story: `${person.name.split(" ")[0]} spreads the month on the table and waits.`,
+        story: tl("{name} spreads the month on the table and waits.", { name: person.name.split(" ")[0]! }),
         art: "/game/art/love.jpg",
         portrait: person.portrait,
         tag: "Household",

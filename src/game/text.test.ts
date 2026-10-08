@@ -40,4 +40,18 @@ describe("DEF-I18N-01..04: engine text as key + variables, translated at display
     expect(tr("fr", "Bought Corner laundromat. +$300/mo passive.")).toBe("Bought Corner laundromat. +$300/mo passive.");
     expect(tr("es", "\u2063tl:{broken")).toBe("\u2063tl:{broken");
   });
+
+  it("[I18N-03] every tl() key of the engine exists in fr and es with the same placeholders", () => {
+    const src = readFileSync(new URL("./engine.ts", import.meta.url), "utf8");
+    const keys = [...src.matchAll(/\btl\(\s*"((?:[^"\\]|\\.)*)"/g)].map((m) => JSON.parse(`"${m[1]}"`) as string);
+    expect(keys.length).toBeGreaterThan(70);
+    const names = (s: string) => [...s.matchAll(/\{(\w+)(?:\|lower)?\}/g)].map((m) => m[1]).sort();
+    for (const k of keys) {
+      for (const lang of ["fr", "es"] as const) {
+        const v = tr(lang, k);
+        if (k !== "{amount} max" || lang === "es") expect(v, `${lang}: ${k}`).not.toBe(k); // "{amount} max" is French too
+        expect(names(v), `${lang}: ${k}`).toEqual(names(k));
+      }
+    }
+  });
 });
