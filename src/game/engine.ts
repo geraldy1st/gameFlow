@@ -1,4 +1,5 @@
 import { tl } from "./text";
+import { metroOfferTurn, metroReward } from "./metro-run";
 import {
   BIG_DEALS,
   BOOMS,
@@ -303,6 +304,11 @@ export interface GameState {
    * (trophies) nor the passive-income chart history. Absent in normal games and old saves.
    */
   practice?: boolean;
+  /**
+   * Metro run (metro-run.ts): the last multiple of 10 whose offer was answered (declined or played), so each offer
+   * opens once. Optional: absent in old saves and new games = never offered.
+   */
+  metroTurn?: number;
 }
 
 export interface TrainingState {
@@ -2074,6 +2080,7 @@ export type Action =
   | { type: "MUTE" }
   | { type: "NEW"; picks: Pick[]; training?: boolean }
   | { type: "SKIP_TRAINING" }
+  | { type: "METRO"; result: "decline" | "run"; lives?: number }
   | { type: "CONTINUE"; saved: GameState };
 
 /**
@@ -2109,6 +2116,8 @@ export function reduce(state: GameState, action: Action): GameState {
       // A tutorial game gets its own seed even when it is created in the same millisecond as the real game it
       // stands in front of (DEF-TUT-10/11), so the two never share a seed.
       return createMatch(action.picks, (Date.now() ^ (state.seed + 17) ^ (action.training ? 0x5bd1e995 : 0)) >>> 0, state.muted, { training: !!action.training });
+    case "METRO":
+      return doMetro(state, action.result, action.lives ?? 0);
     case "SKIP_TRAINING":
       if (!state.training || state.training.skipped) return state;
       return log({ ...state, training: { ...state.training, skipped: true } }, "Training skipped: normal rules from the next turn.");
@@ -3128,6 +3137,21 @@ function doBreathe(s: GameState): GameState {
   return finish(withP(s, (p) => ({ ...p, brokeTurns: 0 })), "You catch your breath. No roll this turn.", "idle");
 }
 
+/**
+ * Metro run answer. Only while an offer is due (metroOfferTurn), so it opens once per multiple of 10 and can't be
+ * replayed. Declining or failing changes nothing but the journal; a finished run credits the active player's cash
+ * only (no calm, loans, assets or position). Always ends with the offer marked as answered.
+ */
+function doMetro(s: GameState, result: "decline" | "run", lives: number): GameState {
+  const due = metroOfferTurn(s);
+  if (due === null) return s;
+  const n = { ...s, metroTurn: due };
+  if (result === "decline") return log(n, "Metro run: not this time");
+  const reward = metroReward(lives);
+  if (reward <= 0) return log(n, "Metro run: missed");
+  return blip(log(withP(n, (p) => ({ ...p, cash: p.cash + reward })), tl("Metro run: +{amount}", { amount: money(reward) })), "cash");
+}
+
 function doBorrow(s: GameState): GameState {
   if (trainingFor(s)) return s;
   if (s.phase === "card") return doChoice(s, "borrow");
@@ -3299,6 +3323,8 @@ export function hydrate(saved: GameState): GameState {
   // A save from before DEF-TUT-10 whose script is still running is a tutorial game too.
   if (saved.practice === true || (s.training && !s.training.skipped)) s.practice = true;
   else delete s.practice;
+  if (typeof saved.metroTurn === "number" && Number.isFinite(saved.metroTurn) && saved.metroTurn > 0) s.metroTurn = Math.floor(saved.metroTurn);
+  else delete s.metroTurn;
   if (!players.length) return { ...blankMenu(), muted: !!saved.muted };
   if (s.screen === "win" || s.phase === "win") {
     const idx = Math.min(Math.max(s.winner ?? 0, 0), players.length - 1);

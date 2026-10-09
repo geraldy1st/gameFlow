@@ -27,17 +27,20 @@ import {
   type Player,
   type Reaction,
 } from "@/game/engine";
+import { makeAutopilot, metroOfferTurn, wrongGestures, type MetroAction, type RunState } from "@/game/metro-run";
 import { arrivalLine, arrivalMood, bodyPortrait, dressedPortrait, expressionOf, outcomeLine, phraseSalt, speakerIsNpc } from "@/game/speech";
 import { DealSheet } from "./boite/DealSheet";
 import { fmtMoney, localizeMoney } from "./boite/format";
 import { FriendScene, type FriendEvent } from "./boite/FriendScene";
 import { CoinRain, GateScene } from "./boite/GateScene";
 import { usePassiveHistory, type Point } from "./boite/history";
-import { prefersReducedMotion, useIsMobile, useModalFocus } from "./boite/hooks";
+import { prefersReducedMotion, useIsMobile, useModalFocus, useReducedMotion } from "./boite/hooks";
 import { FAMILIES, IconDefs, Ico, type Family } from "./boite/icons";
 import { IntroVideo, probeIntro, type IntroPick } from "./boite/IntroVideo";
 import { MenuScreen } from "./boite/MenuScreen";
 import { MetroBoard, trackSpaces } from "./boite/MetroBoard";
+import { MetroOffer, MetroRun } from "./boite/MetroRun";
+import type { RunnerAudio } from "./boite/metro-audio";
 import { TrainingCoach, coachView, type TutLocal } from "./boite/TrainingCoach";
 import {
   TRAINING_BACKUP_KEY,
@@ -55,6 +58,16 @@ import { TRAINING_STRINGS, fill } from "./boite/training-strings";
 import { BoxDie, Dock, FlowBox, GateBox, MobileHud, PassiveChart, StationStrip, WhoBox, hereLabel, lineName, rollLabel } from "./boite/PlayerMat";
 
 type TFn = (text: string, vars?: Record<string, string | number>) => string;
+
+// Hidden test hook for the metro run: only in dev builds (or a build made with VITE_METRO_HOOK=1, never the
+// public one). `?metro-demo=win` lets a bot play the right gestures, `?metro-demo=crash` the wrong ones.
+// `?metro-demo=hurt` takes one hit (+$250).
+const METRO_HOOK = import.meta.env.DEV || import.meta.env.VITE_METRO_HOOK === "1";
+function metroDemoDriver(): ((s: RunState) => MetroAction | null) | undefined {
+  if (!METRO_HOOK || typeof window === "undefined") return undefined;
+  const v = new URLSearchParams(window.location.search).get("metro-demo");
+  return v === "win" ? makeAutopilot() : v === "hurt" ? makeAutopilot({ miss: [3] }) : v === "crash" ? wrongGestures : undefined;
+}
 
 function MoodFace({
   src,
@@ -593,6 +606,10 @@ export function GameFlow() {
   const [replayAsk, setReplayAsk] = useState<ReplayAsk>(null);
   const [hasBackup, setHasBackup] = useState(false);
   const [outcome, setOutcome] = useState<{ mood: Reaction; line: string; fact: string; portrait: string; fallback: string; name: string } | null>(null);
+  // Metro run: the accepted offer being played (the game state only changes when it is over).
+  const [metroPlay, setMetroPlay] = useState<{ turn: number; audio: RunnerAudio; driver?: (s: RunState) => MetroAction | null } | null>(null);
+  const metroBusyRef = useRef(false);
+  const reducedMotion = useReducedMotion();
   const phaseRef = useRef(state.phase);
   const logRef = useRef(state.log[0] ?? "");
   const stateRef = useRef(state);
@@ -798,6 +815,7 @@ export function GameFlow() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const s = stateRef.current;
+      if (metroBusyRef.current) return; // the metro offer / run owns the keyboard meanwhile
       if (friendEv || introMode) return;
       if (coachRef.current && !rules && !optionsOpen) return; // the coach owns Enter / Space meanwhile
       if (gateOpenRef.current && !rules && !optionsOpen) {
@@ -1088,7 +1106,12 @@ export function GameFlow() {
   const points: Point[] = player ? (passiveHistory[player.id] ?? []) : [];
   const isMobile = useIsMobile();
   const otherOverlay = !!(coach || outcome || friendEv || statusFor || historyOpen || friendId || circleOpen || dayOpen || shopOpen || wardrobeOpen || chat || ledgerOpen || legendOpen || rules || tutorial !== null || confirmNew || introMode || typeof intro === "number");
-  const gateOpen = !!player && state.screen === "play" && state.phase === "idle" && player.track === "grind" && player.level < 2 && unlocked(player) && !gateSeen[player.id] && !otherOverlay;
+  // Metro run offer: due at the end of every 10th turn (never in the training / practice), one per multiple of 10.
+  const metroDue = metroOfferTurn(state);
+  const metroOffer = metroDue !== null && !metroPlay && !otherOverlay && !optionsOpen;
+  const metroBusy = metroOffer || !!metroPlay;
+  metroBusyRef.current = metroBusy;
+  const gateOpen = !!player && state.screen === "play" && state.phase === "idle" && player.track === "grind" && player.level < 2 && unlocked(player) && !gateSeen[player.id] && !otherOverlay && !metroBusy;
   const dismissGate = () => {
     if (player) setGateSeen((g) => ({ ...g, [player.id]: true }));
   };
@@ -1459,7 +1482,38 @@ export function GameFlow() {
         </div>
       )}
 
-      {state.screen === "play" && state.phase === "pass" && player && !coach && (
+      {metroOffer && player && metroDue !== null && (
+        <MetroOffer
+          t={t}
+          money={money}
+          portrait={portraitOf(player)}
+          reduced={reducedMotion}
+          gameMuted={state.muted}
+          onDecline={() => go({ type: "METRO", result: "decline" })}
+          onRun={(audio) => setMetroPlay({ turn: metroDue, audio, driver: metroDemoDriver() })}
+        />
+      )}
+
+      {metroPlay && player && (
+        <MetroRun
+          t={t}
+          money={money}
+          name={nameOf(player)}
+          faces={{ idle: portraitOf(player), happy: expressionOf(player, "happy"), stressed: expressionOf(player, "stressed") }}
+          skirt={player.characterId === "aoi"}
+          cash={player.cash}
+          reduced={reducedMotion}
+          gameMuted={state.muted}
+          audio={metroPlay.audio}
+          driver={metroPlay.driver}
+          onDone={(lives) => {
+            setMetroPlay(null);
+            go({ type: "METRO", result: "run", lives });
+          }}
+        />
+      )}
+
+      {state.screen === "play" && state.phase === "pass" && player && !coach && !metroBusy && (
         <div className="overlay">
           <div className="pass-gate">
             <p className="kicker">{t("Hot-seat")}</p>

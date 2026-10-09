@@ -618,6 +618,10 @@ const fr: Record<string, string> = {
   "Noa funds small runs and writes the terms where you can see them. She likes a clear no more than a muddy yes. If she tips a share, she has already done the boring reading, and she will not pretend the risk is a favor.":
     "Noa finance les petits coups et écrit les clauses là où tu peux les lire. Elle préfère un non clair à un oui trouble. Si elle te souffle une part, elle a déjà fait la lecture ennuyeuse, et elle ne fera pas semblant que le risque est un service.",
   "Paintings you earn stay under Options, then Rewards.": "Les tableaux gagnés restent dans Options, puis Récompenses.",
+  // Metro run journal lines (engine.ts doMetro)
+  "Metro run: not this time": "Course vers le métro : pas cette fois",
+  "Metro run: missed": "Course vers le métro : ratée",
+  "Metro run: +{amount}": "Course vers le métro : +{amount}",
   // DEF-I18N-01..04: journal, card and data strings (engine.ts / data.ts)
   "Lattes, chalk menus, and paint under your nails.": "Des lattes, des menus à la craie et de la peinture sous les ongles.",
   "Other people’s decimals, your own cramped desk.": "Les décimales des autres, ton propre bureau exigu.",
@@ -1744,6 +1748,10 @@ const es: Record<string, string> = {
     "Noa financia los golpes pequeños y escribe las cláusulas donde puedes leerlas. Prefiere un no claro a un sí turbio. Si te sopla una participación, ya hizo la lectura aburrida, y no fingirá que el riesgo es un favor.",
   "Paintings you earn stay under Options, then Rewards.": "Los cuadros que ganas viven en Opciones, luego Recompensas.",
   "Hot-seat pass": "Pasa la mesa",
+  // Metro run journal lines (engine.ts doMetro)
+  "Metro run: not this time": "Carrera al metro: esta vez no",
+  "Metro run: missed": "Carrera al metro: fallida",
+  "Metro run: +{amount}": "Carrera al metro: +{amount}",
   // DEF-I18N-01..04: journal, card and data strings (engine.ts / data.ts)
   "Lattes, chalk menus, and paint under your nails.": "Lattes, menús de tiza y pintura bajo las uñas.",
   "Other people’s decimals, your own cramped desk.": "Los decimales de otros, tu propio escritorio apretado.",
