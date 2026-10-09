@@ -174,6 +174,11 @@ export interface Player {
   reaction: Reaction;
   calm: number;
   turns: number;
+  /**
+   * Metro run (metro-run.ts): the last multiple of 10 of this player's own turns whose offer was answered (declined
+   * or played), so each player's offer opens once per multiple. Optional: absent in old saves and new games.
+   */
+  metroTurn?: number;
   householdIn: number;
   nextCfBoost: boolean;
   nextDownCut: boolean;
@@ -304,11 +309,6 @@ export interface GameState {
    * (trophies) nor the passive-income chart history. Absent in normal games and old saves.
    */
   practice?: boolean;
-  /**
-   * Metro run (metro-run.ts): the last multiple of 10 whose offer was answered (declined or played), so each offer
-   * opens once. Optional: absent in old saves and new games = never offered.
-   */
-  metroTurn?: number;
 }
 
 export interface TrainingState {
@@ -3145,7 +3145,7 @@ function doBreathe(s: GameState): GameState {
 function doMetro(s: GameState, result: "decline" | "run", lives: number): GameState {
   const due = metroOfferTurn(s);
   if (due === null) return s;
-  const n = { ...s, metroTurn: due };
+  const n = withP(s, (p) => ({ ...p, metroTurn: due }));
   if (result === "decline") return log(n, "Metro run: not this time");
   const reward = metroReward(lives);
   if (reward <= 0) return log(n, "Metro run: missed");
@@ -3265,6 +3265,10 @@ function withPlayerDefaults(raw0: Player): Player {
   return p;
 }
 
+function validMetroTurn(v: unknown): number | undefined {
+  return typeof v === "number" && Number.isFinite(v) && v > 0 ? Math.floor(v) : undefined;
+}
+
 function hydratePlayer(raw0: Player): Player {
   const raw = withPlayerDefaults(raw0);
   const level = raw.level === 2 ? 2 : 1;
@@ -3294,6 +3298,7 @@ function hydratePlayer(raw0: Player): Player {
       dislikes: f.dislikes ?? 0,
     })),
     circleTurn: raw.circleTurn ?? 0,
+    metroTurn: validMetroTurn(raw.metroTurn),
     lifeTurn: typeof raw.lifeTurn === "number" ? raw.lifeTurn : 0,
     outfit: isOutfit(raw.outfit) ? raw.outfit : "jeans",
     ownedOutfits: ownedOutfitsOf(raw),
@@ -3323,8 +3328,13 @@ export function hydrate(saved: GameState): GameState {
   // A save from before DEF-TUT-10 whose script is still running is a tutorial game too.
   if (saved.practice === true || (s.training && !s.training.skipped)) s.practice = true;
   else delete s.practice;
-  if (typeof saved.metroTurn === "number" && Number.isFinite(saved.metroTurn) && saved.metroTurn > 0) s.metroTurn = Math.floor(saved.metroTurn);
-  else delete s.metroTurn;
+  // Metro run: saves from the first metro-run build kept one table-wide `metroTurn` (multiples of GameState.turn).
+  // Solo: same count as the player's own turns, so it moves onto the player. Hot-seat: a different count, ignored.
+  const legacy = (saved as { metroTurn?: unknown }).metroTurn;
+  delete (s as { metroTurn?: unknown }).metroTurn;
+  if (players.length === 1 && players[0]!.metroTurn === undefined && validMetroTurn(legacy) !== undefined) {
+    s = { ...s, players: [{ ...players[0]!, metroTurn: validMetroTurn(legacy) }] };
+  }
   if (!players.length) return { ...blankMenu(), muted: !!saved.muted };
   if (s.screen === "win" || s.phase === "win") {
     const idx = Math.min(Math.max(s.winner ?? 0, 0), players.length - 1);

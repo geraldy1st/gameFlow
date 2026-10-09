@@ -1,5 +1,5 @@
 /**
- * "Metro run" — optional 3-lane runner offered every 10 game turns (spec: Geraldy, 09/10/2026).
+ * "Metro run" — optional 3-lane runner offered every 10 of a player's own turns (spec: Geraldy, 09/10/2026).
  *
  * Pure module, no DOM: the offer rule, the reward, and the runner itself (lanes, obstacles, distance, lives,
  * outcome). The canvas UI (components/game/boite/MetroRun.tsx) only renders this state and feeds it actions and
@@ -11,7 +11,7 @@ import type { GameState } from "./engine";
 
 /* ------------------------------------------------------------------ offer & reward */
 
-/** An offer every 10 finished game turns (GameState.turn), i.e. at turns 10, 20, 30... */
+/** An offer every 10 of a player's own finished turns (Player.turns), i.e. at their turns 10, 20, 30... */
 export const METRO_EVERY = 10;
 export const METRO_LIVES = 3;
 export const METRO_REWARD_FULL = 500;
@@ -23,32 +23,34 @@ export const METRO_REWARD_HURT = 250;
  */
 const SOLO_GRACE = 2;
 
-type OfferState = Pick<GameState, "screen" | "phase" | "turn" | "players" | "training" | "intro"> & {
+type OfferState = Pick<GameState, "screen" | "phase" | "players" | "current" | "training" | "intro"> & {
   practice?: boolean;
-  metroTurn?: number;
 };
 
 /**
- * The game turn (a multiple of 10) whose metro offer is due right now, or null.
+ * The multiple of 10 of the active player's own turns whose metro offer is due right now, or null.
  *
- * `GameState.turn` counts finished turns of the whole table: +1 per player turn (solo: each turn; hot-seat: each
- * player's turn, so in a 2-player game turn 10 is the 5th turn of player 2). A turn N is over when:
- * - hot-seat: phase "pass" with turn === N (before the next player takes the table), the active player is the one
- *   who just played (`current`);
- * - solo: the engine already opened turn N + 1, phase "idle" (before the first roll).
- * Never during the tutorial / practice games, on a card, broke, win, or after the offer for N was answered
- * (`metroTurn`, optional: absent in old saves = never offered).
+ * Counted per player (Player.turns, decided by Geraldy 09/10/2026): every player gets their own offer after their
+ * own turns 10, 20, 30... `Player.turns` counts the turns a player has started (the current one included). Their
+ * turn N is over when:
+ * - hot-seat: phase "pass" (before the next player takes the table) with turns === N; the active player
+ *   (`current`) is the one who just played and gets the offer;
+ * - solo: the engine already opened turn N + 1 (turns === N + 1), phase "idle" (before the first roll).
+ * Never during the tutorial / practice games, on a card, broke, win, or after this player answered the offer for N
+ * (`Player.metroTurn`, optional: absent in old saves = never offered).
  */
 export function metroOfferTurn(s: OfferState): number | null {
   if (s.screen !== "play" || s.practice === true || s.training || s.intro || !s.players?.length) return null;
-  const done = typeof s.metroTurn === "number" ? s.metroTurn : 0;
+  const p = s.players[s.current];
+  if (!p || typeof p.turns !== "number") return null;
+  const done = typeof p.metroTurn === "number" ? p.metroTurn : 0;
   if (s.players.length > 1) {
     if (s.phase !== "pass") return null;
-    const n = s.turn;
+    const n = p.turns;
     return n > 0 && n % METRO_EVERY === 0 && done < n ? n : null;
   }
   if (s.phase !== "idle") return null;
-  const ended = s.turn - 1;
+  const ended = p.turns - 1;
   const n = ended - (ended % METRO_EVERY);
   return n > 0 && ended - n <= SOLO_GRACE && done < n ? n : null;
 }
