@@ -86,14 +86,17 @@ describe("Social bonus when someone joins the circle", () => {
     expect(cur(n).vitals.social).toBe(50 + drift("friend"));
   });
 
+  // v3: friend slots grow with Social (3 to 7, skills.ts maxFriends). Social Lv. 4 (400 XP) = the historic 5 seats.
+  const social4 = (s: GameState) => ({ ...s, players: s.players.map((p) => ({ ...p, skills: { ...p.skills, social: 400 } })) });
+
   it(`circle at ${MAX_FRIENDS - 1}: the last seat is taken, with the bonus`, () => {
-    const n = act(withFriendCard(base, FRIEND, 50, MAX_FRIENDS - 1), { type: "CHOICE", id: "friend" });
+    const n = act(social4(withFriendCard(base, FRIEND, 50, MAX_FRIENDS - 1)), { type: "CHOICE", id: "friend" });
     expect(cur(n).friends).toHaveLength(MAX_FRIENDS);
     expect(cur(n).vitals.social).toBe(60 + drift("friend"));
   });
 
   it("full circle: refused, no bonus", () => {
-    const s = withFriendCard(base, FRIEND, 50, MAX_FRIENDS - 1);
+    const s = social4(withFriendCard(base, FRIEND, 50, MAX_FRIENDS - 1));
     s.players[0]!.friends.push(tie("zz"));
     const n = act(s, { type: "CHOICE", id: "friend" });
     expect(cur(n).friends).toHaveLength(MAX_FRIENDS);

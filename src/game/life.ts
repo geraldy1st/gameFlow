@@ -1,3 +1,5 @@
+import { SKILL_RULES } from "./tuning";
+
 export type OutfitId = "shorts" | "jeans" | "jog" | "tee" | "shirt" | "night";
 
 export interface Vitals {
@@ -5,6 +7,8 @@ export interface Vitals {
   social: number;
   mind: number;
   luck: number;
+  /** v3 Health gauge (SKILLS.md §5). Old saves get SKILL_RULES.health.start. */
+  health: number;
 }
 
 export const BIRTHDAY_COST = 280;
@@ -56,11 +60,12 @@ function clamp(n: number): number {
 }
 
 export function startingVitals(characterId: string): Vitals {
-  if (characterId === "aoi") return { content: 64, social: 58, mind: 52, luck: 48 };
-  if (characterId === "ren") return { content: 44, social: 40, mind: 72, luck: 42 };
-  if (characterId === "mio") return { content: 70, social: 66, mind: 48, luck: 62 };
-  if (characterId === "sora") return { content: 56, social: 46, mind: 68, luck: 54 };
-  return { content: 55, social: 50, mind: 55, luck: 50 };
+  const health = SKILL_RULES.health.start;
+  if (characterId === "aoi") return { content: 64, social: 58, mind: 52, luck: 48, health };
+  if (characterId === "ren") return { content: 44, social: 40, mind: 72, luck: 42, health };
+  if (characterId === "mio") return { content: 70, social: 66, mind: 48, luck: 62, health };
+  if (characterId === "sora") return { content: 56, social: 46, mind: 68, luck: 54, health };
+  return { content: 55, social: 50, mind: 55, luck: 50, health };
 }
 
 export function normalizeVitals(raw: Partial<Vitals> | undefined, characterId: string): Vitals {
@@ -70,16 +75,18 @@ export function normalizeVitals(raw: Partial<Vitals> | undefined, characterId: s
     social: clamp(raw?.social ?? base.social),
     mind: clamp(raw?.mind ?? base.mind),
     luck: clamp(raw?.luck ?? base.luck),
+    health: clamp(typeof raw?.health === "number" && Number.isFinite(raw.health) ? raw.health : base.health),
   };
 }
 
 export function bumpVitals(v: Vitals | undefined, d: Partial<Vitals>): Vitals {
-  const base = v ?? { content: 50, social: 50, mind: 50, luck: 50 };
+  const base = v ?? { content: 50, social: 50, mind: 50, luck: 50, health: SKILL_RULES.health.start };
   return {
     content: clamp(base.content + (d.content ?? 0)),
     social: clamp(base.social + (d.social ?? 0)),
     mind: clamp(base.mind + (d.mind ?? 0)),
     luck: clamp(base.luck + (d.luck ?? 0)),
+    health: clamp((base.health ?? SKILL_RULES.health.start) + (d.health ?? 0)),
   };
 }
 
@@ -91,5 +98,6 @@ export function driftVitals(v: Vitals, turns: number): Vitals {
     social: turns % 2 === 0 ? -1 : 0,
     mind: turns % 4 === 0 ? 1 : 0,
     luck,
+    health: turns % SKILL_RULES.health.driftEvery === 0 ? -1 : 0,
   });
 }

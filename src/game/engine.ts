@@ -63,6 +63,37 @@ import {
   type Vitals,
 } from "./life";
 import { CLOTH_PRICE, HOME_LEVEL, homeItem } from "./shop";
+import { CLASS_QUIZ, SKILL_RULES, SKILL_XP } from "./tuning";
+import { goodById, shopOfGood, unlockState, type Progress } from "./shops";
+import {
+  GAUGE_SKILLS,
+  SKILL_NAMES,
+  crashCut,
+  dueGigs,
+  experienceLevel,
+  unlockCut,
+  gainSkills,
+  gigIncome,
+  healthSalaryPct,
+  hydrateSkills,
+  loyaltyStep,
+  lowHealth,
+  lowMoodFactor,
+  maxFriends,
+  mentorBonus,
+  negoDiscount,
+  pct,
+  promoCopies,
+  quietDealChance,
+  quizReward,
+  refuseMoodCost,
+  rerollChance,
+  resaleBonus,
+  skillLevel,
+  skipLifestyleChance,
+  type SkillId,
+  type Skills,
+} from "./skills";
 
 export type TrackId = "grind" | "freedom" | "venture";
 export type Reaction = "idle" | "happy" | "stressed" | "love" | "proud";
@@ -78,6 +109,8 @@ export interface Line {
   k: string;
   v: string;
   tone?: Tone;
+  /** v3: the line is a skill effect chip (« Négociation Niv. 3 : −10 % »), coloured by skill. */
+  chip?: SkillId;
 }
 
 export interface Choice {
@@ -189,6 +222,21 @@ export interface Player {
   homeOwned: string[];
   homeOn: string[];
   vitals: Vitals;
+  /** v3 skills (skills.ts): XP without a cap, by skill. Optional: old saves are seeded from their gauges. */
+  skills?: Skills;
+  /** v3 Creativity side incomes switched on (SKILLS.md §9). */
+  sideGigs?: { id: string; started: number }[];
+  /** v3 Happiness: the free re-roll of this turn is used. */
+  rerollUsed?: boolean;
+  /** v3: where the current roll started (for the Happiness re-roll). */
+  rollFrom?: number;
+  /** v3 Charisma: own turn of the last on-demand interview. */
+  lastInterview?: number;
+  /** v3 Class quiz: own turn of the last quiz played. */
+  quizTurn?: number;
+  /** v3 goods bought (tuning.ts GOODS ids) and how many times (books can be bought again). */
+  goods?: string[];
+  goodsCount?: Record<string, number>;
 }
 
 export type Payload =
@@ -248,6 +296,10 @@ export interface CardView {
 }
 
 export interface Statement {
+  /** v3: salary bonus from a high Health gauge (included in salary). */
+  healthBonus: number;
+  /** v3: Creativity side incomes (in salary, or in passive when they count toward the Gate). */
+  gigIncome: number;
   career: CareerDef;
   salary: number;
   passive: number;
@@ -465,9 +517,16 @@ export function statement(p: Player): Statement {
     p.expenseMods +
     bizPayroll +
     allyCost;
-  const salary = career.salary + p.salaryBonus + p.sideIncome + partnerIncome;
-  const passive = p.assets.reduce((n, a) => n + a.cashFlow, 0) + bizRevenue + allyIncome;
+  // v3 skills: high Health raises the salary; Creativity side incomes are earned income unless the open decision
+  // SKILL_RULES.creativity.countsTowardGate says they count as passive (and so toward the Gate).
+  const healthBonus = Math.round(Math.max(0, career.salary + p.salaryBonus) * healthSalaryPct(p));
+  const gigs = gigIncome(p);
+  const gigsPassive = SKILL_RULES.creativity.countsTowardGate ? gigs : 0;
+  const salary = career.salary + p.salaryBonus + p.sideIncome + partnerIncome + healthBonus + (gigs - gigsPassive);
+  const passive = p.assets.reduce((n, a) => n + a.cashFlow, 0) + bizRevenue + allyIncome + gigsPassive;
   return {
+    healthBonus,
+    gigIncome: gigs,
     career,
     salary,
     passive,
@@ -506,7 +565,9 @@ function dealById(id: string): DealDef {
 function price(p: Player, deal: DealDef, training = false): { down: number; cashFlow: number } {
   let down = deal.down;
   let cashFlow = deal.cashFlow;
-  if (hasTrait(p, "Investor")) down = Math.round(down * 0.9);
+  const nego = negoDiscount(p);
+  if (nego > 0) down = Math.round(down * (1 - Math.min(SKILL_RULES.nego.maxCombined, nego + (hasTrait(p, "Investor") ? 0.1 : 0))));
+  else if (hasTrait(p, "Investor")) down = Math.round(down * 0.9);
   if (p.nextDownCut) down = Math.round(down * 0.8);
   if (p.nextCfBoost) cashFlow = Math.round(cashFlow * 1.2);
   if (isRealty(deal.id)) cashFlow = Math.max(40, cashFlow + clothDelta(p.outfit));
@@ -516,7 +577,35 @@ function price(p: Player, deal: DealDef, training = false): { down: number; cash
 
 function spendAmount(p: Player, spend: SpendDef): number {
   const base = spend.amount;
-  return hasTrait(p, "Party-goer") ? Math.round(base * 1.15) : base;
+  const party = hasTrait(p, "Party-goer") ? Math.round(base * 1.15) : base;
+  const mood = lowMoodFactor(p);
+  return mood === 1 ? party : Math.round(party * mood);
+}
+
+/** Effect chip line: « Négociation Niv. 3 : −10 % ». */
+export function skillChip(p: Player, id: SkillId, v: string, tone: Tone = "up"): Line {
+  return { k: tl("{skill} Lv. {n}", { skill: SKILL_NAMES[id], n: String(skillLevel(p, id)) }), v, tone, chip: id };
+}
+
+const minusPct = (x: number) => `−${pct(x)}%`;
+const plusPct = (x: number) => `+${pct(x)}%`;
+
+/** Deal reading (Intelligence §3): profitability and risk, "???" under the level. */
+function readingLines(p: Player, down: number, cashFlow: number, pool: "small" | "big" | "premium"): Line[] {
+  if (!SKILL_RULES.effects) return [];
+  const can = skillLevel(p, "mind") >= SKILL_RULES.mind.readDealsAt;
+  const yearly = down > 0 ? Math.round(((cashFlow * 12) / down) * 100) : 0;
+  const risk = pool === "small" ? "low" : pool === "big" ? "medium" : "high";
+  return [
+    { k: "Profitability", v: can ? (down > 0 ? tl("{n}%/yr", { n: String(yearly) }) : "∞") : "???", tone: "gold" },
+    { k: "Risk", v: can ? risk : "???", tone: can && risk === "low" ? "up" : "gold" },
+    ...(can ? [skillChip(p, "mind", "profitability visible")] : []),
+  ];
+}
+
+function negoLines(p: Player): Line[] {
+  const d = negoDiscount(p);
+  return d > 0 ? [skillChip(p, "nego", minusPct(d))] : [];
 }
 
 function takeDeal(p: Player, deal: DealDef, down: number, cashFlow: number, seq: number): Player {
@@ -559,6 +648,7 @@ function dealCard(p: Player, deal: DealDef, pool: "small" | "big" | "premium", t
       v: `${money(priced.cashFlow, true)}/mo`,
       tone: "up",
     },
+    ...(training ? [] : [...readingLines(p, priced.down, priced.cashFlow, pool), ...negoLines(p)]),
   ];
   if (deal.payment > 0) lines.push({ k: "Monthly note", v: `${money(deal.payment)}/mo`, tone: "down" });
   if (deal.passive) lines.push({ k: "Total price", v: money(deal.cost) });
@@ -745,6 +835,7 @@ export function createMatch(picks: Pick[], seed: number, muted: boolean, opts?: 
       homeOwned: [],
       homeOn: [],
       vitals: startingVitals(pick.custom ? "custom" : pick.characterId),
+      skills: hydrateSkills(undefined, startingVitals(pick.custom ? "custom" : pick.characterId)),
     };
   });
   let state: GameState = {
@@ -781,6 +872,14 @@ function landing(s: GameState): GameState {
   const p = cur(s);
   const space = trackOf(p.track)[p.position]!;
   let card = buildSpace(s, space.kind);
+  // Happiness (high gauge): once per turn, a free re-roll on a lifestyle / tax / health square. Never after crossing
+  // a payday (it would pay twice).
+  const chance = !trainingFor(s) && !p.rerollUsed && s.passedPay === 0 && typeof p.rollFrom === "number" && (space.kind === "lifestyle" || space.kind === "tax" || space.kind === "health") && card.payload.t !== "ok" ? rerollChance(p) : 0;
+  if (chance > 0) {
+    const r = rand(s.seed);
+    s = { ...s, seed: r.seed };
+    if (r.value < chance) card = { ...card, lines: [...card.lines, skillChip(p, "content", "free re-roll")], choices: [...card.choices, ghost("Re-roll", "reroll")] };
+  }
   if (s.passedPay !== 0 && space.kind !== "payday") {
     card = { ...card, lines: [paydayLine(s.passedPay), ...card.lines] };
   }
@@ -807,7 +906,15 @@ function buildSpace(s: GameState, kind: string): CardView {
   if (kind === "small") return drawDeal(s, "small");
   if (kind === "big") return drawDeal(s, "big");
   if (kind === "premium") return drawDeal(s, "premium");
-  if (kind === "lifestyle") return lifestyleCard(s);
+  if (kind === "lifestyle") {
+    const skip = skipLifestyleChance(p);
+    if (skip > 0) {
+      const r = rand(s.seed);
+      s.seed = r.seed;
+      if (r.value < skip) return { ...quietCard(), story: "Discipline: you walk past without stopping.", lines: [skillChip(p, "discipline", "skipped")] };
+    }
+    return lifestyleCard(s);
+  }
   if (kind === "market") return marketCard(s);
   if (kind === "career") return careerCard(s);
   if (kind === "social") return socialCard(s);
@@ -830,6 +937,15 @@ function buildSpace(s: GameState, kind: string): CardView {
   if (kind === "brand") return brandCard(p);
   if (kind === "scale") return scaleCard(p);
   if (kind === "exit") return exitCard(s);
+  const lucky = quietDealChance(p);
+  if (lucky > 0) {
+    const r = rand(s.seed);
+    s.seed = r.seed;
+    if (r.value < lucky) {
+      const card = drawDeal(s, "small");
+      return { ...card, lines: [skillChip(p, "luck", "small deal"), ...card.lines] };
+    }
+  }
   return quietCard();
 }
 
@@ -927,6 +1043,9 @@ function lifestyleCard(s: GameState): CardView {
   const lines: Line[] = [{ k: "Pay", v: money(amount), tone: "down" }];
   if (spend.monthly) lines.push({ k: "Then monthly", v: `${money(spend.monthly)}/mo`, tone: "down" });
   if (hasTrait(p, "Party-goer")) lines.push({ k: "Party friend", v: "Lifestyle costs +15%", tone: "down" });
+  if (lowMoodFactor(p) > 1) lines.push({ k: "Low mood", v: plusPct(SKILL_RULES.happiness.lowPct), tone: "down", chip: "content" });
+  const moodCost = refuseMoodCost(p);
+  if (SKILL_RULES.effects) lines.push(moodCost > 0 ? { k: "Letting it pass", v: tl("Happiness −{n}", { n: String(moodCost) }), tone: "down" } : skillChip(p, "discipline", "refusing is free"));
   const choices: Choice[] =
     p.cash >= amount
       ? [gold("Pay", "pay"), ghost("Let it pass", "decline")]
@@ -971,8 +1090,11 @@ function marketCard(s: GameState): CardView {
 
 function careerCard(s: GameState): CardView {
   const p = cur(s);
-  const ids = ["promo", "offer", "hustle", "solo", "burn", "cert", "city", "layoff"];
-  const drawn = drawId(s.decks.career, ids, s.seed);
+  const extra = promoCopies(p);
+  const ids = ["promo", "offer", "hustle", "solo", "burn", "cert", "city", "layoff", ...Array.from({ length: extra }, (_, i) => `promo#${i + 1}`)];
+  const drawn0 = drawId(s.decks.career, ids, s.seed);
+  // Charisma: the extra copies are promotions under another deck id ("promo#1"...).
+  const drawn = { ...drawn0, id: drawn0.id.startsWith("promo#") ? "promo" : drawn0.id };
   s.seed = drawn.seed;
   s.decks = { ...s.decks, career: drawn.queue };
   const kind = drawn.id;
@@ -1034,7 +1156,31 @@ function careerCard(s: GameState): CardView {
       payload: { t: "career", kind },
     };
   }
-  return { title, story, art: "/game/art/career.jpg", tag: "Career crossroads", lines, choices, payload: { t: "career", kind } };
+  const chipLines = kind === "promo" && extra > 0 ? [skillChip(p, "charisma", tl("+{n} promotions in the deck", { n: String(extra) }))] : [];
+  const interview = canInterview(p) ? [ghost("Go to an interview", "interview")] : [];
+  return { title, story, art: "/game/art/career.jpg", tag: "Career crossroads", lines: [...lines, ...chipLines], choices: [...choices, ...interview], payload: { t: "career", kind } };
+}
+
+/** Charisma Lv. 4+: an on-demand job offer on a Career square, once every few own turns. */
+function canInterview(p: Player): boolean {
+  if (!SKILL_RULES.effects || skillLevel(p, "charisma") < SKILL_RULES.charisma.interviewAt) return false;
+  return typeof p.lastInterview !== "number" || p.turns - p.lastInterview >= SKILL_RULES.charisma.interviewEvery;
+}
+
+function interviewCard(s: GameState): CardView {
+  const p = cur(s);
+  const open = openCareers(s.turn, p.level).filter((c) => c.id !== p.careerId);
+  const offered = drawSome(s, open, 3);
+  const cloth = clothDelta(p.outfit);
+  return {
+    title: "Interview",
+    story: "You asked for the meeting. They listened. Pick a career. Your clothes shift every salary by the same amount.",
+    art: "/game/art/career.jpg",
+    tag: "Career crossroads",
+    lines: [...offered.map((next) => ({ k: next.title, v: `${money(next.salary + cloth)}/mo`, tone: "gold" as const })), clothesLine(cloth), skillChip(p, "charisma", "interview")],
+    choices: [...offered.map((next) => gold(next.title, `take:${next.id}`)), ghost("Stay", "decline")],
+    payload: { t: "career", kind: "offer" },
+  };
 }
 
 function socialCard(s: GameState): CardView {
@@ -1043,7 +1189,26 @@ function socialCard(s: GameState): CardView {
   const missing = FRIENDS.filter((f) => !known.has(f.id));
   const r = rand(s.seed);
   s.seed = r.seed;
-  if ((missing.length && (p.friends.length === 0 || r.value < 0.62)) && p.friends.length < MAX_FRIENDS) {
+  const mentor = mentorBonus(p);
+  if (mentor > 0) {
+    const rm = rand(s.seed);
+    s.seed = rm.seed;
+    if (rm.value < mentor) {
+      const card = mentorCard(p);
+      return { ...card, lines: [skillChip(p, "reputation", "mentor"), ...card.lines] };
+    }
+  }
+  if (SKILL_RULES.effects && p.friends.length && skillLevel(p, "social") >= SKILL_RULES.social.hiddenDealAt) {
+    const rh = rand(s.seed);
+    s.seed = rh.seed;
+    if (rh.value < SKILL_RULES.social.hiddenDealChance) {
+      const friend = p.friends[Math.floor(rh.value * 1000) % p.friends.length]!;
+      const deal = SMALL_DEALS[Math.floor(rh.value * 7919) % SMALL_DEALS.length]!;
+      const card = dealCard(p, deal, "small");
+      return { ...card, lines: [{ k: tl("Tip from {name}", { name: friendDef(friend.id).name }), v: "", tone: "gold", chip: "social" }, ...card.lines] };
+    }
+  }
+  if ((missing.length && (p.friends.length === 0 || r.value < 0.62)) && p.friends.length < maxFriends(p, MAX_FRIENDS)) {
     const r2 = rand(s.seed);
     s.seed = r2.seed;
     const person = missing[Math.floor(r2.value * missing.length)]!;
@@ -1947,9 +2112,12 @@ function beginTurn(s0: GameState, first = false): GameState {
           });
       }
     }
-    return { ...p, turns, calm, friends, householdIn: Math.max(0, p.householdIn - 1), reaction: "idle", vitals: driftVitals(p.vitals ?? startingVitals(p.characterId), turns) };
+    const loyal = friends.filter((f) => f.loyalty >= 4).length;
+    const next: Player = { ...p, turns, calm, friends, householdIn: Math.max(0, p.householdIn - 1), reaction: "idle", vitals: driftVitals(p.vitals ?? startingVitals(p.characterId), turns), rerollUsed: false };
+    return loyal ? gainSkills(next, { reputation: loyal * SKILL_XP.loyalFriendReputation }) : next;
   });
   for (const name of faded) n = log(n, tl("{name} faded from your circle.", { name }));
+  if (!frozen) n = skillTurn(n);
   const p = cur(n);
   if (p.brokeTurns > 0) return { ...n, phase: "broke", card: null };
   if (p.skipTurns > 0) {
@@ -1966,6 +2134,27 @@ function beginTurn(s0: GameState, first = false): GameState {
     };
   }
   return { ...n, phase: "idle", card: null };
+}
+
+/** v3 skills at the start of a turn: Creativity side incomes switch on; low Health may force a rest. */
+function skillTurn(s0: GameState): GameState {
+  let s = s0;
+  const p = cur(s);
+  for (const id of dueGigs(p)) {
+    s = withP(s, (pl) => ({ ...pl, sideGigs: [...(pl.sideGigs ?? []), { id, started: pl.turns }] }));
+    s = log(s, id === "drawings" ? "Side income: drawings" : "Side income: online content");
+  }
+  if (lowHealth(cur(s)) && cur(s).skipTurns === 0 && cur(s).brokeTurns === 0) {
+    const r = rand(s.seed);
+    s = { ...s, seed: r.seed };
+    if (r.value < SKILL_RULES.health.forcedRestChance) {
+      const pl = cur(s);
+      const bill = Math.round(SKILL_RULES.health.medicalBase + statement(pl).career.salary * SKILL_RULES.health.medicalSalaryPct);
+      s = withP(s, (x) => ({ ...x, cash: x.cash - bill, skipTurns: x.skipTurns + 1, vitals: bumpVitals(x.vitals, { health: SKILL_RULES.health.forcedRestHeal }) }));
+      s = log(s, tl("Forced rest. Medical costs {amount}.", { amount: money(bill) }));
+    }
+  }
+  return s;
 }
 
 function addLoan(p: Player, seq: number): Player {
@@ -2004,8 +2193,15 @@ function applyMarket(p: Player, id: string): { player: Player; note: string; rea
   }
   if (id === "boom") return { player: { ...p, nextCfBoost: true }, note: "Your next deal will cash-flow 20% harder.", reaction: "happy" };
   if (id === "crash") {
-    if (!assets.length) return { player: { ...p, cash: Math.max(0, p.cash - 200) }, note: "The crash barely knows your name. −$200.", reaction: "stressed" };
-    assets[0] = { ...assets[0]!, cashFlow: Math.max(30, Math.round(assets[0]!.cashFlow * 0.7)) };
+    const cut = crashCut(p);
+    if (!assets.length) {
+      if (cut > 0) {
+        const bill = Math.round(200 * (1 - cut));
+        return { player: { ...p, cash: Math.max(0, p.cash - bill) }, note: tl("The crash barely knows your name. Luck: −{amount}.", { amount: money(bill) }), reaction: "stressed" };
+      }
+      return { player: { ...p, cash: Math.max(0, p.cash - 200) }, note: "The crash barely knows your name. −$200.", reaction: "stressed" };
+    }
+    assets[0] = { ...assets[0]!, cashFlow: Math.max(30, Math.round(assets[0]!.cashFlow * (cut > 0 ? 1 - 0.3 * (1 - cut) : 0.7))) };
     return { player: { ...p, assets }, note: tl("{asset} is marked down.", { asset: assets[0]!.name }), reaction: "stressed" };
   }
   if (id === "glut") return { player: { ...p, nextDownCut: true }, note: "Your next down payment is 20% lighter.", reaction: "happy" };
@@ -2023,6 +2219,11 @@ function applyBoom(p: Player, id: string, _seq: number): { player: Player; note:
     };
   }
   if (id === "drop") {
+    const cut = crashCut(p);
+    if (!p.assets.length && cut > 0) {
+      const bill = Math.round(600 * (1 - cut));
+      return { player: { ...p, cash: p.cash - bill }, note: tl("The crash still sends a bill. Luck: −{amount}.", { amount: money(bill) }), reaction: "stressed" };
+    }
     if (!p.assets.length) return { player: { ...p, cash: p.cash - 600 }, note: "The crash still sends a bill. −$600.", reaction: "stressed" };
     return {
       player: { ...p, assets: p.assets.map((a) => ({ ...a, cashFlow: Math.max(40, Math.round(a.cashFlow * 0.85)) })) },
@@ -2073,6 +2274,10 @@ export type Action =
   | { type: "BUY_CLOTH"; outfit: OutfitId }
   | { type: "BUY_HOME"; id: string }
   | { type: "TOGGLE_HOME"; id: string }
+  /** v3 Activities › Class quiz: `correct` good answers out of CLASS_QUIZ questions. */
+  | { type: "QUIZ"; correct: number }
+  /** v3 Activities › shops: buy one of tuning.ts GOODS. */
+  | { type: "BUY_GOOD"; id: string }
   | { type: "MENU" }
   | { type: "RULES" }
   | { type: "CREDITS" }
@@ -2100,7 +2305,142 @@ export function trainingRefuses(state: GameState, action: Action): boolean {
   return action.type === "CHOICE" && !(state.phase === "card" && !!state.card?.choices.some((c) => c.id === action.id));
 }
 
+/**
+ * The reducer. v3: every action goes through reduceCore, then awardXp adds the skill XP it earned (SKILLS.md
+ * "Barème des sources" + the gauge → skill bridge). Same state back when nothing changed.
+ */
 export function reduce(state: GameState, action: Action): GameState {
+  const next = reduceCore(state, action);
+  return awardXp(state, next, action);
+}
+
+const BRIDGE: readonly (keyof Vitals & SkillId)[] = GAUGE_SKILLS;
+
+function awardXp(prev: GameState, next: GameState, action: Action): GameState {
+  if (next === prev || action.type === "NEW" || action.type === "CONTINUE" || next.screen !== "play" || prev.screen !== "play") return next;
+  const i = prev.current;
+  const a = prev.players[i];
+  const b = next.players[i];
+  if (!a || !b || a.id !== b.id) return next;
+  const g: Skills = {};
+  const add = (id: SkillId, xp: number) => {
+    if (xp > 0) g[id] = (g[id] ?? 0) + xp;
+  };
+  for (const id of BRIDGE) add(id, ((b.vitals?.[id] ?? 0) - (a.vitals?.[id] ?? 0)) * SKILL_RULES.bridgeXpPerPoint);
+  const spent = a.cash > b.cash;
+  const X = SKILL_XP;
+  if (action.type === "CHOICE" && prev.card && prev.phase === "card") {
+    const pl = prev.card.payload;
+    const closed = next.phase !== "card" || next.card !== prev.card;
+    if (pl.t === "spend" && action.id !== "pay" && action.id !== "borrow" && action.id !== "reroll" && closed) {
+      add("discipline", X.refuseDiscipline);
+      add("reputation", X.refuseReputation);
+    }
+    if ((pl.t === "deal" || pl.t === "deal2") && (b.assets.length > a.assets.length || b.sideIncome > a.sideIncome)) {
+      add("nego", X.dealNego);
+      add("reputation", X.dealReputation);
+    }
+    if (pl.t === "career" && pl.kind === "promo" && action.id === "take") add("charisma", X.promoCharisma);
+    if (pl.t === "circle" && action.id !== "decline" && b.circleTurn !== a.circleTurn) {
+      if (pl.kind === "party") add("charisma", X.partyCharisma);
+      add("reputation", X.circleReputation);
+    }
+    if (pl.t === "life" && action.id === "go" && b.lifeTurn !== a.lifeTurn) {
+      if (pl.kind === "museum") add("creativity", X.museumCreativity);
+      if (pl.kind === "sleep") add("content", X.sleepHappiness);
+    }
+    if ((pl.t === "give" || pl.t === "rest") && action.id === "give" && spent) add("reputation", X.giveReputation);
+  }
+  if (action.type === "BUY_CLOTH" && spent) {
+    add("nego", X.shopNego);
+    if (action.outfit === "shirt" || action.outfit === "night") add("charisma", X.shirtCharisma);
+  }
+  if (action.type === "BUY_HOME" && spent) add("nego", X.shopNego);
+  if (action.type === "BUY_GOOD" && spent) {
+    add("nego", X.shopNego);
+    for (const [id, xp] of Object.entries(goodById(action.id)?.xp ?? {})) add(id as SkillId, xp ?? 0);
+  }
+  if (action.type === "SELL" && b.assets.length < a.assets.length) {
+    add("nego", X.sellNego);
+    add("reputation", X.dealReputation);
+  }
+  if (action.type === "REPAY" && b.liabilities.length < a.liabilities.length) {
+    add("discipline", X.repayDiscipline);
+    add("reputation", X.repayReputation);
+  }
+  if (action.type === "METRO" && action.result === "run" && b.metroTurn !== a.metroTurn) {
+    add("luck", X.metroLuckPerLife * Math.max(0, Math.min(3, Math.floor(action.lives ?? 0))));
+    add("content", X.metroHappiness);
+    add("creativity", X.minigameCreativity);
+  }
+  if (action.type === "QUIZ" && b.quizTurn !== a.quizTurn) {
+    add("mind", CLASS_QUIZ.xpPerCorrect * Math.max(0, Math.floor(action.correct)));
+    add("creativity", CLASS_QUIZ.creativityXp);
+  }
+  // Payday with a positive flow and no loan (collect / the payday square).
+  if ((action.type === "STEP" || action.type === "CHOICE") && b.cash > a.cash && b.liabilities.length === 0 && next.log[0] !== prev.log[0]) {
+    const line = next.log.slice(0, Math.max(0, next.log.length - prev.log.length) + 1);
+    if (line.some((l) => typeof l === "string" && l.includes("payday"))) add("discipline", X.paydayDiscipline);
+  }
+  if (!Object.keys(g).length) return next;
+  return { ...next, players: next.players.map((p, k) => (k === i ? gainSkills(p, g) : p)) };
+}
+
+/** Progress used by the v3 shops (Activities). */
+export function progressOf(p: Player): Progress {
+  return { turns: p.turns, passive: statement(p).passive, level: p.level, xpLevel: experienceLevel(p), cut: unlockCut(p) };
+}
+
+function doQuiz(s: GameState, correct: number): GameState {
+  if (s.screen !== "play" || s.phase !== "idle" || s.training || isPractice(s)) return s;
+  const p = cur(s);
+  if (!quizOpen(p)) return s;
+  const n = Math.max(0, Math.min(3, Math.floor(Number(correct) || 0)));
+  const reward = quizReward(p, n, CLASS_QUIZ.perCorrect, CLASS_QUIZ.mindStepPct, CLASS_QUIZ.mindMaxPct);
+  const next = withP(s, (pl) => ({ ...pl, cash: pl.cash + reward, quizTurn: pl.turns }));
+  return blip(log(next, tl("Class quiz: {n}/3, +{amount}", { n: String(n), amount: money(reward) })), reward > 0 ? "cash" : null);
+}
+
+/** The quiz can be played once every CLASS_QUIZ.everyTurns own turns. */
+export function quizOpen(p: Player): boolean {
+  if (CLASS_QUIZ.everyTurns <= 0 || typeof p.quizTurn !== "number") return true;
+  return p.turns - p.quizTurn >= CLASS_QUIZ.everyTurns;
+}
+
+/** Own turns left before the quiz opens again (0 = open). */
+export function quizWait(p: Player): number {
+  if (quizOpen(p)) return 0;
+  return CLASS_QUIZ.everyTurns - (p.turns - (p.quizTurn ?? 0));
+}
+
+/** Goods owned (v3). Repeatable goods (books) are counted in goodsCount. */
+export function ownsGood(p: Player, id: string): boolean {
+  return (p.goods ?? []).includes(id);
+}
+
+function doBuyGood(s: GameState, id: string): GameState {
+  if (s.screen !== "play" || s.phase !== "idle") return s;
+  const good = goodById(id);
+  const shop = shopOfGood(id);
+  const p = cur(s);
+  if (!good || !shop || !unlockState(shop.unlock, progressOf(p)).open) return s;
+  if (!good.repeat && ownsGood(p, id)) return s;
+  const cost = shopPrice(p, good.price);
+  if (p.cash < cost) return s;
+  let next = withP({ ...s, seq: s.seq + 1 }, (pl) => ({
+    ...pl,
+    cash: pl.cash - cost,
+    goods: good.repeat && ownsGood(pl, id) ? pl.goods : [...(pl.goods ?? []), id],
+    goodsCount: { ...pl.goodsCount, [id]: (pl.goodsCount?.[id] ?? 0) + 1 },
+    expenseMods: pl.expenseMods + (good.monthly ?? 0),
+    vitals: good.gauge ? bumpVitals(pl.vitals, good.gauge) : pl.vitals,
+    assets: good.passive ? [...pl.assets, { id: `a${s.seq}`, name: good.name, cashFlow: good.passive, down: cost, cost: good.price }] : pl.assets,
+  }));
+  next = log(next, tl("Bought {item} for {amount}.", { item: good.name, amount: money(cost) }));
+  return blip(next, "cash");
+}
+
+function reduceCore(state: GameState, action: Action): GameState {
   if (trainingRefuses(state, action)) return state;
   switch (action.type) {
     case "MENU":
@@ -2159,6 +2499,10 @@ export function reduce(state: GameState, action: Action): GameState {
       return doBuyHome(state, action.id);
     case "TOGGLE_HOME":
       return doToggleHome(state, action.id);
+    case "QUIZ":
+      return doQuiz(state, action.correct);
+    case "BUY_GOOD":
+      return doBuyGood(state, action.id);
     default:
       return state;
   }
@@ -2181,8 +2525,9 @@ function doRoll(s: GameState): GameState {
   const len = trackOf(p.track).length;
   const path: number[] = [];
   for (let i = 1; i <= die; i++) path.push((p.position + i) % len);
+  const from = p.position;
   return blip(
-    { ...s, seed: r.seed, die, path, step: 0, phase: "rolling", moveSerial: s.moveSerial + 1, passedPay: 0, card: null },
+    withP({ ...s, seed: r.seed, die, path, step: 0, phase: "rolling", moveSerial: s.moveSerial + 1, passedPay: 0, card: null }, (pl) => (SKILL_RULES.effects ? { ...pl, rollFrom: from } : pl)),
     "dice",
   );
 }
@@ -2207,6 +2552,14 @@ function doChoice(s: GameState, id: string): GameState {
     const n = withP({ ...s, seq: s.seq + 1 }, (pl) => addLoan(pl, s.seq));
     const rebuilt = rebuild(n, payload);
     return blip(log({ ...rebuilt, phase: "card" }, "Borrowed $1,000 at $100/mo."), "cash");
+  }
+  if (id === "reroll" && s.card.choices.some((c) => c.id === "reroll") && typeof p.rollFrom === "number") {
+    const from = p.rollFrom;
+    return blip(log(withP({ ...s, phase: "idle", card: null }, (pl) => ({ ...pl, position: from, rerollUsed: true })), "Happiness: free re-roll."), "whoosh");
+  }
+  if (id === "interview" && payload.t === "career" && canInterview(p)) {
+    const n = withP(s, (pl) => ({ ...pl, lastInterview: pl.turns }));
+    return blip({ ...n, card: interviewCard(n) }, "card");
   }
   if (payload.t === "start") {
     return beginTurn({ ...s, current: 0, intro: false, turn: 1, card: null }, true);
@@ -2258,7 +2611,7 @@ function doChoice(s: GameState, id: string): GameState {
   if (payload.t === "friend") {
     if (id === "decline" || id === "ignore") return finish(s, "You let the introduction pass.", "idle");
     if (p.friends.some((f) => f.id === payload.id)) return finish(s, "You already know them.", "idle");
-    if (p.friends.length >= MAX_FRIENDS) return finish(s, "Your circle is already full.", "idle");
+    if (p.friends.length >= maxFriends(p, MAX_FRIENDS)) return finish(s, "Your circle is already full.", "idle");
     const role = id === "biz" ? "partner" : "friend";
     const name = friendDef(payload.id).name;
     return finish(
@@ -2285,7 +2638,7 @@ function doChoice(s: GameState, id: string): GameState {
   if (payload.t === "health") {
     if (id === "rest") return finish(withP(s, (pl) => ({ ...pl, skipTurns: pl.skipTurns + 1 })), "You will skip your next turn to recover.", "idle");
     if (p.cash < 320) return blip({ ...withP({ ...s, seq: s.seq + 1 }, (pl) => addLoan(pl, s.seq)), card: healthCard() }, "cash");
-    return finish(withP(s, (pl) => ({ ...pl, cash: pl.cash - 320 })), "Clinic bill paid. $320.", "idle");
+    return finish(withP(s, (pl) => ({ ...pl, cash: pl.cash - 320, vitals: bumpVitals(pl.vitals, { health: SKILL_RULES.health.clinicHeal }) })), "Clinic bill paid. $320.", "idle");
   }
   if (payload.t === "rest") {
     if (id === "give") {
@@ -2295,7 +2648,7 @@ function doChoice(s: GameState, id: string): GameState {
           ...pl,
           cash: pl.cash - 200,
           expenseMods: pl.expenseMods - 40,
-          friends: pl.friends.map((f) => ({ ...f, loyalty: Math.min(4, f.loyalty + 1) })),
+          friends: pl.friends.map((f) => ({ ...f, loyalty: Math.min(4, f.loyalty + loyaltyStep(pl)) })),
           calm: 2,
         })),
         "You give $200. Living costs ease by $40/mo.",
@@ -2458,7 +2811,11 @@ function resolveDeal2(s: GameState, payload: Extract<Payload, { t: "deal2" }>, i
 }
 
 function resolveSpend(s: GameState, payload: Extract<Payload, { t: "spend" }>, id: string): GameState {
-  if (id !== "pay") return finish(s, "You let the lifestyle expense pass.", "idle");
+  if (id !== "pay") {
+    const mood = trainingFor(s) ? 0 : refuseMoodCost(cur(s));
+    const n = mood > 0 ? withP(s, (pl) => ({ ...pl, vitals: bumpVitals(pl.vitals, { content: -mood }) })) : s;
+    return finish(n, "You let the lifestyle expense pass.", "idle");
+  }
   const spend = LIFESTYLE.find((x) => x.id === payload.spendId)!;
   if (cur(s).cash < payload.amount) return s;
   return finish(
@@ -2540,11 +2897,24 @@ function doWear(s: GameState, outfit: OutfitId): GameState {
   return withP(s, (pl) => ({ ...pl, outfit }));
 }
 
+/** Shop price after the Negotiation discount (clothes, home shop, v3 goods). */
+export function shopPrice(p: Player, base: number): number {
+  const d = negoDiscount(p);
+  return d > 0 ? Math.round(base * (1 - d)) : base;
+}
+
+/** Resale price of an asset (Negotiation raises it). */
+export function resalePrice(p: Player, asset: Asset): number {
+  const base = Math.max(100, Math.round(asset.down * 0.7 + asset.cost * 0.15));
+  const b = resaleBonus(p);
+  return b > 0 ? Math.round(base * (1 + b)) : base;
+}
+
 function doBuyCloth(s: GameState, outfit: OutfitId): GameState {
   if (s.screen !== "play" || s.phase !== "idle") return s;
   if (outfit === "jeans" || !isOutfit(outfit)) return s;
-  const cost = CLOTH_PRICE[outfit];
   const p = cur(s);
+  const cost = shopPrice(p, CLOTH_PRICE[outfit]);
   const owned = p.ownedOutfits ?? ["jeans"];
   if (owned.includes(outfit) || p.cash < cost) return s;
   return log(
@@ -2559,16 +2929,17 @@ function doBuyHome(s: GameState, id: string): GameState {
   const p = cur(s);
   if (!item || p.level < HOME_LEVEL) return s;
   const owned = p.homeOwned ?? [];
-  if (owned.includes(id) || p.cash < item.cost) return s;
+  const cost = shopPrice(p, item.cost);
+  if (owned.includes(id) || p.cash < cost) return s;
   return log(
     withP(s, (pl) => ({
       ...pl,
-      cash: pl.cash - item.cost,
+      cash: pl.cash - cost,
       homeOwned: [...owned, id],
       homeOn: [...(pl.homeOn ?? []), id],
       vitals: bumpVitals(pl.vitals, item.bump),
     })),
-    tl("Bought {item} for {amount}. It is in the house.", { item: item.name, amount: money(item.cost) }),
+    tl("Bought {item} for {amount}. It is in the house.", { item: item.name, amount: money(cost) }),
   );
 }
 
@@ -2616,7 +2987,7 @@ function doLife(s: GameState, kind: "birthday" | "museum" | "sleep"): GameState 
             ? [
                 { k: "Cost", v: money(0), tone: "gold" },
                 { k: "Happiness", v: "Rises", tone: "up" },
-                { k: "Lucky", v: "Slips", tone: "down" },
+                { k: "Luck", v: "Slips", tone: "down" },
                 { k: "The board", v: "You miss this roll", tone: "down" },
               ]
             : [
@@ -2645,7 +3016,7 @@ function resolveLife(s: GameState, kind: "birthday" | "museum" | "sleep", id: st
       withP(s, (pl) => ({
         ...pl,
         lifeTurn: s.turn,
-        vitals: bumpVitals(pl.vitals, { content: 12, social: -4, luck: -8 }),
+        vitals: bumpVitals(pl.vitals, { content: 12, social: -4, luck: -8, health: SKILL_RULES.health.sleepHeal }),
       })),
       "You slept through the day and missed the board.",
       "idle",
@@ -2878,7 +3249,7 @@ function resolveFriendAct(s: GameState, id: string, choice: string): GameState {
         ...p,
         cash: p.cash - cost,
         calm: 2,
-        friends: p.friends.map((f) => (f.id === id ? { ...f, loyalty: Math.min(4, f.loyalty + 1) } : f)),
+        friends: p.friends.map((f) => (f.id === id ? { ...f, loyalty: Math.min(4, f.loyalty + loyaltyStep(p)) } : f)),
       })),
       tl("A night out costs {amount}.", { amount: money(cost) }),
       "stressed",
@@ -2899,7 +3270,7 @@ function resolveFriendAct(s: GameState, id: string, choice: string): GameState {
 }
 
 function bump(p: Player, id: string): FriendState[] {
-  return p.friends.map((f) => (f.id === id ? { ...f, loyalty: Math.min(4, f.loyalty + 1) } : f));
+  return p.friends.map((f) => (f.id === id ? { ...f, loyalty: Math.min(4, f.loyalty + loyaltyStep(p)) } : f));
 }
 
 function resolveLegacy(s: GameState, id: string, choice: string): GameState {
@@ -2956,7 +3327,7 @@ function resolveFamily(s: GameState, id: string): GameState {
       cash: pl.cash - cost,
       calm: 3,
       expenseMods: id === "party" ? pl.expenseMods - 50 : pl.expenseMods,
-      friends: pl.friends.map((f) => ({ ...f, loyalty: Math.min(4, f.loyalty + 1) })),
+      friends: pl.friends.map((f) => ({ ...f, loyalty: Math.min(4, f.loyalty + loyaltyStep(pl)) })),
     })),
     id === "party" ? "The party costs $800 and loosens the month by $50." : "A quiet gift. $200.",
     "love",
@@ -3172,7 +3543,7 @@ function doSell(s: GameState, id: string): GameState {
   if (s.phase !== "idle") return s;
   const asset = cur(s).assets.find((a) => a.id === id);
   if (!asset) return s;
-  const proceeds = Math.max(100, Math.round(asset.down * 0.7 + asset.cost * 0.15));
+  const proceeds = resalePrice(cur(s), asset);
   return blip(
     log(
       withP(s, (p) => ({
@@ -3297,6 +3668,15 @@ function hydratePlayer(raw0: Player): Player {
     homeOwned: Array.isArray(raw.homeOwned) ? raw.homeOwned.filter((id) => typeof id === "string") : [],
     homeOn: Array.isArray(raw.homeOn) ? raw.homeOn.filter((id) => typeof id === "string") : [],
     vitals: normalizeVitals(raw.vitals, raw.characterId),
+    // v3 skills: XP from the save, or seeded from the save's own gauges (gauge × 3) when it predates skills.
+    skills: hydrateSkills(raw0 && typeof raw0 === "object" ? (raw0 as Partial<Player>).skills : undefined, normalizeVitals((raw0 as Partial<Player> | undefined)?.vitals, raw.characterId)),
+    sideGigs: Array.isArray(raw.sideGigs) ? raw.sideGigs.filter((g) => g && typeof g.id === "string").map((g) => ({ id: g.id, started: Number(g.started) || 0 })) : [],
+    rerollUsed: !!raw.rerollUsed,
+    rollFrom: typeof raw.rollFrom === "number" && Number.isInteger(raw.rollFrom) ? raw.rollFrom : undefined,
+    lastInterview: typeof raw.lastInterview === "number" && Number.isFinite(raw.lastInterview) ? raw.lastInterview : undefined,
+    quizTurn: typeof raw.quizTurn === "number" && Number.isFinite(raw.quizTurn) ? raw.quizTurn : undefined,
+    goods: Array.isArray(raw.goods) ? raw.goods.filter((id) => typeof id === "string" && !!goodById(id)) : [],
+    goodsCount: raw.goodsCount && typeof raw.goodsCount === "object" ? Object.fromEntries(Object.entries(raw.goodsCount).filter(([k, v]) => !!goodById(k) && typeof v === "number" && v > 0)) : {},
   };
 }
 
@@ -3408,4 +3788,16 @@ export function portraitOf(p: Player): string {
 
 export function nameOf(p: Player): string {
   return face(p).name;
+}
+
+/** v3 skills: read-only access to the priced deal and the lifestyle amount (tests, Legend examples). */
+export function priceOf(p: Player, dealId: string): { down: number; cashFlow: number } {
+  return price(p, dealById(dealId));
+}
+export function spendOf(p: Player, spendId: string): number {
+  const spend = LIFESTYLE.find((x) => x.id === spendId);
+  return spend ? spendAmount(p, spend) : 0;
+}
+export function marketFor(p: Player, id: string): Player {
+  return applyMarket(p, id).player;
 }

@@ -1,10 +1,31 @@
 import { describe, expect, it } from "vitest";
 import { TRAINING_DICE, TRAINING_TURNS } from "./data";
-import { createMatch, cur, hydrate, reduce, statement, type GameState, type Pick } from "./engine";
-import { answer, canonical, firstChoice, hash, playNormal, REGRESSION_ACTIONS, REGRESSION_SEEDS, rollAndMove } from "./__tests__/drive";
+import {
+  createMatch,
+  cur,
+  hydrate,
+  reduce,
+  statement,
+  type GameState,
+  type Pick,
+  type Player,
+} from "./engine";
+import { SKILL_RULES } from "./tuning";
+import {
+  answer,
+  canonical,
+  firstChoice,
+  hash,
+  playNormal,
+  REGRESSION_ACTIONS,
+  REGRESSION_SEEDS,
+  rollAndMove,
+} from "./__tests__/drive";
 import fixture from "./__tests__/normal-game.fixture.json";
 
-const E = { reduce: reduce as (s: GameState, a: { type: string; [k: string]: unknown }) => GameState };
+const E = {
+  reduce: reduce as (s: GameState, a: { type: string; [k: string]: unknown }) => GameState,
+};
 const AOI: Pick = { characterId: "aoi", dreamId: "cafe" };
 const SEEDS = Array.from({ length: 100 }, (_, i) => i * 7919 + 1);
 
@@ -24,12 +45,17 @@ interface TurnLog {
 function turn(s0: GameState, choice?: string): { s: GameState; log: TurnLog } {
   const moved = rollAndMove(E, s0);
   const log = { die: moved.die, position: cur(moved).position, card: moved.card };
-  const s = answer(E, moved, (st) => (choice && st.card!.choices.some((c) => c.id === choice) ? choice : firstChoice(st)));
+  const s = answer(E, moved, (st) =>
+    choice && st.card!.choices.some((c) => c.id === choice) ? choice : firstChoice(st),
+  );
   return { s, log };
 }
 
 /** Plays the 5 scripted turns (solo). */
-function playScript(seed: number, policy: Policy = {}): { s: GameState; logs: TurnLog[]; states: GameState[] } {
+function playScript(
+  seed: number,
+  policy: Policy = {},
+): { s: GameState; logs: TurnLog[]; states: GameState[] } {
   let s = training(seed);
   const logs: TurnLog[] = [];
   const states: GameState[] = [s];
@@ -92,7 +118,11 @@ describe("training mode (tutorial/RULES.md §13)", () => {
     expect(t1.payload.t).toBe("rest");
     expect(t1.choices.map((c) => c.id)).toEqual(["rest"]);
     for (const seed of SEEDS.slice(0, 30)) {
-      for (const policy of [{}, { 3: "accept", 4: "pay" }, { 3: "decline", 4: "decline" }] as Policy[]) {
+      for (const policy of [
+        {},
+        { 3: "accept", 4: "pay" },
+        { 3: "decline", 4: "decline" },
+      ] as Policy[]) {
         for (const l of playScript(seed, policy).logs) {
           expect(l.card!.choices.some((c) => c.id === "borrow")).toBe(false);
         }
@@ -104,7 +134,10 @@ describe("training mode (tutorial/RULES.md §13)", () => {
   });
 
   it("6. vitals unchanged across the 5 turns, no friends", () => {
-    for (const policy of [{ 3: "accept", 4: "pay" }, { 3: "decline", 4: "decline" }] as Policy[]) {
+    for (const policy of [
+      { 3: "accept", 4: "pay" },
+      { 3: "decline", 4: "decline" },
+    ] as Policy[]) {
       const { states, s } = playScript(42, policy);
       const v0 = states[0]!.players[0]!.vitals;
       for (const st of states) {
@@ -149,35 +182,68 @@ describe("training mode (tutorial/RULES.md §13)", () => {
     expect(s.training).toBeNull();
     // A save made mid-training round-trips.
     const mid = turn(training(42)).s;
-    expect(hydrate(JSON.parse(JSON.stringify(mid))).training).toEqual({ turn: 2, player: 0, skipped: false });
+    expect(hydrate(JSON.parse(JSON.stringify(mid))).training).toEqual({
+      turn: 2,
+      player: 0,
+      skipped: false,
+    });
   });
 
   it("10. normal game (training off) is unchanged: same snapshots as the base engine", () => {
     // v3: solo only. The 8 "duo" snapshots were removed with the 2-player mode (REMOVE-2P.md §6).
     const rosters: Record<string, Pick[]> = { solo: [AOI] };
+    // v3 skills: the replay runs with the skill EFFECTS off (tuning.ts SKILL_RULES.effects) and without the v3 player
+    // fields (skills XP, Health gauge, side gigs, re-roll / interview / quiz markers, goods), to prove the base rules
+    // are byte-identical. The effects themselves are covered in skills.test.ts.
+    const v3Free = (p: Player) => {
+      const {
+        skills: _s,
+        sideGigs: _g,
+        rerollUsed: _r,
+        rollFrom: _f,
+        lastInterview: _i,
+        quizTurn: _q,
+        goods: _o,
+        goodsCount: _c,
+        ...rest
+      } = p;
+      const { health: _h, ...vitals } = p.vitals;
+      return { ...rest, vitals };
+    };
     const strip = (s: GameState) => {
       const { training: t, ...rest } = s;
       expect(t).toBeNull();
-      return rest;
+      return { ...rest, players: s.players.map(v3Free) };
     };
     // main@4803db0 reference: drop what the redesign intentionally adds (vitals with the Social bonus, and the
     // per-friend socialGain record used by the mat badge, DEF-GF-05)
     const stripVitals = (s: GameState) => ({
       ...strip(s),
-      players: s.players.map(({ vitals: _v, ...p }) => ({ ...p, friends: p.friends.map(({ socialGain: _g, ...f }) => f) })),
+      players: s.players
+        .map(v3Free)
+        .map(({ vitals: _v, ...p }) => ({
+          ...p,
+          friends: p.friends.map(({ socialGain: _g, ...f }) => f),
+        })),
     });
-    for (const [name, picks] of Object.entries(rosters)) {
-      for (const seed of REGRESSION_SEEDS) {
-        const key = `${name}:${seed}` as keyof typeof fixture.full;
-        const start = createMatch(picks, seed, false);
-        const full = playNormal(E, start, REGRESSION_ACTIONS, strip);
-        const want = fixture.full[key];
-        expect(full.hashes.length).toBe(want.actions);
-        expect(full.hashes.filter((_, i) => i % 25 === 24)).toEqual(want.checkpoints);
-        expect(hash(canonical(full.final))).toBe(want.final);
-        const noV = playNormal(E, start, REGRESSION_ACTIONS, stripVitals);
-        expect(hash(canonical(noV.final))).toBe(fixture.mainNoVitals[key].final);
+    const effects = SKILL_RULES.effects;
+    SKILL_RULES.effects = false;
+    try {
+      for (const [name, picks] of Object.entries(rosters)) {
+        for (const seed of REGRESSION_SEEDS) {
+          const key = `${name}:${seed}` as keyof typeof fixture.full;
+          const start = createMatch(picks, seed, false);
+          const full = playNormal(E, start, REGRESSION_ACTIONS, strip);
+          const want = fixture.full[key];
+          expect(full.hashes.length).toBe(want.actions);
+          expect(full.hashes.filter((_, i) => i % 25 === 24)).toEqual(want.checkpoints);
+          expect(hash(canonical(full.final))).toBe(want.final);
+          const noV = playNormal(E, start, REGRESSION_ACTIONS, stripVitals);
+          expect(hash(canonical(noV.final))).toBe(fixture.mainNoVitals[key].final);
+        }
       }
+    } finally {
+      SKILL_RULES.effects = effects;
     }
   });
 });
@@ -226,7 +292,10 @@ describe("DEF-TUT-04: engine guard while the script runs", () => {
 
   it("the guard does not block the scripted path (all 5 turns complete, both T3/T4 answers)", () => {
     for (const seed of SEEDS.slice(0, 20)) {
-      for (const policy of [{ 3: "accept", 4: "pay" }, { 3: "decline", 4: "decline" }]) {
+      for (const policy of [
+        { 3: "accept", 4: "pay" },
+        { 3: "decline", 4: "decline" },
+      ]) {
         const { s, logs } = playScript(seed, policy);
         expect(s.training).toBeNull();
         expect(logs.map((l) => l.die)).toEqual([...TRAINING_DICE]);
@@ -236,7 +305,10 @@ describe("DEF-TUT-04: engine guard while the script runs", () => {
 
   it("after Skip, normal rules come back (the shop works again)", () => {
     const s = E.reduce(training(SEEDS[1]!), { type: "SKIP_TRAINING" });
-    const after = E.reduce({ ...s, players: s.players.map((p) => ({ ...p, cash: 5000 })) }, { type: "BUY_CLOTH", outfit: "tee" });
+    const after = E.reduce(
+      { ...s, players: s.players.map((p) => ({ ...p, cash: 5000 })) },
+      { type: "BUY_CLOTH", outfit: "tee" },
+    );
     expect(cur(after).ownedOutfits).toContain("tee");
   });
 });

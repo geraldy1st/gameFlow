@@ -250,7 +250,7 @@ function VitalsBars({ vitals, t }: { vitals: Vitals | undefined; t: TFn }) {
     { key: "content", label: "Happiness" },
     { key: "social", label: "Social" },
     { key: "mind", label: "Intelligence" },
-    { key: "luck", label: "Lucky" },
+    { key: "luck", label: "Luck" },
   ];
   return (
     <div className="vitals">
@@ -466,7 +466,7 @@ function vitalBits(bump: Partial<Vitals>, t: TFn): string {
   if (bump.content) parts.push(`${t("Happiness")} +${bump.content}`);
   if (bump.social) parts.push(`${t("Social")} +${bump.social}`);
   if (bump.mind) parts.push(`${t("Intelligence")} +${bump.mind}`);
-  if (bump.luck) parts.push(`${t("Lucky")} +${bump.luck}`);
+  if (bump.luck) parts.push(`${t("Luck")} +${bump.luck}`);
   return parts.join(" · ");
 }
 
