@@ -6,7 +6,7 @@
  * - the level (XP without a cap) = what the player has learnt; it never goes down. The level is computed, never stored.
  */
 import { levelState } from "./format-compact";
-import { CURVES, SKILL_RULES } from "./tuning";
+import { AFFINITY_SEED, ANTI_FARM, CIRCLE_AFFINITY_BONUS, CLASS_QUIZ, CURVES, SKILL_REWARDS, SKILL_RULES } from "./tuning";
 
 export const SKILL_IDS = ["content", "social", "mind", "luck", "health", "discipline", "nego", "charisma", "creativity", "reputation"] as const;
 export type SkillId = (typeof SKILL_IDS)[number];
@@ -174,13 +174,15 @@ export function lowHealth(p: { vitals?: { health?: number } }): boolean {
 export type GigId = (typeof SKILL_RULES.creativity.gigs)[number]["id"];
 
 /** Monthly creative side income for the gigs the player has switched on. */
-export function gigIncome(p: HasSkills & { sideGigs?: { id: string }[] }): number {
-  if (!on() || !p.sideGigs?.length) return 0;
+export function gigIncome(p: HasSkills & { sideGigs?: { id: string }[]; gigBonus?: number }): number {
+  if (!on()) return 0;
+  const extra = Math.max(0, Math.min(SKILL_RULES.creativity.minigameMax, p.gigBonus ?? 0));
+  if (!p.sideGigs?.length) return extra;
   const r = SKILL_RULES.creativity;
   const base = r.gigs.filter((g) => p.sideGigs!.some((x) => x.id === g.id)).reduce((n, g) => n + g.monthly, 0);
   const last = r.gigs[r.gigs.length - 1]!.at;
   const over = Math.max(0, skillLevel(p, "creativity") - last);
-  return Math.round(base * (1 + Math.min(r.maxPct, r.stepPct * over)));
+  return Math.round(base * (1 + Math.min(r.maxPct, r.stepPct * over))) + extra;
 }
 
 /** Gigs whose level is reached but not switched on yet. */
@@ -190,13 +192,49 @@ export function dueGigs(p: HasSkills & { sideGigs?: { id: string }[] }): GigId[]
   return SKILL_RULES.creativity.gigs.filter((g) => lv >= g.at && !p.sideGigs?.some((x) => x.id === g.id)).map((g) => g.id);
 }
 
-/** Class quiz cash for `correct` answers, with the Intelligence bonus. */
-export function quizReward(p: HasSkills, correct: number, perCorrect: number, stepPct: number, maxPct: number): number {
-  const bonus = on() ? tier(skillLevel(p, "mind"), stepPct, maxPct) : 0;
-  return Math.round(Math.max(0, Math.floor(correct)) * perCorrect * (1 + bonus));
+/** Class quiz cash (Geraldy, 11/10): all correct → 500, 1 to 4 → 250, 0 → nothing. No Intelligence cash bonus. */
+export function quizCash(correct: number, total: number = CLASS_QUIZ.questions): number {
+  const n = Math.max(0, Math.min(total, Math.floor(Number(correct) || 0)));
+  if (n <= 0) return CLASS_QUIZ.zeroReward;
+  return n >= total ? CLASS_QUIZ.perfectReward : CLASS_QUIZ.partialReward;
+}
+
+/** Intelligence XP bonus on quiz.* skill points (SKILLS.md §12): +min(50 %, 5 % × (level − 1)). */
+export function quizXpBonus(p: HasSkills): number {
+  return on() ? tier(skillLevel(p, "mind"), CLASS_QUIZ.mindStepPct, CLASS_QUIZ.mindMaxPct) : 0;
+}
+
+/** Points of one SKILL_REWARDS line, × mult, rounded. Unknown key → nothing. */
+export function rewardPoints(key: string, mult = 1): Skills {
+  const out: Skills = {};
+  const line = SKILL_REWARDS[key];
+  if (!line || mult <= 0) return out;
+  for (const [id, n] of Object.entries(line)) {
+    const v = Math.round((n ?? 0) * mult);
+    if (v > 0) out[id as SkillId] = v;
+  }
+  return out;
+}
+
+/** Anti-farm factor for `key` in own turn `turn`, given the log; returns the factor and the updated log. */
+export function antiFarm(log: Record<string, { turn: number; n: number }> | undefined, key: string, turn: number) {
+  const prev = log?.[key];
+  const n = prev && prev.turn === turn ? prev.n : 0;
+  const factor = ANTI_FARM[Math.min(n, ANTI_FARM.length - 1)] ?? 0;
+  return { factor, log: { ...(log ?? {}), [key]: { turn, n: n + 1 } } };
+}
+
+/** circle.bonusAffinity multiplier from the friend's affinity level. */
+export function affinityMult(level: number): number {
+  return 1 + CIRCLE_AFFINITY_BONUS.step * Math.min(CIRCLE_AFFINITY_BONUS.maxSteps, Math.max(0, level - 1));
 }
 
 /** Percent text for chips: 0.1 → "10 %"-style number (rounded to 1 decimal). */
 export function pct(x: number): number {
   return Math.round(x * 1000) / 10;
+}
+
+/** Affinity points of a friend (likes and loyalty seed the bar; no cap). */
+export function affinityPoints(f: { likes: number; loyalty: number }): number {
+  return Math.max(0, f.likes) * AFFINITY_SEED.perLike + Math.max(0, f.loyalty) * AFFINITY_SEED.perLoyalty;
 }

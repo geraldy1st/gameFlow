@@ -574,7 +574,7 @@ function GamesTab({ state, p, t, onQuiz }: { state: GameState; p: Player; t: TFn
             <span className="v3-tx">
               <strong>{t(g.name)}</strong>
               <small>
-                {t("{amount} per correct answer", { amount: `$${CLASS_QUIZ.perCorrect}` })}
+                {t("{perfect} with no mistakes, otherwise {partial}", { perfect: `$${CLASS_QUIZ.perfectReward}`, partial: `$${CLASS_QUIZ.partialReward}` })}
                 {wait > 0 ? ` · ${t("again in {n} turns", { n: wait })}` : ""}
               </small>
             </span>

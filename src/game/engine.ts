@@ -1,5 +1,5 @@
 import { tl } from "./text";
-import { metroOfferTurn, metroReward } from "./metro-run";
+import { METRO_LIVES, metroOfferTurn, metroReward } from "./metro-run";
 import {
   BIG_DEALS,
   BOOMS,
@@ -63,7 +63,8 @@ import {
   type Vitals,
 } from "./life";
 import { CLOTH_PRICE, HOME_LEVEL, homeItem } from "./shop";
-import { CLASS_QUIZ, SKILL_RULES, SKILL_XP } from "./tuning";
+import { CLASS_QUIZ, CURVES, SKILL_RULES, SKILL_XP } from "./tuning";
+import { levelState } from "./format-compact";
 import { goodById, shopOfGood, unlockState, type Progress } from "./shops";
 import {
   GAUGE_SKILLS,
@@ -85,7 +86,12 @@ import {
   pct,
   promoCopies,
   quietDealChance,
-  quizReward,
+  quizCash,
+  quizXpBonus,
+  rewardPoints,
+  antiFarm,
+  affinityMult,
+  affinityPoints,
   refuseMoodCost,
   rerollChance,
   resaleBonus,
@@ -226,6 +232,10 @@ export interface Player {
   skills?: Skills;
   /** v3 Creativity side incomes switched on (SKILLS.md §9). */
   sideGigs?: { id: string; started: number }[];
+  /** v3 SKILLS.md §11.6: extra $/mo on "online content" from mini-games finished with high Creativity (capped). */
+  gigBonus?: number;
+  /** v3 SKILLS.md §12 anti-farm: per activity key, the own turn and how many times it paid this turn. */
+  skillLog?: Record<string, { turn: number; n: number }>;
   /** v3 Happiness: the free re-roll of this turn is used. */
   rerollUsed?: boolean;
   /** v3: where the current roll started (for the Happiness re-roll). */
@@ -2275,7 +2285,7 @@ export type Action =
   | { type: "BUY_HOME"; id: string }
   | { type: "TOGGLE_HOME"; id: string }
   /** v3 Activities › Class quiz: `correct` good answers out of CLASS_QUIZ questions. */
-  | { type: "QUIZ"; correct: number }
+  | { type: "QUIZ"; correct: number; creative?: number }
   /** v3 Activities › shops: buy one of tuning.ts GOODS. */
   | { type: "BUY_GOOD"; id: string }
   | { type: "MENU" }
@@ -2329,6 +2339,17 @@ function awardXp(prev: GameState, next: GameState, action: Action): GameState {
   for (const id of BRIDGE) add(id, ((b.vitals?.[id] ?? 0) - (a.vitals?.[id] ?? 0)) * SKILL_RULES.bridgeXpPerPoint);
   const spent = a.cash > b.cash;
   const X = SKILL_XP;
+  // SKILLS.md §12: one table (tuning.ts SKILL_REWARDS), anti-farm per own turn (50 %, 25 %, then 0).
+  let log = b.skillLog;
+  const addKey = (key: string, mult = 1, farm = true) => {
+    let f = 1;
+    if (farm) {
+      const r = antiFarm(log, key, a.turns);
+      f = r.factor;
+      log = r.log;
+    }
+    for (const [id, xp] of Object.entries(rewardPoints(key, mult * f))) add(id as SkillId, xp ?? 0);
+  };
   if (action.type === "CHOICE" && prev.card && prev.phase === "card") {
     const pl = prev.card.payload;
     const closed = next.phase !== "card" || next.card !== prev.card;
@@ -2342,13 +2363,12 @@ function awardXp(prev: GameState, next: GameState, action: Action): GameState {
     }
     if (pl.t === "career" && pl.kind === "promo" && action.id === "take") add("charisma", X.promoCharisma);
     if (pl.t === "circle" && action.id !== "decline" && b.circleTurn !== a.circleTurn) {
-      if (pl.kind === "party") add("charisma", X.partyCharisma);
-      add("reputation", X.circleReputation);
+      const f = a.friends.find((x) => x.id === pl.friendId);
+      const aff = f ? levelState(affinityPoints(f), CURVES.affinity).level : 1;
+      addKey(`circle.${pl.kind}`, affinityMult(aff));
+      if (a.partner?.id === pl.friendId) addKey("circle.partner");
     }
-    if (pl.t === "life" && action.id === "go" && b.lifeTurn !== a.lifeTurn) {
-      if (pl.kind === "museum") add("creativity", X.museumCreativity);
-      if (pl.kind === "sleep") add("content", X.sleepHappiness);
-    }
+    if (pl.t === "life" && action.id === "go" && b.lifeTurn !== a.lifeTurn) addKey(`life.${pl.kind}`);
     if ((pl.t === "give" || pl.t === "rest") && action.id === "give" && spent) add("reputation", X.giveReputation);
   }
   if (action.type === "BUY_CLOTH" && spent) {
@@ -2369,21 +2389,27 @@ function awardXp(prev: GameState, next: GameState, action: Action): GameState {
     add("reputation", X.repayReputation);
   }
   if (action.type === "METRO" && action.result === "run" && b.metroTurn !== a.metroTurn) {
-    add("luck", X.metroLuckPerLife * Math.max(0, Math.min(3, Math.floor(action.lives ?? 0))));
-    add("content", X.metroHappiness);
-    add("creativity", X.minigameCreativity);
+    const lives = Math.max(0, Math.min(METRO_LIVES, Math.floor(action.lives ?? 0)));
+    addKey("runner.finish");
+    if (lives > 0) addKey("runner.win");
+    for (let k = 0; k < lives; k++) addKey("runner.perLife", 1, false);
+    if (lives === METRO_LIVES) addKey("runner.noHit");
   }
   if (action.type === "QUIZ" && b.quizTurn !== a.quizTurn) {
-    add("mind", CLASS_QUIZ.xpPerCorrect * Math.max(0, Math.floor(action.correct)));
-    add("creativity", CLASS_QUIZ.creativityXp);
+    const n = Math.max(0, Math.min(CLASS_QUIZ.questions, Math.floor(Number(action.correct) || 0)));
+    // Geraldy: 0 / 5 gives nothing at all; otherwise the full quiz.complete line, + the Intelligence XP bonus.
+    if (n > 0) {
+      addKey("quiz.complete", 1 + quizXpBonus(a));
+      if (creativeOpen(a) && (action.creative ?? 0) > 0) add("creativity", CLASS_QUIZ.creativeXp);
+    }
   }
   // Payday with a positive flow and no loan (collect / the payday square).
   if ((action.type === "STEP" || action.type === "CHOICE") && b.cash > a.cash && b.liabilities.length === 0 && next.log[0] !== prev.log[0]) {
     const line = next.log.slice(0, Math.max(0, next.log.length - prev.log.length) + 1);
     if (line.some((l) => typeof l === "string" && l.includes("payday"))) add("discipline", X.paydayDiscipline);
   }
-  if (!Object.keys(g).length) return next;
-  return { ...next, players: next.players.map((p, k) => (k === i ? gainSkills(p, g) : p)) };
+  if (!Object.keys(g).length) return log !== b.skillLog ? { ...next, players: next.players.map((p, k) => (k === i ? { ...p, skillLog: log } : p)) } : next;
+  return { ...next, players: next.players.map((p, k) => (k === i ? { ...gainSkills(p, g), skillLog: log } : p)) };
 }
 
 /** Progress used by the v3 shops (Activities). */
@@ -2391,14 +2417,28 @@ export function progressOf(p: Player): Progress {
   return { turns: p.turns, passive: statement(p).passive, level: p.level, xpLevel: experienceLevel(p), cut: unlockCut(p) };
 }
 
-function doQuiz(s: GameState, correct: number): GameState {
+function doQuiz(s: GameState, correct: number, creative = 0): GameState {
   if (s.screen !== "play" || s.phase !== "idle" || s.training || isPractice(s)) return s;
   const p = cur(s);
   if (!quizOpen(p)) return s;
-  const n = Math.max(0, Math.min(3, Math.floor(Number(correct) || 0)));
-  const reward = quizReward(p, n, CLASS_QUIZ.perCorrect, CLASS_QUIZ.mindStepPct, CLASS_QUIZ.mindMaxPct);
-  const next = withP(s, (pl) => ({ ...pl, cash: pl.cash + reward, quizTurn: pl.turns }));
-  return blip(log(next, tl("Class quiz: {n}/3, +{amount}", { n: String(n), amount: money(reward) })), reward > 0 ? "cash" : null);
+  const total = CLASS_QUIZ.questions;
+  const n = Math.max(0, Math.min(total, Math.floor(Number(correct) || 0)));
+  const c = n > 0 && creativeOpen(p) ? Math.max(0, Math.min(2, Math.floor(Number(creative) || 0))) : 0;
+  const reward = quizCash(n, total) + (c === 2 ? CLASS_QUIZ.creativeBest : c === 1 ? CLASS_QUIZ.creativeOk : 0);
+  const next = withP(s, (pl) => ({ ...(n > 0 ? minigameGig(pl) : pl), cash: pl.cash + reward, quizTurn: pl.turns }));
+  return blip(log(next, tl("Class quiz: {n}/{m}, +{amount}", { n: String(n), m: String(total), amount: money(reward) })), reward > 0 ? "cash" : null);
+}
+
+/** SKILLS.md §11.2: the creative bonus question shows from Creativity CLASS_QUIZ.creativeAt. */
+export function creativeOpen(p: Player): boolean {
+  return SKILL_RULES.effects && skillLevel(p, "creativity") >= CLASS_QUIZ.creativeAt;
+}
+
+/** SKILLS.md §11.6: a finished mini-game with high Creativity feeds the "online content" side income (counts for the Gate). */
+function minigameGig(p: Player): Player {
+  const r = SKILL_RULES.creativity;
+  if (!SKILL_RULES.effects || skillLevel(p, "creativity") < r.minigameAt) return p;
+  return { ...p, gigBonus: Math.min(r.minigameMax, (p.gigBonus ?? 0) + r.minigameStep) };
 }
 
 /** The quiz can be played once every CLASS_QUIZ.everyTurns own turns. */
@@ -2500,7 +2540,7 @@ function reduceCore(state: GameState, action: Action): GameState {
     case "TOGGLE_HOME":
       return doToggleHome(state, action.id);
     case "QUIZ":
-      return doQuiz(state, action.correct);
+      return doQuiz(state, action.correct, action.creative);
     case "BUY_GOOD":
       return doBuyGood(state, action.id);
     default:
@@ -3508,7 +3548,7 @@ function doBreathe(s: GameState): GameState {
 function doMetro(s: GameState, result: "decline" | "run", lives: number): GameState {
   const due = metroOfferTurn(s);
   if (due === null) return s;
-  const n = withP(s, (p) => ({ ...p, metroTurn: due }));
+  const n = withP(s, (p) => ({ ...(result === "run" ? minigameGig(p) : p), metroTurn: due }));
   if (result === "decline") return log(n, "Metro run: not this time");
   const reward = metroReward(lives);
   if (reward <= 0) return log(n, "Metro run: missed");
@@ -3670,6 +3710,8 @@ function hydratePlayer(raw0: Player): Player {
     vitals: normalizeVitals(raw.vitals, raw.characterId),
     // v3 skills: XP from the save, or seeded from the save's own gauges (gauge × 3) when it predates skills.
     skills: hydrateSkills(raw0 && typeof raw0 === "object" ? (raw0 as Partial<Player>).skills : undefined, normalizeVitals((raw0 as Partial<Player> | undefined)?.vitals, raw.characterId)),
+    gigBonus: Math.max(0, Number(raw.gigBonus) || 0),
+    skillLog: raw.skillLog && typeof raw.skillLog === "object" ? raw.skillLog : {},
     sideGigs: Array.isArray(raw.sideGigs) ? raw.sideGigs.filter((g) => g && typeof g.id === "string").map((g) => ({ id: g.id, started: Number(g.started) || 0 })) : [],
     rerollUsed: !!raw.rerollUsed,
     rollFrom: typeof raw.rollFrom === "number" && Number.isInteger(raw.rollFrom) ? raw.rollFrom : undefined,

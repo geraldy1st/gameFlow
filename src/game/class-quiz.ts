@@ -1,5 +1,5 @@
 /**
- * GameFlow v3 — « Quiz en classe » content: Kyoko M.'s lesson and its 3 questions (from the finance quizzes of
+ * GameFlow v3 — « Quiz en classe » content: Kyoko M.'s lesson and its 5 questions (from the finance quizzes of
  * quizzes.ts), with the handwritten keyword of each answer, the correction and the board formula.
  * The teacher keeps only her initial: name card « Kyoko M. », « Kyoko-sensei » in her speech bubbles (tuning.ts).
  */
@@ -22,14 +22,14 @@ export interface ClassQuestion {
 export const LESSON = {
   title: { en: "Today’s lesson: cash flow", fr: "Leçon du jour : le cash-flow", es: "Lección de hoy: el flujo de caja" } as L<string>,
   text: {
-    en: "Cash flow is what is left each month: income minus expenses. Put into an asset, it earns in turn, as long as the asset brings in more than it costs.",
-    fr: "Le cash-flow, c’est ce qui reste chaque mois : revenus moins dépenses. Placé dans un actif, il rapporte à son tour, à condition que l’actif rapporte plus qu’il ne coûte.",
-    es: "El flujo de caja es lo que queda cada mes: ingresos menos gastos. Invertido en un activo, rinde a su vez, siempre que el activo deje más de lo que cuesta.",
+    en: "Cash flow is what is left each month: income minus expenses. An asset raises it, a liability eats it, and an emergency fund protects it.",
+    fr: "Le cash-flow, c’est ce qui reste chaque mois : revenus moins dépenses. Un actif l’augmente, un passif le mange, et un fonds d’urgence le protège.",
+    es: "El flujo de caja es lo que queda cada mes: ingresos menos gastos. Un activo lo aumenta, un pasivo se lo come y un fondo de emergencia lo protege.",
   } as L<string>,
   plan: {
-    en: ["A month’s cash flow", "Compound interest", "Borrowing for an asset"],
-    fr: ["Le cash-flow d’un mois", "Les intérêts composés", "Emprunter pour un actif"],
-    es: ["El flujo de un mes", "El interés compuesto", "Pedir prestado para un activo"],
+    en: ["Cash flow", "Liabilities", "Compound interest", "Borrowing for an asset", "The emergency fund"],
+    fr: ["Le cash-flow", "Le passif", "Les intérêts composés", "Emprunter pour un actif", "Le fonds d’urgence"],
+    es: ["El flujo de caja", "El pasivo", "El interés compuesto", "Pedir prestado para un activo", "El fondo de emergencia"],
   } as L<string[]>,
 };
 
@@ -54,6 +54,27 @@ export const CLASS_QUESTIONS: ClassQuestion[] = [
       es: "El flujo de caja es lo que queda cuando se van los gastos del mes.",
     },
     board: { en: "On the board: CF = Salary + Passive − Expenses.", fr: "Au tableau : CF = Salaire + Passif − Dépenses.", es: "En la pizarra: FC = Salario + Pasivo − Gastos." },
+  },
+  {
+    q: { en: "A liability is…", fr: "Un passif, c’est…", es: "Un pasivo es…" },
+    choices: {
+      en: ["Any object at all", "Something that takes money out every month", "A friend who likes you", "Cash in the bank"],
+      fr: ["N’importe quel objet", "Quelque chose qui sort de l’argent chaque mois", "Un ami qui t’aime bien", "Du cash à la banque"],
+      es: ["Cualquier objeto", "Algo que saca dinero cada mes", "Un amigo que te aprecia", "Efectivo en el banco"],
+    },
+    answer: 1,
+    kw: {
+      en: ["an object", "money out", "a friend", "cash"],
+      fr: ["un objet", "sort de l’argent", "un ami", "du cash"],
+      es: ["un objeto", "saca dinero", "un amigo", "efectivo"],
+    },
+    fix: { en: "→ costs me", fr: "→ me coûte", es: "→ me cuesta" },
+    why: {
+      en: "A liability asks for a payment. An asset pays you.",
+      fr: "Un passif demande un paiement. Un actif te paie.",
+      es: "Un pasivo pide un pago. Un activo te paga.",
+    },
+    board: { en: "On the board: Asset = pays me · Liability = costs me.", fr: "Au tableau : Actif = me rapporte · Passif = me coûte.", es: "En la pizarra: Activo = me paga · Pasivo = me cuesta." },
   },
   {
     q: { en: "Compound interest is…", fr: "Les intérêts composés, c’est…", es: "El interés compuesto es…" },
@@ -101,4 +122,42 @@ export const CLASS_QUESTIONS: ClassQuestion[] = [
     },
     board: { en: "Compare the ROI (gain / cost) to the loan rate.", fr: "Compare le ROI (gain / coût) au taux du prêt.", es: "Compara el ROI (ganancia / coste) con el tipo del préstamo." },
   },
+  {
+    q: { en: "An emergency fund is cash kept for…", fr: "Un fonds d’urgence, c’est du cash gardé pour…", es: "Un fondo de emergencia es dinero guardado para…" },
+    choices: {
+      en: ["The next pair of sneakers", "A friend’s stock tip", "A bill you did not see coming", "Decorating before the rent"],
+      fr: ["La prochaine paire de baskets", "Le tuyau boursier d’un ami", "Une facture que tu n’avais pas prévue", "Décorer avant le loyer"],
+      es: ["Las próximas zapatillas", "El soplo bursátil de un amigo", "Una factura que no esperabas", "Decorar antes del alquiler"],
+    },
+    answer: 2,
+    kw: {
+      en: ["sneakers", "stock tip", "the unexpected", "decor"],
+      fr: ["baskets", "tuyau boursier", "l’imprévu", "la déco"],
+      es: ["zapatillas", "soplo bursátil", "lo imprevisto", "la deco"],
+    },
+    fix: { en: "→ the unexpected", fr: "→ l’imprévu", es: "→ lo imprevisto" },
+    why: {
+      en: "The fund is for surprises, not for wants.",
+      fr: "Le fonds sert à la surprise, pas à l’envie.",
+      es: "El fondo es para las sorpresas, no para los caprichos.",
+    },
+    board: { en: "On the board: set aside first, wants after.", fr: "Au tableau : de côté d’abord, les envies ensuite.", es: "En la pizarra: primero apartar, luego los caprichos." },
+  },
 ];
+
+/** SKILLS.md §11.2 — creative bonus question (Creativity ≥ CLASS_QUIZ.creativeAt): every answer is accepted, the best scores 2. */
+export const CREATIVE_QUESTION = {
+  q: { en: "Bonus: how would you bring in $100 more a month?", fr: "Bonus : comment ferais-tu entrer 100 $ de plus par mois ?", es: "Bonus: ¿cómo harías entrar 100 $ más al mes?" } as L<string>,
+  choices: {
+    en: ["Rent out the spare room to a student", "Sell my drawings online", "Pick up extra shifts"],
+    fr: ["Louer la chambre en trop à un étudiant", "Vendre mes dessins en ligne", "Faire des heures en plus"],
+    es: ["Alquilar el cuarto libre a un estudiante", "Vender mis dibujos en internet", "Hacer horas extra"],
+  } as L<[string, string, string]>,
+  /** Grade of each answer: 2 = best (an asset that pays every month), 1 = fine. */
+  grade: [2, 1, 1] as const,
+  why: {
+    en: "All three work. The room keeps paying while you sleep: that is an asset.",
+    fr: "Les trois marchent. La chambre continue de payer pendant que tu dors : c’est un actif.",
+    es: "Las tres funcionan. El cuarto sigue pagando mientras duermes: eso es un activo.",
+  } as L<string>,
+};

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { LIFESTYLE, SMALL_DEALS } from "./data";
 import { createMatch, cur, hydrate, marketFor, priceOf, quizOpen, reduce, spendOf, statement, unlocked, type GameState, type Player } from "./engine";
-import { experienceLevel, gainSkill, gigIncome, maxFriends, negoDiscount, skillLevel, type SkillId } from "./skills";
-import { CLASS_QUIZ, SKILL_RULES } from "./tuning";
+import { affinityMult, antiFarm, experienceLevel, gainSkill, gigIncome, maxFriends, negoDiscount, quizCash, rewardPoints, skillLevel, type SkillId } from "./skills";
+import { CLASS_QUIZ, SKILL_REWARDS, SKILL_RULES } from "./tuning";
 
 const AOI = { characterId: "aoi", dreamId: "cafe" };
 /** Smallest XP reaching a level on the skill curve (cumulative 100, 220, 364, 536.8, 744.2 … → ceil). */
@@ -90,21 +90,21 @@ describe("v3 skills: effects (SKILLS.md)", () => {
     expect(statement({ ...fit, vitals: { ...fit.vitals, health: 75 } }).healthBonus).toBe(0);
   });
 
-  it("Creativity side incomes add to the cash flow but NOT to the Gate (open decision, flag countsTowardGate)", () => {
+  it("Creativity side incomes count as passive income, so toward the Gate (Geraldy); the flag can turn that off", () => {
     const p = { ...at(cur(idle()), "creativity", 6), sideGigs: [{ id: "drawings", started: 1 }, { id: "online", started: 2 }] };
     expect(gigIncome(p)).toBe(210);
     const st = statement(p);
     const bare = statement({ ...p, sideGigs: [] });
     expect(st.cashFlow - bare.cashFlow).toBe(210);
-    expect(st.passive).toBe(bare.passive);
+    expect(st.passive - bare.passive).toBe(210);
     const flag = SKILL_RULES.creativity.countsTowardGate;
-    SKILL_RULES.creativity.countsTowardGate = true;
+    SKILL_RULES.creativity.countsTowardGate = false;
     try {
-      expect(statement(p).passive - bare.passive).toBe(210);
+      expect(statement(p).passive).toBe(bare.passive);
+      expect(statement(p).cashFlow - bare.cashFlow).toBe(210);
     } finally {
       SKILL_RULES.creativity.countsTowardGate = flag;
     }
-    expect(unlocked(p)).toBe(unlocked({ ...p, sideGigs: [] }));
   });
 
   it("with SKILL_RULES.effects off, no effect at all (the regression replay relies on it)", () => {
@@ -139,20 +139,95 @@ describe("v3 skills: XP sources and the new actions", () => {
     const n = reduce(card, { type: "CHOICE", id: "go" });
     const dMind = cur(n).vitals.mind - cur(s).vitals.mind;
     expect(dMind).toBeGreaterThan(0);
-    expect((cur(n).skills!.mind ?? 0) - (cur(s).skills!.mind ?? 0)).toBe(dMind * 10);
+    // bridge (10 XP per gauge point) + the life.museum line of SKILL_REWARDS (Intelligence 140, Creativity 40)
+    expect((cur(n).skills!.mind ?? 0) - (cur(s).skills!.mind ?? 0)).toBe(dMind * 10 + 140);
     expect((cur(n).skills!.creativity ?? 0) - (cur(s).skills!.creativity ?? 0)).toBe(40);
   });
 
-  it("class quiz: 150 $ per good answer (+5 %/Intelligence level), once every few turns, never in practice", () => {
-    const s = idle();
-    const n = reduce(s, { type: "QUIZ", correct: 3 });
-    const lv = skillLevel(cur(s), "mind");
-    expect(cur(n).cash - cur(s).cash).toBe(Math.round(3 * CLASS_QUIZ.perCorrect * (1 + Math.min(0.5, 0.05 * (lv - 1)))));
-    expect((cur(n).skills!.mind ?? 0) - (cur(s).skills!.mind ?? 0)).toBe(90);
+  it("class quiz cash (Geraldy): 0/5 nothing, 1/5 and 4/5 → 250 $, 5/5 → 500 $; once per turn, never in practice", () => {
+    expect(CLASS_QUIZ.questions).toBe(5);
+    const s = withPlayer(idle(), (p) => ({ ...p, skills: { ...p.skills, mind: 0, creativity: 0 } }));
+    const cash = (n: number) => cur(reduce(s, { type: "QUIZ", correct: n })).cash - cur(s).cash;
+    expect(cash(0)).toBe(0);
+    expect(cash(1)).toBe(250);
+    expect(cash(4)).toBe(250);
+    expect(cash(5)).toBe(500);
+    expect([quizCash(0), quizCash(1), quizCash(4), quizCash(5)]).toEqual([0, 250, 250, 500]);
+    const n = reduce(s, { type: "QUIZ", correct: 5 });
     expect(quizOpen(cur(n))).toBe(false);
-    expect(reduce(n, { type: "QUIZ", correct: 3 })).toBe(n);
+    expect(reduce(n, { type: "QUIZ", correct: 5 })).toBe(n);
     const practice = createMatch([AOI], 3, false, { training: true });
-    expect(reduce(practice, { type: "QUIZ", correct: 3 })).toBe(practice);
+    expect(reduce(practice, { type: "QUIZ", correct: 5 })).toBe(practice);
+  });
+
+  it("class quiz skill points: 0/5 gives none; 1, 4 and 5 give the whole quiz.complete line (+ Intelligence XP bonus)", () => {
+    const s = withPlayer(idle(), (p) => ({ ...p, skills: { ...p.skills, mind: 0, creativity: 0 } }));
+    const ids: SkillId[] = ["nego", "content", "mind", "luck", "charisma", "discipline", "reputation", "health", "creativity", "social"];
+    const diff = (n: number) => {
+      const after = cur(reduce(s, { type: "QUIZ", correct: n }));
+      return Object.fromEntries(ids.map((id) => [id, (after.skills![id] ?? 0) - (cur(s).skills![id] ?? 0)]));
+    };
+    expect(Object.values(diff(0)).every((v) => v === 0)).toBe(true);
+    const want = { nego: 200, content: 150, mind: 100, luck: 100, charisma: 100, discipline: 100, reputation: 50, health: 10, creativity: 10, social: 10 };
+    expect(SKILL_REWARDS["quiz.complete"]).toEqual(want);
+    for (const n of [1, 4, 5]) expect(diff(n)).toEqual(want); // Intelligence level 1 → no bonus
+    // Intelligence level 5 → +20 % XP (never cash)
+    const smart = withPlayer(s, (p) => ({ ...p, skills: { ...p.skills, mind: XP_FOR[5]! } }));
+    const after = cur(reduce(smart, { type: "QUIZ", correct: 4 }));
+    expect(after.skills!.nego! - (cur(smart).skills!.nego ?? 0)).toBe(240);
+    expect(after.cash - cur(smart).cash).toBe(250);
+  });
+
+  it("creative bonus question (Creativity ≥ 5): +100 / +50 $ and +60 Creativity XP, not part of the perfect score", () => {
+    const s = withPlayer(idle(), (p) => ({ ...p, skills: { ...p.skills, mind: 0, creativity: XP_FOR[5]! } }));
+    const best = reduce(s, { type: "QUIZ", correct: 5, creative: 2 });
+    expect(cur(best).cash - cur(s).cash).toBe(600);
+    expect(cur(best).skills!.creativity! - cur(s).skills!.creativity!).toBe(70);
+    expect(cur(reduce(s, { type: "QUIZ", correct: 3, creative: 1 })).cash - cur(s).cash).toBe(300);
+    expect(cur(reduce(s, { type: "QUIZ", correct: 0, creative: 2 })).cash - cur(s).cash).toBe(0);
+    const low = withPlayer(s, (p) => ({ ...p, skills: { ...p.skills, creativity: 0 } }));
+    expect(cur(reduce(low, { type: "QUIZ", correct: 5, creative: 2 })).cash - cur(low).cash).toBe(500);
+  });
+
+  it("runner skill points (SKILLS.md §12): finish, win, per life, no hit", () => {
+    const s = withPlayer(idle(), (p) => ({ ...p, turns: 11, metroTurn: 0, skills: { ...p.skills, creativity: 0 } }));
+    const sk = (lives: number) => {
+      const a = cur(s).skills!;
+      const b = cur(reduce(s, { type: "METRO", result: "run", lives })).skills!;
+      return (id: SkillId) => (b[id] ?? 0) - (a[id] ?? 0);
+    };
+    const lost = sk(0);
+    expect([lost("health"), lost("luck"), lost("content"), lost("discipline")]).toEqual([60, 50, 40, 20]);
+    const full = sk(3);
+    expect(full("health")).toBe(60 + 3 * 15);
+    expect(full("luck")).toBe(50 + 40 + 3 * 10);
+    expect(full("content")).toBe(40 + 40);
+    expect(full("discipline")).toBe(20 + 30 + 40);
+    expect(sk(2)("discipline")).toBe(50);
+  });
+
+  it("anti-farm: the same activity in the same own turn pays 100 %, 50 %, 25 %, then 0", () => {
+    let log: Record<string, { turn: number; n: number }> | undefined;
+    const got: number[] = [];
+    for (let k = 0; k < 5; k++) {
+      const r = antiFarm(log, "life.sleep", 7);
+      got.push(r.factor);
+      log = r.log;
+    }
+    expect(got).toEqual([1, 0.5, 0.25, 0, 0]);
+    expect(antiFarm(log, "life.sleep", 8).factor).toBe(1);
+    expect(rewardPoints("life.sleep", 0.5)).toEqual({ health: 50, content: 20 });
+    expect(affinityMult(1)).toBe(1);
+    expect(affinityMult(9)).toBeCloseTo(1.5);
+  });
+
+  it("Creativity side incomes count toward the Gate (Geraldy); finished mini-games feed online content up to +100 $/mo", () => {
+    expect(SKILL_RULES.creativity.countsTowardGate).toBe(true);
+    const s = withPlayer(idle(), (p) => ({ ...p, sideGigs: [{ id: "drawings", started: 1 }], skills: { ...p.skills, creativity: XP_FOR[6]! } }));
+    expect(statement(cur(s)).passive).toBeGreaterThanOrEqual(gigIncome(cur(s)));
+    const n = reduce(s, { type: "QUIZ", correct: 2 });
+    expect(cur(n).gigBonus).toBe(5);
+    expect(gigIncome({ ...cur(n), gigBonus: 1e6 }) - gigIncome({ ...cur(n), gigBonus: 0 })).toBe(100);
   });
 
   it("goods: a shop must be open; the book is repeatable and gives Intelligence XP", () => {

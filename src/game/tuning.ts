@@ -25,18 +25,24 @@ export const CURVES = {
 /* ------------------------------------------------------------------ class quiz (Activities › Mini-games) */
 
 export const CLASS_QUIZ = {
-  /** Cash per correct answer, before the Intelligence bonus. 3 questions → 450 $ max at Intelligence Lv. 1. */
-  perCorrect: 150,
-  /** Intelligence bonus: +stepPct per level above 1, capped at +maxPct. */
+  /** Questions per quiz (Geraldy, 11/10). */
+  questions: 5,
+  /** Cash: all correct → perfect; 1 to (questions − 1) correct → partial; 0 correct → zero (no cash, no skill points). */
+  perfectReward: 500,
+  partialReward: 250,
+  zeroReward: 0,
+  /** Intelligence XP bonus on quiz.* skill points (SKILLS.md §12): +stepPct per level above 1, capped at +maxPct. XP only, never cash. */
   mindStepPct: 0.05,
   mindMaxPct: 0.5,
   /** Seconds per question. */
   seconds: 20,
-  /** Once per this many of the player's own turns (0 = any time). */
-  everyTurns: 5,
-  /** XP per correct answer (Intelligence) and per finished quiz (Creativity). */
-  xpPerCorrect: 30,
-  creativityXp: 30,
+  /** Once per this many of the player's own turns (SKILLS.md §12: "once per turn at most"; 0 = any time). */
+  everyTurns: 1,
+  /** SKILLS.md §11.2: creative bonus question from this Creativity level; cash for the best / another answer; Creativity XP. Never counts in the perfect score. */
+  creativeAt: 5,
+  creativeBest: 100,
+  creativeOk: 50,
+  creativeXp: 60,
   /** Teacher: name card and signature / label in her speech bubbles. */
   teacherName: "Kyoko M.",
   teacherLabel: "Kyoko-sensei",
@@ -131,11 +137,12 @@ export const SKILL_RULES = {
     /** After the last gig level: +step per level, capped. */
     stepPct: 0.1,
     maxPct: 1,
-    /**
-     * OPEN DECISION: do creative side incomes count as passive income (and so toward opening the Gate)?
-     * false (default asked for) = they are earned income: they add to cash flow but not to the Gate.
-     */
-    countsTowardGate: false,
+    /** Geraldy (11/10): creative side incomes count as passive income, and so toward opening the Gate. */
+    countsTowardGate: true,
+    /** SKILLS.md §11.6: each finished mini-game with Creativity ≥ minigameAt adds +minigameStep $/mo to "online content", capped. */
+    minigameAt: 6,
+    minigameStep: 5,
+    minigameMax: 100,
   },
   reputation: {
     /** Unlock conditions (turn, passive income, experience level) drop by min(max, step × (level − 1)). */
@@ -149,10 +156,6 @@ export const SKILL_RULES = {
 
 /** XP by source (SKILLS.md "Barème des sources"). The gauge bridge comes on top. */
 export const SKILL_XP = {
-  partyCharisma: 30,
-  circleReputation: 10,
-  museumCreativity: 40,
-  sleepHappiness: 40,
   shopNego: 20,
   shirtCharisma: 60, // professional shirt / going-out clothes
   promoCharisma: 80,
@@ -166,10 +169,35 @@ export const SKILL_XP = {
   repayReputation: 40,
   giveReputation: 40,
   loyalFriendReputation: 20, // per own turn and per friend at loyalty 4
-  metroLuckPerLife: 20,
-  metroHappiness: 40,
-  minigameCreativity: 30,
 };
+
+/**
+ * SKILLS.md §12 — skill points for mini-games and activities, ONE editable table (quiz decided by Geraldy, the rest
+ * delegated). Keys: SkillId ("content" = Happiness / Bonheur, "mind" = Intelligence, "nego" = Negotiation).
+ * Rules: no negative points; the same activity again in the same own turn gives ANTI_FARM[n] of the points.
+ */
+export const SKILL_REWARDS: Record<string, Partial<Record<"content" | "social" | "mind" | "luck" | "health" | "discipline" | "nego" | "charisma" | "creativity" | "reputation", number>>> = {
+  "quiz.complete": { nego: 200, content: 150, mind: 100, luck: 100, charisma: 100, discipline: 100, reputation: 50, health: 10, creativity: 10, social: 10 },
+  "runner.finish": { health: 60, luck: 50, content: 40, discipline: 20 },
+  "runner.win": { luck: 40, content: 40, discipline: 30 },
+  "runner.perLife": { health: 15, luck: 10 },
+  "runner.spot": { creativity: 30, reputation: 10 },
+  "runner.noHit": { discipline: 40 },
+  "circle.party": { social: 80, content: 70, charisma: 50 },
+  "circle.movies": { content: 60, social: 40, creativity: 30 },
+  "circle.gift": { social: 60, reputation: 30, charisma: 20 },
+  "circle.mission": { mind: 70, discipline: 50, reputation: 40 },
+  "circle.stocks": { mind: 60, luck: 50, nego: 40 },
+  "circle.shop": { nego: 70, luck: 30, social: 30 },
+  "circle.partner": { content: 20 },
+  "life.birthday": { social: 160, content: 140 },
+  "life.museum": { mind: 140, creativity: 40 },
+  "life.sleep": { health: 100, content: 40 },
+};
+/** circle.bonusAffinity: × (1 + step × min(maxSteps, affinity level − 1)) → up to × 1.5. */
+export const CIRCLE_AFFINITY_BONUS = { step: 0.1, maxSteps: 5 };
+/** Anti-farm: 1st time in an own turn 100 %, then 50 %, 25 %, then 0. */
+export const ANTI_FARM = [1, 0.5, 0.25, 0];
 
 /* ------------------------------------------------------------------ affinity */
 

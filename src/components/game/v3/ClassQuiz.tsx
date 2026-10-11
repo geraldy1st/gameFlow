@@ -5,15 +5,18 @@
  * The cash goes through the engine (QUIZ action) when the player leaves the end screen.
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { CLASS_QUESTIONS, LESSON } from "@/game/class-quiz";
-import { quizReward } from "@/game/skills";
+import { CLASS_QUESTIONS, CREATIVE_QUESTION, LESSON } from "@/game/class-quiz";
+import { SKILL_NAMES, quizCash, quizXpBonus, rewardPoints, type SkillId } from "@/game/skills";
+import { SKILL_INFO } from "@/game/skills-info";
+import { creativeOpen } from "@/game/engine";
+import { Ico } from "../boite/icons";
 import { CLASS_QUIZ } from "@/game/tuning";
 import type { Player } from "@/game/engine";
 import type { Lang } from "@/game/i18n";
 import { fmtMoney } from "../boite/format";
 
 type TFn = (text: string, vars?: Record<string, string | number>) => string;
-type Shot = "intro" | "q" | "end";
+type Shot = "intro" | "q" | "bonus" | "end";
 
 const IW = 1280;
 const IH = 720;
@@ -44,7 +47,7 @@ function shuffled(seed: number) {
   });
 }
 
-export function ClassQuiz({ player, lang, t, onFinish, onClose }: { player: Player; lang: Lang; t: TFn; onFinish: (correct: number) => void; onClose: () => void }) {
+export function ClassQuiz({ player, lang, t, onFinish, onClose }: { player: Player; lang: Lang; t: TFn; onFinish: (correct: number, creative: number) => void; onClose: () => void }) {
   const [shot, setShot] = useState<Shot>("intro");
   const [i, setI] = useState(0);
   const [score, setScore] = useState(0);
@@ -55,8 +58,13 @@ export function ClassQuiz({ player, lang, t, onFinish, onClose }: { player: Play
   const [frames, setFrames] = useState<{ t: CSSProperties; n: CSSProperties }>({ t: {}, n: {} });
   const root = useRef<HTMLElement>(null);
   const teacher = CLASS_QUIZ.teacherLabel;
-  const reward = quizReward(player, score, CLASS_QUIZ.perCorrect, CLASS_QUIZ.mindStepPct, CLASS_QUIZ.mindMaxPct);
-  const perShown = quizReward(player, 1, CLASS_QUIZ.perCorrect, CLASS_QUIZ.mindStepPct, CLASS_QUIZ.mindMaxPct);
+  // Geraldy (11/10): 5/5 → 500 $, 1 to 4 → 250 $, 0 → nothing (no cash, no skill points).
+  const [cpick, setCpick] = useState<number | null>(null);
+  const grade = cpick === null ? 0 : CREATIVE_QUESTION.grade[cpick]!;
+  const bonusCash = score > 0 ? (grade === 2 ? CLASS_QUIZ.creativeBest : grade === 1 ? CLASS_QUIZ.creativeOk : 0) : 0;
+  const reward = quizCash(score, qs.length) + bonusCash;
+  const gains = score > 0 ? rewardPoints("quiz.complete", 1 + quizXpBonus(player)) : {};
+  if (score > 0 && grade > 0) gains.creativity = (gains.creativity ?? 0) + CLASS_QUIZ.creativeXp;
 
   // object-fit: cover by hand, so the hand layer and the handwriting stay glued to the painting.
   useLayoutEffect(() => {
@@ -101,13 +109,13 @@ export function ClassQuiz({ player, lang, t, onFinish, onClose }: { player: Play
   }, [left, shot, picked, answer]);
 
   useEffect(() => {
-    const first = root.current?.querySelector<HTMLButtonElement>(shot === "q" ? (picked === null ? ".cq-ans" : "#cq-next") : shot === "intro" ? "#cq-start" : "#cq-done");
+    const first = root.current?.querySelector<HTMLButtonElement>(shot === "q" ? (picked === null ? ".cq-ans" : "#cq-next") : shot === "bonus" ? (cpick === null ? ".cq-ans" : "#cq-next") : shot === "intro" ? "#cq-start" : "#cq-done");
     first?.focus({ preventScroll: true });
-  }, [shot, i, picked]);
+  }, [shot, i, picked, cpick]);
 
   const next = () => {
     if (picked === null) return;
-    if (i + 1 >= qs.length) setShot("end");
+    if (i + 1 >= qs.length) setShot(score > 0 && creativeOpen(player) ? "bonus" : "end");
     else {
       setI(i + 1);
       setPicked(null);
@@ -115,7 +123,7 @@ export function ClassQuiz({ player, lang, t, onFinish, onClose }: { player: Play
     }
   };
   const done = () => {
-    onFinish(score);
+    onFinish(score, grade);
   };
 
   const cur = qs[i]!;
@@ -223,7 +231,36 @@ export function ClassQuiz({ player, lang, t, onFinish, onClose }: { player: Play
             </p>
           </div>
         )}
-        {shot !== "q" && (
+        {shot === "bonus" && (
+          <div className="cq-card">
+            <div className="cq-meta">
+              <span>{t("Creative bonus")}</span>
+            </div>
+            <h3>{CREATIVE_QUESTION.q[lang]}</h3>
+            <div className="cq-answers">
+              {CREATIVE_QUESTION.choices[lang].map((c, k) => (
+                <button key={k} type="button" className={`cq-ans ${cpick === k ? "good" : ""}`} disabled={cpick !== null} onClick={() => setCpick(k)}>
+                  <i>{L[k]}</i>
+                  {c}
+                </button>
+              ))}
+            </div>
+            <button type="button" id="cq-next" className="v3-btn gold" disabled={cpick === null} onClick={() => setShot("end")}>
+              {cpick === null ? t("Answer to continue") : t("See the result →")}
+            </button>
+          </div>
+        )}
+        {shot === "bonus" && cpick !== null && (
+          <div className="cq-fb ok" role="status">
+            <img src={`${BASE}quiz-teacher-face.webp`} alt="" />
+            <p>
+              <i className="spk">{teacher}</i>
+              <b>{grade === 2 ? t("Brilliant!") : t("That works.")}</b> {CREATIVE_QUESTION.why[lang]}
+              <span>{t("+{amount} and +{xp} Creativity XP", { amount: fmtMoney(lang, grade === 2 ? CLASS_QUIZ.creativeBest : CLASS_QUIZ.creativeOk), xp: CLASS_QUIZ.creativeXp })}</span>
+            </p>
+          </div>
+        )}
+        {(shot === "intro" || shot === "end") && (
           <div className="cq-name">
             <b>{CLASS_QUIZ.teacherName}</b>
             <small>{t("Economics teacher")}</small>
@@ -242,7 +279,7 @@ export function ClassQuiz({ player, lang, t, onFinish, onClose }: { player: Play
               ))}
             </ol>
             <div className="row">
-              <small>{t("3 questions · {s} s each · {amount} per correct answer", { s: CLASS_QUIZ.seconds, amount: fmtMoney(lang, perShown) })}</small>
+              <small>{t("{n} questions · {s} s each · {perfect} with no mistakes, otherwise {partial}", { n: qs.length, s: CLASS_QUIZ.seconds, perfect: fmtMoney(lang, CLASS_QUIZ.perfectReward), partial: fmtMoney(lang, CLASS_QUIZ.partialReward) })}</small>
               <button type="button" id="cq-start" className="v3-btn gold" onClick={() => setShot("q")}>
                 {t("Start")}
               </button>
@@ -254,14 +291,27 @@ export function ClassQuiz({ player, lang, t, onFinish, onClose }: { player: Play
             <p className="who">
               {teacher} · {t("end of the lesson")}
             </p>
-            <h3>{score === qs.length ? t("No mistakes!") : score >= 2 ? t("Well played") : t("We review and come back")}</h3>
-            <p>{score === qs.length ? t("Cash flow first, the rest follows.") : score >= 2 ? t("Read your notes tonight and you will get it all.") : t("We go over the board tonight, and tomorrow will be better.")}</p>
+            <h3>{score === qs.length ? t("No mistakes!") : score >= 3 ? t("Well played") : t("We review and come back")}</h3>
+            <p>{score === qs.length ? t("Cash flow first, the rest follows.") : score >= 3 ? t("Read your notes tonight and you will get it all.") : t("We go over the board tonight, and tomorrow will be better.")}</p>
             <div className="res">
               <span className="big">
                 {score} / {qs.length}
               </span>
               <span className="reward">{fmtMoney(lang, reward, true)}</span>
             </div>
+            {score > 0 ? (
+              <div className="cq-xp" aria-label={t("Skill points earned")}>
+                {SKILL_INFO.filter((k) => (gains[k.id as SkillId] ?? 0) > 0).map((k) => (
+                  <span key={k.id} className="cq-xpc" style={{ "--c": k.color } as CSSProperties}>
+                    <Ico name={k.icon} />
+                    {t(SKILL_NAMES[k.id as SkillId])}
+                    <b>+{gains[k.id as SkillId]}</b>
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <small className="note">{t("No answer right: no cash and no skill points this time.")}</small>
+            )}
             <small className="note">
               {t("The gain goes into your cash")}
               {colon}

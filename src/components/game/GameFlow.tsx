@@ -1487,8 +1487,8 @@ export function GameFlow() {
           player={player}
           lang={lang}
           t={t}
-          onFinish={(correct) => {
-            go({ type: "QUIZ", correct });
+          onFinish={(correct, creative) => {
+            go({ type: "QUIZ", correct, creative });
             setClassQuiz(false);
             setHub("acts");
           }}

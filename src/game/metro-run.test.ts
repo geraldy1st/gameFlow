@@ -153,7 +153,7 @@ describe("metro run — offer every 10 of the player's own turns", () => {
       expect(cur(n).cash).toBe(cur(s).cash + gain);
       expect(cur(n).metroTurn).toBe(10);
       // nothing else moves: calm, debts, assets, position (skills earn XP, SKILLS.md)
-      const bare = (p: Player) => ({ ...noMetro(p), cash: 0, skills: undefined });
+      const bare = (p: Player) => ({ ...noMetro(p), cash: 0, skills: undefined, skillLog: undefined, gigBonus: undefined });
       expect(bare(cur(n))).toEqual(bare(cur(s)));
       expect(n.phase).toBe(s.phase);
       expect(n.turn).toBe(s.turn);
