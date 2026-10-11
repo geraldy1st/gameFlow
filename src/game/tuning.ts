@@ -207,6 +207,14 @@ export interface GoodDef {
   repeat?: boolean;
 }
 
+/** Day › Goods categories, data-driven: add an entry here (and items with that `cat`) and the tab shows it. */
+export const GOODS_CATEGORIES: { id: GoodsCategory; name: string; icon: string }[] = [
+  { id: "wardrobe", name: "Wardrobe", icon: "shirt" },
+  { id: "garage", name: "Garage", icon: "car" },
+  { id: "homes", name: "Homes", icon: "house" },
+  { id: "other", name: "Other", icon: "gem" },
+];
+
 /** New goods (mockup proposals). Clothes and home items stay in life.ts / shop.ts and keep their rules. */
 export const GOODS: GoodDef[] = [
   { id: "bike", name: "City bike", note: "Transport −$40/mo", cat: "garage", icon: "bike", price: 300, monthly: -40, xp: { health: 60 } },

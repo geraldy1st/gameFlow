@@ -42,6 +42,8 @@ import { IntroVideo, probeIntro, type IntroPick } from "./boite/IntroVideo";
 import { MenuScreen } from "./boite/MenuScreen";
 import { MetroBoard, trackSpaces } from "./boite/MetroBoard";
 import { MetroOffer, MetroRun } from "./boite/MetroRun";
+import { ActivitiesPanel, BottomNav, DayPanel, FriendAffinity, HubLayer, LegendPanel, MenuPanel, type DayTab, type HubTab, type MenuItem } from "./v3/Hub";
+import { ClassQuiz } from "./v3/ClassQuiz";
 import type { RunnerAudio } from "./boite/metro-audio";
 import { TrainingCoach, coachView, type TutLocal } from "./boite/TrainingCoach";
 import {
@@ -600,6 +602,13 @@ export function GameFlow() {
   const [dayOpen, setDayOpen] = useState(false);
   const [wardrobeOpen, setWardrobeOpen] = useState(false);
   const [shopOpen, setShopOpen] = useState(false);
+  // v3 navigation: bottom bar Day · Activities · Ledger · Menu, and the class quiz.
+  const [hub, setHub] = useState<HubTab | null>(null);
+  const [dayTab, setDayTab] = useState<DayTab>("income");
+  const [legendView, setLegendView] = useState(false);
+  const [classQuiz, setClassQuiz] = useState(false);
+  const navRef = useRef<HTMLElement | null>(null);
+  const asideRef = useRef<HTMLElement | null>(null);
   const [chat, setChat] = useState<{ friendId: string; index: number; step: number } | null>(null);
   const [savedFlash, setSavedFlash] = useState(false);
   const [intro, setIntro] = useState<number | "boot" | null>("boot");
@@ -818,7 +827,7 @@ export function GameFlow() {
     const onKey = (e: KeyboardEvent) => {
       const s = stateRef.current;
       if (metroBusyRef.current) return; // the metro offer / run owns the keyboard meanwhile
-      if (friendEv || introMode) return;
+      if (friendEv || introMode || classQuiz) return;
       if (coachRef.current && !rules && !optionsOpen) return; // the coach owns Enter / Space meanwhile
       if (gateOpenRef.current && !rules && !optionsOpen) {
         if (e.key === "Escape") dismissGateRef.current();
@@ -856,6 +865,11 @@ export function GameFlow() {
         }
         if (circleOpen) {
           setCircleOpen(false);
+          return;
+        }
+        if (hub && !rules && !optionsOpen) {
+          if (legendView) setLegendView(false);
+          else setHub(null);
           return;
         }
         if (chat) {
@@ -927,7 +941,7 @@ export function GameFlow() {
         });
         return;
       }
-      if (outcome || statusFor || historyOpen || friendId || circleOpen || confirmNew || dayOpen || wardrobeOpen || shopOpen || chat || ledgerOpen || legendOpen || rules || optionsOpen || bioId || trophyId) {
+      if (outcome || statusFor || historyOpen || friendId || circleOpen || confirmNew || dayOpen || wardrobeOpen || shopOpen || chat || ledgerOpen || legendOpen || rules || optionsOpen || bioId || trophyId || hub) {
         if (e.key === "Enter" || e.key === " ") setOutcome(null);
         return;
       }
@@ -945,7 +959,7 @@ export function GameFlow() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [rules, tutorial, bioId, optionsOpen, trophyId, outcome, statusFor, historyOpen, friendId, circleOpen, confirmNew, dayOpen, wardrobeOpen, shopOpen, chat, intro, friendEv, introMode, ledgerOpen, legendOpen]);
+  }, [rules, tutorial, bioId, optionsOpen, trophyId, outcome, statusFor, historyOpen, friendId, circleOpen, confirmNew, dayOpen, wardrobeOpen, shopOpen, chat, intro, friendEv, introMode, ledgerOpen, legendOpen, hub, legendView, classQuiz]);
 
   const go = (action: Action) => {
     unlockAudio();
@@ -1104,13 +1118,32 @@ export function GameFlow() {
     if (stateRef.current.screen !== "menu") dispatch({ type: "MENU" });
   };
 
+  const openHub = (tab: HubTab) => {
+    setLegendView(false);
+    if (tab === "ledger") {
+      setHub(null);
+      setLedgerOpen(true);
+      return;
+    }
+    setHub((h) => (h === tab ? null : tab));
+  };
+  const menuItems: MenuItem[] = [
+    { label: t("Legend"), icon: "key", hl: true, onClick: () => setLegendView(true) },
+    { label: t("Rules"), icon: "list", onClick: () => setRules(true) },
+    { label: savedFlash ? t("Saved") : t("Save"), icon: savedFlash ? "check" : "save", onClick: saveNow },
+    { label: state.muted ? t("Sound off") : t("Sound on"), icon: state.muted ? "mute" : "sound", pressed: !state.muted, onClick: () => go({ type: "MUTE" }) },
+    { label: t("Options"), icon: "wrench", onClick: () => { setOptTab("lang"); setOptionsOpen(true); } },
+    { label: t("Finance quiz"), icon: "quiz", onClick: () => { setOptTab("quiz"); setQuizId(null); setQuizDone(false); setOptionsOpen(true); } },
+    { label: t("Choose a life"), icon: "house", onClick: () => { setHub(null); go({ type: "MENU" }); } },
+    { label: t("Credits"), icon: "star", onClick: () => { setHub(null); go({ type: "CREDITS" }); } },
+  ];
   const player = state.players.length ? cur(state) : null;
   const shownDie = state.phase === "rolling" ? flicker : state.die;
   const viewState = state.phase === "rolling" ? { ...state, die: shownDie } : state;
   const passiveHistory = usePassiveHistory(state);
   const points: Point[] = player ? (passiveHistory[player.id] ?? []) : [];
   const isMobile = useIsMobile();
-  const otherOverlay = !!(coach || outcome || friendEv || statusFor || historyOpen || friendId || circleOpen || dayOpen || shopOpen || wardrobeOpen || chat || ledgerOpen || legendOpen || rules || tutorial !== null || confirmNew || introMode || typeof intro === "number");
+  const otherOverlay = !!(hub || classQuiz || coach || outcome || friendEv || statusFor || historyOpen || friendId || circleOpen || dayOpen || shopOpen || wardrobeOpen || chat || ledgerOpen || legendOpen || rules || tutorial !== null || confirmNew || introMode || typeof intro === "number");
   // Metro run offer: due at the end of every 10th turn (never in the training / practice), one per multiple of 10.
   const metroDue = metroOfferTurn(state);
   const metroOffer = metroDue !== null && !metroPlay && !otherOverlay && !optionsOpen;
@@ -1262,7 +1295,7 @@ export function GameFlow() {
             </section>
             <StationStrip player={player} t={t} />
             {!isMobile && (
-              <aside className="mat d-only">
+              <aside className="mat d-only" ref={asideRef}>
                 <WhoBox player={player} state={state} t={t} lang={lang} onStatus={() => setStatusFor(player)} />
                 <FlowBox player={player} t={t} lang={lang} />
                 <GateBox player={player} t={t} lang={lang} points={points} />
@@ -1272,28 +1305,7 @@ export function GameFlow() {
                   t={t}
                   onRoll={() => go({ type: "ROLL" })}
                   ctx={hasCtx ? ctxButtons : undefined}
-                  actions={
-                    <>
-                      <button type="button" className="btn" disabled={!idle} onClick={() => setDayOpen(true)}>
-                        <Ico name="sun" />
-                        {t("Day")}
-                      </button>
-                      <button type="button" className="btn" onClick={() => setShopOpen(true)}>
-                        <Ico name="bag" />
-                        {t("Shop")}
-                      </button>
-                      {(player.friends.length > 0 || player.partner) && (
-                        <button type="button" className="btn" onClick={() => setCircleOpen(true)}>
-                          <Ico name="people" />
-                          {t("Circle")}
-                        </button>
-                      )}
-                      <button type="button" className="btn" onClick={() => setLedgerOpen(true)}>
-                        <Ico name="ledger" />
-                        {t("Ledger")}
-                      </button>
-                    </>
-                  }
+                  actions={<BottomNav tab={hub} onTab={openHub} t={t} navRef={navRef} />}
                 />
               </aside>
             )}
@@ -1307,27 +1319,22 @@ export function GameFlow() {
                     {rollLabel(viewState, t)}
                   </button>
                 </div>
-                <div className="sec">
-                  <button type="button" className="btn" disabled={!idle} onClick={() => setDayOpen(true)}>
-                    <Ico name="sun" />
-                    {t("Day")}
-                  </button>
-                  <button type="button" className="btn" onClick={() => setShopOpen(true)}>
-                    <Ico name="bag" />
-                    {t("Shop")}
-                  </button>
-                  <button type="button" className="btn" onClick={() => setLedgerOpen(true)}>
-                    <Ico name="coin" />
-                    {t("Ledger")}
-                  </button>
-                  <button type="button" className="btn" onClick={() => setLegendOpen(true)}>
-                    <Ico name="key" />
-                    {t("Legend")}
-                  </button>
-                </div>
+                <BottomNav tab={hub} onTab={openHub} t={t} navRef={navRef} />
               </nav>
             )}
           </main>
+        )}
+        {state.screen === "play" && player && hub && !coach && !classQuiz && (
+          <HubLayer anchor={asideRef} nav={navRef} label={t(hub === "day" ? "Day" : hub === "acts" ? "Activities" : "Menu")} onClose={() => setHub(null)}>
+            {hub === "day" && <DayPanel state={state} tab={dayTab} setTab={setDayTab} t={t} lang={lang} go={go} onFriend={(id) => setFriendId(id)} onClose={() => setHub(null)} />}
+            {hub === "acts" && <ActivitiesPanel state={state} t={t} lang={lang} go={go} onQuiz={() => setClassQuiz(true)} onClose={() => setHub(null)} />}
+            {hub === "menu" &&
+              (legendView ? (
+                <LegendPanel map={<LegendBody t={t} />} player={player} t={t} lang={lang} onClose={() => setHub(null)} onBack={() => setLegendView(false)} />
+              ) : (
+                <MenuPanel items={menuItems} t={t} onClose={() => setHub(null)} />
+              ))}
+          </HubLayer>
         )}
 
         {state.screen === "win" && player && (
@@ -1487,6 +1494,19 @@ export function GameFlow() {
         </div>
       )}
 
+      {classQuiz && player && state.screen === "play" && (
+        <ClassQuiz
+          player={player}
+          lang={lang}
+          t={t}
+          onFinish={(correct) => {
+            go({ type: "QUIZ", correct });
+            setClassQuiz(false);
+            setHub("acts");
+          }}
+          onClose={() => setClassQuiz(false)}
+        />
+      )}
       {metroOffer && player && metroDue !== null && (
         <MetroOffer
           t={t}
@@ -1863,6 +1883,7 @@ export function GameFlow() {
                     <h2>{def.name}</h2>
                     <p className="kicker">{t("Biography")}</p>
                     <p>{t(def.bio)}</p>
+                    {f && <FriendAffinity f={f} name={def.name.split(" ")[0]!} t={t} />}
                     {f && turns !== null && (
                       <div className="rows">
                         <div><span>{t("Turns together")}</span><strong>{turns}</strong></div>

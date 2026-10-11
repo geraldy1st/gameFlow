@@ -9,6 +9,26 @@ import type { SpaceDef, SpaceKind } from "@/game/data";
 const S = 'fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"';
 
 export const ICON_PATHS: Record<string, string> = {
+  // v3 (skills, goods, activities)
+  smile: `<circle cx="12" cy="12" r="9" ${S}/><path d="M8.5 14.5c1.8 2 5.2 2 7 0M9 9.5h.01M15 9.5h.01" ${S}/>`,
+  clover: `<path d="M12 12c-3-1-5-3-3.5-5S12 7 12 9c0-2 2-3.5 3.5-2s-.5 4-3.5 5zm0 0c1 3 3 5 5 3.5S17 12 15 12c2 0 3.5-2 2-3.5M12 12c-1 3-3 5-5 3.5S7 12 9 12M12 12l1 8" ${S}/>`,
+  target: `<circle cx="12" cy="12" r="9" ${S}/><circle cx="12" cy="12" r="5" ${S}/><circle cx="12" cy="12" r="1.2" fill="currentColor"/>`,
+  medal: `<path d="M8 3l2.5 6M16 3l-2.5 6" ${S}/><circle cx="12" cy="15" r="6" ${S}/><path d="M12 12.5v5" ${S}/>`,
+  brush: `<path d="M14 4l6 6-8 8H6v-6z" ${S}/><path d="M6 18c0 2-2 2.5-2 2.5S8 21 9 18" ${S}/>`,
+  shirt: `<path d="M8 3l4 3 4-3 5 4-3 3v11H6V10L3 7z" ${S}/>`,
+  jeans: `<path d="M6 3h12l1 18h-5l-2-11-2 11H5z" ${S}/>`,
+  dress: `<path d="M9 3h6l-1 5 5 13H5l5-13z" ${S}/>`,
+  bike: `<circle cx="6" cy="16" r="3.5" ${S}/><circle cx="18" cy="16" r="3.5" ${S}/><path d="M6 16l4-7h5l3 7M10 9l3 7M14 6h3" ${S}/>`,
+  scooter: `<circle cx="6" cy="17" r="2.6" ${S}/><circle cx="18" cy="17" r="2.6" ${S}/><path d="M8.6 17H15l2-7h-4M17 10l1-4h2" ${S}/>`,
+  car: `<path d="M4 15l2-6h12l2 6v3H4z" ${S}/><circle cx="8" cy="18" r="1.6" fill="currentColor"/><circle cx="16" cy="18" r="1.6" fill="currentColor"/>`,
+  lamp: `<path d="M8 3h8l3 8H5z" ${S}/><path d="M12 11v8M8 20h8" ${S}/>`,
+  frame: `<rect x="3" y="5" width="18" height="14" rx="1.5" ${S}/><path d="M6 16l4-5 3 3 2-2 3 4" ${S}/>`,
+  gym: `<path d="M3 9v6M6 7v10M18 7v10M21 9v6M6 12h12" ${S}/>`,
+  unknown: `<circle cx="12" cy="12" r="9" ${S}/><path d="M9.5 9.5a2.5 2.5 0 015 0c0 1.8-2.5 2-2.5 4M12 17h.01" ${S}/>`,
+  menu: `<path d="M4 7h16M4 12h16M4 17h16" ${S}/>`,
+  game: `<rect x="3" y="7" width="18" height="11" rx="4" ${S}/><path d="M8 10v5M5.5 12.5h5M15.5 11.5h.01M18 13.5h.01" ${S}/>`,
+  quiz: `<path d="M4 5h11l5 5v9H4z" ${S}/><path d="M8 11h7M8 15h5" ${S}/>`,
+  run: `<circle cx="14" cy="4.5" r="2" ${S}/><path d="M8 21l3-6 3 2v4M6 12l3-3 4 1 2 3 3 1M11 15l2-5" ${S}/>`,
   coin: `<circle cx="12" cy="12" r="9" ${S}/><text x="12" y="16.6" text-anchor="middle" font-family="Fredoka,Nunito,sans-serif" font-weight="700" font-size="13" fill="currentColor">$</text>`,
   up: `<path d="M12 3.5l7.5 8.5h-4.8v8.5H9.3V12H4.5z" fill="currentColor"/>`,
   up2: `<path d="M7.5 3l5 6H9.6v5H5.4V9H2.5z" fill="currentColor"/><path d="M16.5 8l5.5 6.5h-3.3V21h-4.4v-6.5H11z" fill="currentColor"/>`,
