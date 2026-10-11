@@ -42,8 +42,9 @@ import { IntroVideo, probeIntro, type IntroPick } from "./boite/IntroVideo";
 import { MenuScreen } from "./boite/MenuScreen";
 import { MetroBoard, trackSpaces } from "./boite/MetroBoard";
 import { MetroOffer, MetroRun } from "./boite/MetroRun";
-import { ActivitiesPanel, BottomNav, DayPanel, FriendAffinity, HubLayer, LegendPanel, MenuPanel, type DayTab, type HubTab, type MenuItem } from "./v3/Hub";
+import { ActivitiesPanel, BottomNav, DayPanel, FriendAffinity, HubLayer, LegendPanel, MenuPanel, Tabs, type DayTab, type HubTab, type MenuItem } from "./v3/Hub";
 import { ClassQuiz } from "./v3/ClassQuiz";
+import { Pager } from "./v3/Pager";
 import type { RunnerAudio } from "./boite/metro-audio";
 import { TrainingCoach, coachView, type TutLocal } from "./boite/TrainingCoach";
 import {
@@ -295,7 +296,6 @@ function LedgerBody({
   lang,
   points,
   onHistory,
-  onFriend,
 }: {
   player: Player;
   state: GameState;
@@ -304,130 +304,119 @@ function LedgerBody({
   lang: Lang;
   points: Point[];
   onHistory: () => void;
-  onFriend: (id: string) => void;
 }) {
+  // v3 no-scroll: three tabs (summary · assets & debts · journal); the long lists are paginated.
+  const [tab, setTab] = useState<"sum" | "assets" | "log">("sum");
   const st = statement(player);
   const partner = player.partner ? PARTNERS.find((p) => p.id === player.partner!.id) : null;
   const idle = state.phase === "idle";
   const m = (n: number, signed = false) => fmtMoney(lang, n, signed);
+  type Line = { k: string; label: string; value: string; cls: string; act?: { label: string; run: () => void } };
+  const lines: Line[] = [
+    ...player.assets.map((a) => ({ k: a.id, label: t(a.name), value: `${m(a.cashFlow, true)}${t("/mo")}`, cls: "up", act: idle ? { label: t("Sell"), run: () => dispatch({ type: "SELL", id: a.id }) } : undefined })),
+    ...player.liabilities.map((l) => ({ k: l.id, label: t(l.name), value: `${m(-l.payment)}${t("/mo")}`, cls: "down", act: idle && player.cash >= l.principal ? { label: `${t("Repay")} ${m(l.principal)}`, run: () => dispatch({ type: "REPAY", id: l.id }) } : undefined })),
+  ];
+  const expenses: [string, number][] = [
+    [t("Taxes"), st.taxes],
+    [t("Rent") + (st.roommate ? t(" (roommate)") : ""), st.rent],
+    [t("Food & transport"), st.food + st.transport],
+    [t("Other + lifestyle"), st.other + st.mods],
+    [t("Partner"), st.partnerExpense],
+    [`${t("Children")} (${player.children.length})`, st.childCost],
+    [t("Debt payments"), st.debtPay],
+    ...(st.bizPayroll > 0 ? ([[t("Business payroll"), st.bizPayroll]] as [string, number][]) : []),
+    ...(st.allyCost > 0 ? ([[t("Business partners"), st.allyCost]] as [string, number][]) : []),
+  ];
   return (
-    <div className="ledger">
-      <div className="rows">
-        <div><span>{t("Cash")}</span><strong className="num">{m(player.cash)}</strong></div>
-        <div><span>{t("Salary & earned")}</span><strong className="num up">{m(st.salary, true)}</strong></div>
-        <div><span>{t("Passive income")}</span><strong className="num up">{m(st.passive, true)}</strong></div>
-        {st.allyIncome > 0 && <div><span>{t("Allied income")}</span><strong className="num up">{m(st.allyIncome, true)}</strong></div>}
-        <div><span>{t("Monthly expenses")}</span><strong className="num down">{m(-st.expenses)}</strong></div>
-        <div className="total"><span>{t("Monthly cash flow")}</span><strong className={`num ${st.cashFlow >= 0 ? "up" : "down"}`}>{m(st.cashFlow, true)}</strong></div>
+    <div className="ledger v3-ledger">
+      <div className="v3">
+        <Tabs tabs={[["sum", "Summary"], ["assets", "Assets"], ["log", "Journal"]]} value={tab} onChange={setTab} t={t} label={t("Ledger")} />
       </div>
-      <div className="m-only">
-        <PassiveChart points={points.length ? points : [{ turn: state.turn, passive: st.passive }]} expenses={st.expenses} t={t} lang={lang} />
-      </div>
-      {idle && (
-        <div className="chip-row">
-          {!trainingFor(state) && (
-            <button type="button" className="btn btn-ghost" onClick={() => dispatch({ type: "BORROW" })}>{t("Borrow $1,000")}</button>
-          )}
-          {partner && player.householdIn === 0 && (
-            <button type="button" className="btn btn-ghost" onClick={() => dispatch({ type: "HOUSE" })}>{t("Household decision")}</button>
-          )}
-        </div>
-      )}
-      {player.business && (
-        <div className="list-block">
-          <h3>{t(player.business.name)}</h3>
+      {tab === "sum" && (
+        <div className="v3-lg-body">
           <div className="rows">
-            <div><span>{t("Revenue")}</span><strong className="num up">{m(player.business.revenue, true)}{t("/mo")}</strong></div>
-            <div><span>{t("Payroll")}</span><strong className="num down">{m(-player.business.payroll)}{t("/mo")}</strong></div>
-            <div><span>{t("Venture goal")}</span><strong className="num">{m(VENTURE_GOAL)}{t("/mo")}</strong></div>
+            <div><span>{t("Cash")}</span><strong className="num">{m(player.cash)}</strong></div>
+            <div><span>{t("Salary & earned")}</span><strong className="num up">{m(st.salary, true)}</strong></div>
+            <div><span>{t("Passive income")}</span><strong className="num up">{m(st.passive, true)}</strong></div>
+            {st.allyIncome > 0 && <div><span>{t("Allied income")}</span><strong className="num up">{m(st.allyIncome, true)}</strong></div>}
+            <div><span>{t("Monthly expenses")}</span><strong className="num down">{m(-st.expenses)}</strong></div>
+            <div className="total"><span>{t("Monthly cash flow")}</span><strong className={`num ${st.cashFlow >= 0 ? "up" : "down"}`}>{m(st.cashFlow, true)}</strong></div>
           </div>
-        </div>
-      )}
-      {player.level >= 2 && player.keptRevenue && !player.stretchClaimed && (
-        <p className="muted">{t("Level 2 aim: {passive}/mo passive, or {cash} cash.", { passive: m(FORTUNE_PASSIVE), cash: m(FORTUNE_CASH) })}</p>
-      )}
-      <details className="list-block">
-        <summary>{t("Expense lines")}</summary>
-        <div className="rows">
-          <div><span>{t("Taxes")}</span><span className="num">{m(-st.taxes)}</span></div>
-          <div><span>{t("Rent")}{st.roommate ? t(" (roommate)") : ""}</span><span className="num">{m(-st.rent)}</span></div>
-          <div><span>{t("Food & transport")}</span><span className="num">{m(-(st.food + st.transport))}</span></div>
-          <div><span>{t("Other + lifestyle")}</span><span className="num">{m(-(st.other + st.mods))}</span></div>
-          <div><span>{t("Partner")}</span><span className="num">{m(-st.partnerExpense)}</span></div>
-          <div><span>{t("Children")} ({player.children.length})</span><span className="num">{m(-st.childCost)}</span></div>
-          <div><span>{t("Debt payments")}</span><span className="num">{m(-st.debtPay)}</span></div>
-          {st.bizPayroll > 0 && <div><span>{t("Business payroll")}</span><span className="num">{m(-st.bizPayroll)}</span></div>}
-          {st.allyCost > 0 && <div><span>{t("Business partners")}</span><span className="num">{m(-st.allyCost)}</span></div>}
-        </div>
-      </details>
-      <div className="list-block">
-        <h3>{t("Assets")}</h3>
-        {player.assets.length === 0 && <p className="muted">{t("None yet. Deals live on the board.")}</p>}
-        {player.assets.map((a) => (
-          <div className="mini" key={a.id}>
-            <span>{t(a.name)}</span>
-            <span className="num up">{m(a.cashFlow, true)}{t("/mo")}</span>
-            {idle && (
-              <button type="button" className="linkish" onClick={() => dispatch({ type: "SELL", id: a.id })}>{t("Sell")}</button>
-            )}
+          <div className="v3-lg-chart">
+            <PassiveChart points={points.length ? points : [{ turn: state.turn, passive: st.passive }]} expenses={st.expenses} t={t} lang={lang} />
           </div>
-        ))}
-      </div>
-      <div className="list-block">
-        <h3>{t("Liabilities")}</h3>
-        {player.liabilities.length === 0 && <p className="muted">{t("No notes. The bank is patient, not kind.")}</p>}
-        {player.liabilities.map((l) => (
-          <div className="mini" key={l.id}>
-            <span>{t(l.name)}</span>
-            <span className="num down">{m(-l.payment)}{t("/mo")}</span>
-            {idle && player.cash >= l.principal && (
-              <button type="button" className="linkish" onClick={() => dispatch({ type: "REPAY", id: l.id })}>{t("Repay")} {m(l.principal)}</button>
-            )}
-          </div>
-        ))}
-      </div>
-      <div className="list-block">
-        <h3>{t("Circle")}</h3>
-        <div className="people">
-          {partner && (
-            <button type="button" className="person" onClick={() => onFriend(partner.id)}>
-              <img src={partner.portrait} alt="" />
-              <span>{partner.name.split(" ")[0]} · {t("partner")}</span>
-            </button>
+          {player.business && (
+            <p className="muted">
+              {t(player.business.name)} · {t("Revenue")} {m(player.business.revenue, true)}{t("/mo")} · {t("Payroll")} {m(-player.business.payroll)}{t("/mo")} · {t("Venture goal")} {m(VENTURE_GOAL)}{t("/mo")}
+            </p>
           )}
-          {player.children.map((c) => (
-            <figure key={c.id}>
-              <img src="/game/art/love.jpg" alt="" />
-              <figcaption>{c.name}</figcaption>
-            </figure>
-          ))}
-          {player.friends.map((f) => {
-            const def = FRIENDS.find((x) => x.id === f.id);
-            if (!def) return null;
-            return (
-              <button type="button" key={f.id} className="person" onClick={() => onFriend(f.id)}>
-                <img src={def.portrait} alt="" />
-                <span>{def.name.split(" ")[0]} · {f.role === "partner" ? t("Business partner") : `${f.likes} ❤️`}</span>
-              </button>
-            );
-          })}
-          {!partner && player.friends.length === 0 && player.children.length === 0 && (
-            <p className="muted">{t("Love, family, and friends show up on their squares.")}</p>
+          {player.level >= 2 && player.keptRevenue && !player.stretchClaimed && (
+            <p className="muted">{t("Level 2 aim: {passive}/mo passive, or {cash} cash.", { passive: m(FORTUNE_PASSIVE), cash: m(FORTUNE_CASH) })}</p>
+          )}
+          {idle && (
+            <div className="chip-row">
+              {!trainingFor(state) && (
+                <button type="button" className="btn btn-ghost" onClick={() => dispatch({ type: "BORROW" })}>{t("Borrow $1,000")}</button>
+              )}
+              {partner && player.householdIn === 0 && (
+                <button type="button" className="btn btn-ghost" onClick={() => dispatch({ type: "HOUSE" })}>{t("Household decision")}</button>
+              )}
+            </div>
           )}
         </div>
-        {idle && player.friends.length > 0 && player.circleTurn !== state.turn && (
-          <p className="muted">{t("Before you roll, you can spend time with someone here.")}</p>
-        )}
-        {idle && player.friends.length > 0 && player.circleTurn === state.turn && (
-          <p className="muted">{t("You already saw your circle this turn.")}</p>
-        )}
-      </div>
-      <ul className="log">
-        {state.log.map((line, i) => (
-          <li key={`${line}-${i}`}>{t(line)}</li>
-        ))}
-      </ul>
-      <button type="button" className="btn btn-ghost btn-wide" onClick={onHistory}>{t("Decisions")}</button>
+      )}
+      {tab === "assets" && (
+        <div className="v3-lg-body">
+          {lines.length === 0 ? (
+            <>
+              <p className="muted">{t("None yet. Deals live on the board.")}</p>
+              <p className="muted">{t("No notes. The bank is patient, not kind.")}</p>
+            </>
+          ) : (
+            <Pager
+              items={lines}
+              itemH={52}
+              minW={260}
+              maxCols={2}
+              t={t}
+              label={t("Assets")}
+              render={(l) => (
+                <div className="mini v3-mini">
+                  <span>{l.label}</span>
+                  <span className={`num ${l.cls}`}>{l.value}</span>
+                  {l.act && <button type="button" className="linkish" onClick={l.act.run}>{l.act.label}</button>}
+                </div>
+              )}
+            />
+          )}
+          <p className="v3-lg-sub">{t("Expense lines")}</p>
+          <Pager
+            items={expenses.filter(([, v]) => v > 0)}
+            itemH={30}
+            minW={200}
+            maxCols={2}
+            t={t}
+            label={t("Expense lines")}
+            render={([label, v]) => (
+              <div className="v3-exp"><span>{label}</span><span className="num">{m(-v)}</span></div>
+            )}
+          />
+        </div>
+      )}
+      {tab === "log" && (
+        <div className="v3-lg-body">
+          <Pager
+            items={state.log}
+            itemH={36}
+            minW={260}
+            maxCols={1}
+            t={t}
+            label={t("Journal")}
+            render={(line) => <p className="v3-logline">{t(line)}</p>}
+          />
+          <button type="button" className="btn btn-ghost btn-wide" onClick={onHistory}>{t("Decisions")}</button>
+        </div>
+      )}
     </div>
   );
 }
@@ -1473,7 +1462,6 @@ export function GameFlow() {
               lang={lang}
               points={points}
               onHistory={() => { setLedgerOpen(false); setHistoryOpen(true); }}
-              onFriend={(id) => { setLedgerOpen(false); setFriendId(id); }}
             />
             <button type="button" className="btn btn-gold" onClick={() => setLedgerOpen(false)}>{t("Close")}</button>
           </article>

@@ -75,9 +75,11 @@ export function MenuScreen({
   };
   const shown = CHARACTERS.find((c) => c.id === current.characterId);
   const c2 = colon(lang);
+  // v3 no-scroll: on phones the life and the dream are two tabs instead of one long page.
+  const [mtab, setMtab] = useState<"life" | "dream">("life");
 
   return (
-    <main className="screen s-menu">
+    <main className={`screen s-menu mt-${mtab}${creating ? " is-creating" : ""}`}>
       <div className="menu-main">
         <div className="hero">
           <p className="kick">{t("Original manga board")}</p>
@@ -103,6 +105,16 @@ export function MenuScreen({
               {canCreate ? <Ico name="star" /> : <Ico name="lock" />}
               {t("Create your own")}
             </button>
+          </div>
+          <div className="menu-tabs m-only">
+            <div className="v3 v3-tabs" role="tablist" aria-label={t("Choose a life")}>
+              <button type="button" role="tab" aria-selected={mtab === "life"} onClick={() => setMtab("life")}>
+                {t("Character")}
+              </button>
+              <button type="button" role="tab" aria-selected={mtab === "dream"} onClick={() => setMtab("dream")}>
+                {t("Dream")}
+              </button>
+            </div>
           </div>
         </div>
 

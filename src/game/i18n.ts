@@ -1259,6 +1259,8 @@ const fr: Record<string, string> = {
   "Garage": "Garage",
   "Homes": "Logements",
   "Other": "Autres",
+  "Summary": "Bilan",
+  "Journal": "Journal",
 };
 
 const es: Record<string, string> = {
@@ -2516,6 +2518,8 @@ const es: Record<string, string> = {
   "Garage": "Garaje",
   "Homes": "Viviendas",
   "Other": "Otros",
+  "Summary": "Resumen",
+  "Journal": "Diario",
 };
 
 const long: Record<Lang, Record<string, string>> = {

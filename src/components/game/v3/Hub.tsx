@@ -114,7 +114,7 @@ function PanelHead({ kicker, title, t, onClose }: { kicker: string; title: strin
   );
 }
 
-function Tabs<T extends string>({ tabs, value, onChange, t, label }: { tabs: [T, string][]; value: T; onChange: (v: T) => void; t: TFn; label: string }) {
+export function Tabs<T extends string>({ tabs, value, onChange, t, label }: { tabs: [T, string][]; value: T; onChange: (v: T) => void; t: TFn; label: string }) {
   return (
     <div className="v3-tabs" role="tablist" aria-label={label}>
       {tabs.map(([id, name]) => (
@@ -646,7 +646,7 @@ export function LegendPanel({ map, player, t, lang, onClose, onBack }: { map: Re
             <Pager
               items={SKILL_INFO}
               minW={260}
-              itemH={118}
+              itemH={158}
               maxCols={3}
               t={t}
               label={t("Skills")}
