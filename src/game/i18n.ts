@@ -1186,6 +1186,11 @@ const fr: Record<string, string> = {
   "Bought {item} for {amount}.": "Acheté : {item} pour {amount}.",
   "The crash barely knows your name. Luck: −{amount}.": "Le krach te connaît à peine. Chance : −{amount}.",
   "The crash still sends a bill. Luck: −{amount}.": "Le krach envoie quand même une facture. Chance : −{amount}.",
+  "Opens at turn {n}": "Ouvre au tour {n}",
+  "Opens at {n}/mo passive income": "Ouvre à {n}/mois de revenu passif",
+  "Opens once the Gate is crossed": "Ouvre une fois la Porte franchie",
+  "Opens at experience level {n}": "Ouvre au niveau d’expérience {n}",
+  "Open": "Ouvert",
 };
 
 const es: Record<string, string> = {
@@ -2370,6 +2375,11 @@ const es: Record<string, string> = {
   "Bought {item} for {amount}.": "Comprado: {item} por {amount}.",
   "The crash barely knows your name. Luck: −{amount}.": "La caída apenas sabe tu nombre. Suerte: −{amount}.",
   "The crash still sends a bill. Luck: −{amount}.": "La caída igual manda una factura. Suerte: −{amount}.",
+  "Opens at turn {n}": "Abre en el turno {n}",
+  "Opens at {n}/mo passive income": "Abre con {n}/mes de ingreso pasivo",
+  "Opens once the Gate is crossed": "Abre al cruzar la Puerta",
+  "Opens at experience level {n}": "Abre en el nivel de experiencia {n}",
+  "Open": "Abierto",
 };
 
 const long: Record<Lang, Record<string, string>> = {
