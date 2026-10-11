@@ -64,7 +64,7 @@ export function hash(str: string): string {
 }
 
 /**
- * Plays a normal game with a fixed policy (always the first choice, READY on pass, BREATHE when broke)
+ * Plays a normal game with a fixed policy (always the first choice, BREATHE when broke)
  * and returns a hash after every action, plus the final state. `strip` removes fields absent from the baseline engine.
  */
 export function playNormal<S extends AnyState>(
@@ -81,7 +81,6 @@ export function playNormal<S extends AnyState>(
     else if (s.phase === "idle") s = e.reduce(s, { type: "ROLL" });
     else if (s.phase === "rolling") s = e.reduce(s, { type: "REVEAL" });
     else if (s.phase === "moving") s = e.reduce(s, { type: "STEP" });
-    else if (s.phase === "pass") s = e.reduce(s, { type: "READY" });
     else if (s.phase === "broke") s = e.reduce(s, { type: "BREATHE" });
     else break;
     hashes.push(hash(canonical(strip(s))));

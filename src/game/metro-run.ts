@@ -30,12 +30,10 @@ type OfferState = Pick<GameState, "screen" | "phase" | "players" | "current" | "
 /**
  * The multiple of 10 of the active player's own turns whose metro offer is due right now, or null.
  *
- * Counted per player (Player.turns, decided by Geraldy 09/10/2026): every player gets their own offer after their
- * own turns 10, 20, 30... `Player.turns` counts the turns a player has started (the current one included). Their
- * turn N is over when:
- * - hot-seat: phase "pass" (before the next player takes the table) with turns === N; the active player
- *   (`current`) is the one who just played and gets the offer;
- * - solo: the engine already opened turn N + 1 (turns === N + 1), phase "idle" (before the first roll).
+ * Counted on the player's own turns (Player.turns, decided by Geraldy 09/10/2026): an offer after turns 10, 20,
+ * 30... `Player.turns` counts the turns the player has started (the current one included), so turn N is over once
+ * the engine opened turn N + 1 (turns === N + 1), phase "idle" (before the first roll). The game is solo only since
+ * v3 (the same-screen 2-player mode was removed); the per-player marker stays ready for online play.
  * Never during the tutorial / practice games, on a card, broke, win, or after this player answered the offer for N
  * (`Player.metroTurn`, optional: absent in old saves = never offered).
  */
@@ -44,11 +42,6 @@ export function metroOfferTurn(s: OfferState): number | null {
   const p = s.players[s.current];
   if (!p || typeof p.turns !== "number") return null;
   const done = typeof p.metroTurn === "number" ? p.metroTurn : 0;
-  if (s.players.length > 1) {
-    if (s.phase !== "pass") return null;
-    const n = p.turns;
-    return n > 0 && n % METRO_EVERY === 0 && done < n ? n : null;
-  }
   if (s.phase !== "idle") return null;
   const ended = p.turns - 1;
   const n = ended - (ended % METRO_EVERY);

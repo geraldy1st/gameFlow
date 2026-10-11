@@ -17,7 +17,6 @@ export interface TrainingStrings {
   replayNote: string;
   skipToast: string;
   topSub: string;
-  passNote: string;
   steps: Record<StepId, [string, string]>;
   paid: string;
   perMonth: string;
@@ -46,7 +45,6 @@ const fr: TrainingStrings = {
   replayNote: "Rejouable à tout moment : Options › Revoir le tutoriel.",
   skipToast: "Tutoriel passé : place à ta vraie partie, intacte. Rejouable depuis Options.",
   topSub: "Entraînement · Tour {n}/5 · {name}",
-  passNote: "Tour d’entraînement de {name} terminé — au joueur suivant (règles normales).",
   steps: {
     t1roll: ["Lance le dé", "Tout commence ici. En entraînement, le dé est réglé pour de petits pas sans risque."],
     t1pawn: ["Ton pion avance", "{d} au dé = {d} stations. Te voilà sur Don : une station calme, rien à payer ce tour-ci."],
@@ -96,7 +94,6 @@ const en: TrainingStrings = {
   replayNote: "Replay any time: Options › Replay the tutorial.",
   skipToast: "Tutorial skipped: on to your real game, untouched. Replay it from Options.",
   topSub: "Training · Turn {n}/5 · {name}",
-  passNote: "{name}’s training turn is done — next player (normal rules).",
   steps: {
     t1roll: ["Roll the die", "It all starts here. In training, the die is set for small, safe steps."],
     t1pawn: ["Your token moves", "{d} on the die = {d} stations. You land on Charity: a quiet stop, nothing to pay this turn."],
@@ -146,7 +143,6 @@ const es: TrainingStrings = {
   replayNote: "Puedes repetirlo cuando quieras: Opciones › Ver el tutorial otra vez.",
   skipToast: "Tutorial saltado: pasas a tu partida real, intacta. Repítelo desde Opciones.",
   topSub: "Entrenamiento · Turno {n}/5 · {name}",
-  passNote: "Turno de entrenamiento de {name} terminado — siguiente jugador (reglas normales).",
   steps: {
     t1roll: ["Tira el dado", "Todo empieza aquí. En el entrenamiento, el dado está ajustado para pasos pequeños y sin riesgo."],
     t1pawn: ["Tu ficha avanza", "{d} en el dado = {d} estaciones. Llegas a Donación: una parada tranquila, nada que pagar este turno."],

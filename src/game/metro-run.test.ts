@@ -33,7 +33,6 @@ function step(s: GameState): GameState {
   if (s.phase === "idle") return reduce(s, { type: "ROLL" });
   if (s.phase === "rolling") return reduce(s, { type: "REVEAL" });
   if (s.phase === "moving") return reduce(s, { type: "STEP" });
-  if (s.phase === "pass") return reduce(s, { type: "READY" });
   if (s.phase === "broke") return reduce(s, { type: "BREATHE" });
   return s;
 }
@@ -42,21 +41,20 @@ interface Offer {
   due: number;
   turn: number;
   phase: string;
-  player: number;
   own: number;
 }
 
-/** Own turns finished by every player (Player.turns counts the current one too). */
-const ownDone = (s: GameState) => Math.min(...s.players.map((p, i) => p.turns - (i === s.current && s.phase !== "pass" ? 1 : 0)));
+/** Own turns finished (Player.turns counts the current one too). */
+const ownDone = (s: GameState) => cur(s).turns - 1;
 
-/** Plays until every player finished `maxOwn` of their own turns, answering every offer with `answer`. */
+/** Plays until `maxOwn` own turns are finished, answering every offer with `answer`. */
 function playWithOffers(picks: Pick[], seed: number, maxOwn: number, answer: (s: GameState) => GameState): { offers: Offer[]; s: GameState } {
   let s = createMatch(picks, seed, false);
   const offers: Offer[] = [];
   for (let i = 0; i < 8000 && ownDone(s) < maxOwn && s.phase !== "win"; i++) {
     const due = metroOfferTurn(s);
     if (due !== null) {
-      offers.push({ due, turn: s.turn, phase: s.phase, player: s.current, own: cur(s).turns });
+      offers.push({ due, turn: s.turn, phase: s.phase, own: cur(s).turns });
       const next = answer(s);
       expect(metroOfferTurn(next)).toBeNull(); // answered: never twice for the same multiple of 10
       s = next;
@@ -81,38 +79,19 @@ function started(picks: Pick[], seed: number): GameState {
   return s;
 }
 
-/** The active player's own turn count set to `own` (other players untouched), in `phase`. */
+/** The player's own turn count set to `own`, in `phase`. */
 function withOwn(s: GameState, own: number, phase: GameState["phase"], extra: Partial<Player> = {}): GameState {
   return { ...s, phase, card: null, players: s.players.map((p, i) => (i === s.current ? { ...p, turns: own, ...extra } : p)) };
 }
 
-/** A state where the active player's offer for `n` is due (solo: idle of their turn n+1; multi: pass after turn n). */
+/** A state where the offer for `n` is due: idle at the start of own turn n + 1. */
 function dueState(picks: Pick[], n = 10): GameState {
-  const s = started(picks, 5);
-  return picks.length > 1 ? withOwn(s, n, "pass") : withOwn(s, n + 1, "idle");
+  return withOwn(started(picks, 5), n + 1, "idle");
 }
 
-describe("metro run — offer every 10 of a player's own turns", () => {
-  it("multi: offered after the player's own turns 10, 20, 30 only (not 5 or 15), at their hand-over", () => {
-    const base = started([AOI, REN], 3);
-    const at = (own: number, phase: GameState["phase"] = "pass") => metroOfferTurn(withOwn(base, own, phase));
-    expect([5, 9, 10, 11, 15, 20, 25, 30, 31].map((n) => at(n))).toEqual([null, null, 10, null, null, 20, null, 30, null]);
-    expect(at(10, "idle")).toBeNull();
-    expect(at(10, "card")).toBeNull();
-    expect(at(10, "win")).toBeNull();
-    expect(at(10, "broke")).toBeNull();
-    // the table-wide GameState.turn plays no part, nor the other player's count
-    expect(metroOfferTurn({ ...withOwn(base, 10, "pass"), turn: 19 } as GameState)).toBe(10);
-    expect(metroOfferTurn({ ...withOwn(base, 10, "pass"), turn: 20 } as GameState)).toBe(10);
-    const other = (base.current + 1) % 2;
-    const otherAt10 = { ...withOwn(base, 7, "pass"), turn: 20 };
-    otherAt10.players = otherAt10.players.map((p, i) => (i === other ? { ...p, turns: 10 } : p));
-    expect(metroOfferTurn(otherAt10)).toBeNull();
-    // answered by this player = gone for this player only
-    expect(metroOfferTurn(withOwn(base, 10, "pass", { metroTurn: 10 }))).toBeNull();
-  });
-
-  it("solo: offered at the start of the next turn (after own turns 10, 20, 30), not after 5 or 15", () => {
+// v3: solo only. The hot-seat cases (offer at the hand-over, one offer per player) went with the 2-player mode.
+describe("metro run — offer every 10 of the player's own turns", () => {
+  it("offered at the start of the next turn (after own turns 10, 20, 30), not after 5 or 15", () => {
     const base = started([AOI], 3);
     // Player.turns at the start of a turn = that turn's number
     const at = (turn: number, phase: GameState["phase"] = "idle") => metroOfferTurn(withOwn({ ...base, turn }, turn, phase));
@@ -120,10 +99,11 @@ describe("metro run — offer every 10 of a player's own turns", () => {
     expect(at(11, "card")).toBeNull();
     expect(at(11, "rolling")).toBeNull();
     expect(at(11, "broke")).toBeNull();
+    expect(at(11, "win")).toBeNull();
     expect(metroOfferTurn(withOwn(base, 11, "idle", { metroTurn: 10 }))).toBeNull();
   });
 
-  it("solo is unchanged: Player.turns follows GameState.turn", () => {
+  it("Player.turns follows GameState.turn", () => {
     let s = started([AOI], 9);
     for (let i = 0; i < 3000 && s.turn < 25 && s.phase !== "win"; i++) {
       expect(cur(s).turns).toBe(s.turn);
@@ -131,69 +111,55 @@ describe("metro run — offer every 10 of a player's own turns", () => {
     }
   });
 
-  it("real games: solo gets 10/20/30 once; in 2 players EACH player gets their own 10/20/30 once", () => {
-    for (const seed of [1, 7, 42, 99, 2026]) {
-      const solo = playWithOffers([AOI], seed, 31, decline);
-      if (solo.s.phase !== "win") expect(solo.offers.map((o) => o.due)).toEqual([10, 20, 30]);
-      for (const o of solo.offers) {
-        expect(o.phase).toBe("idle");
-        expect(o.turn).toBe(o.due + 1);
-      }
-      const duo = playWithOffers([AOI, REN], seed, 31, decline);
-      for (const who of [0, 1]) {
-        const mine = duo.offers.filter((o) => o.player === who);
-        if (duo.s.phase !== "win") expect(mine.map((o) => o.due)).toEqual([10, 20, 30]);
-        for (const o of mine) {
-          expect(o.phase).toBe("pass");
-          expect(o.own).toBe(o.due); // right after the player's own 10th / 20th / 30th turn
-          expect(o.turn).toBe(2 * o.due - 1 + who); // table turns: player 1 at 19/39/59, player 2 at 20/40/60
+  it("real games: 10/20/30 offered once each, at the idle start of the next turn", () => {
+    for (const picks of [[AOI], [REN]]) {
+      for (const seed of [1, 7, 42, 99, 2026]) {
+        const solo = playWithOffers(picks, seed, 31, decline);
+        if (solo.s.phase !== "win") expect(solo.offers.map((o) => o.due)).toEqual([10, 20, 30]);
+        for (const o of solo.offers) {
+          expect(o.phase).toBe("idle");
+          expect(o.turn).toBe(o.due + 1);
+          expect(o.own).toBe(o.due + 1);
         }
       }
-      if (duo.s.phase !== "win") expect(duo.offers.map((o) => o.player)).toEqual([0, 1, 0, 1, 0, 1]);
     }
   });
 
-  it("refusing has no effect on the game (only a journal line and this player's 'answered' flag)", () => {
-    for (const picks of [[AOI], [AOI, REN]]) {
-      const s = dueState(picks);
-      const n = decline(s);
-      expect(n.players.map(noMetro)).toEqual(s.players.map(noMetro));
-      n.players.forEach((p, i) => expect(p.metroTurn).toBe(i === s.current ? 10 : undefined));
+  it("refusing has no effect on the game (only a journal line and the 'answered' flag)", () => {
+    const s = dueState([AOI]);
+    const n = decline(s);
+    expect(n.players.map(noMetro)).toEqual(s.players.map(noMetro));
+    expect(cur(n).metroTurn).toBe(10);
+    expect(n.phase).toBe(s.phase);
+    expect(n.turn).toBe(s.turn);
+    expect(n.seed).toBe(s.seed);
+    expect(n.log.length).toBe(s.log.length + 1);
+    expect(english(n.log[0]!)).toBe("Metro run: not this time");
+    expect(metroOfferTurn(n)).toBeNull();
+    // answering again is ignored
+    expect(reduce(n, { type: "METRO", result: "run", lives: 3 })).toBe(n);
+  });
+
+  it("rewards: 3 lives = +$500, 1–2 lives = +$250, 0 lives = nothing — cash and skill XP only", () => {
+    expect([0, 1, 2, 3].map(metroReward)).toEqual([0, 250, 250, 500]);
+    for (const [lives, gain, line] of [
+      [3, 500, "Metro run: +$500"],
+      [2, 250, "Metro run: +$250"],
+      [1, 250, "Metro run: +$250"],
+      [0, 0, "Metro run: missed"],
+    ] as const) {
+      const s = dueState([AOI]);
+      const n = reduce(s, { type: "METRO", result: "run", lives });
+      expect(cur(n).cash).toBe(cur(s).cash + gain);
+      expect(cur(n).metroTurn).toBe(10);
+      // nothing else moves: calm, debts, assets, position (skills earn XP, SKILLS.md)
+      const bare = (p: Player) => ({ ...noMetro(p), cash: 0, skills: undefined });
+      expect(bare(cur(n))).toEqual(bare(cur(s)));
       expect(n.phase).toBe(s.phase);
       expect(n.turn).toBe(s.turn);
-      expect(n.current).toBe(s.current);
-      expect(n.seed).toBe(s.seed);
-      expect(n.log.length).toBe(s.log.length + 1);
-      expect(english(n.log[0]!)).toBe("Metro run: not this time");
-      expect(metroOfferTurn(n)).toBeNull();
-      // answering again is ignored
-      expect(reduce(n, { type: "METRO", result: "run", lives: 3 })).toBe(n);
-    }
-  });
-
-  it("rewards: 3 lives = +$500, 1–2 lives = +$250, 0 lives = nothing — cash of the active player only", () => {
-    expect([0, 1, 2, 3].map(metroReward)).toEqual([0, 250, 250, 500]);
-    for (const picks of [[AOI], [AOI, REN]]) {
-      for (const [lives, gain, line] of [
-        [3, 500, "Metro run: +$500"],
-        [2, 250, "Metro run: +$250"],
-        [1, 250, "Metro run: +$250"],
-        [0, 0, "Metro run: missed"],
-      ] as const) {
-        const s = dueState(picks);
-        const n = reduce(s, { type: "METRO", result: "run", lives });
-        const who = s.current;
-        expect(n.players[who]!.cash).toBe(s.players[who]!.cash + gain);
-        expect(n.players[who]!.metroTurn).toBe(10);
-        // nothing else moves: calm, debts, assets, position, other players
-        expect({ ...noMetro(n.players[who]!), cash: 0 }).toEqual({ ...noMetro(s.players[who]!), cash: 0 });
-        n.players.forEach((p, i) => i !== who && expect(p).toEqual(s.players[i]));
-        expect(n.phase).toBe(s.phase);
-        expect(n.turn).toBe(s.turn);
-        expect(english(n.log[0]!)).toBe(line);
-        // no double credit
-        expect(reduce(n, { type: "METRO", result: "run", lives })).toBe(n);
-      }
+      expect(english(n.log[0]!)).toBe(line);
+      // no double credit
+      expect(reduce(n, { type: "METRO", result: "run", lives })).toBe(n);
     }
   });
 
@@ -208,62 +174,56 @@ describe("metro run — offer every 10 of a player's own turns", () => {
   });
 
   it("never offered in the training or the practice game, and METRO is refused there", () => {
-    for (const picks of [[AOI], [AOI, REN]]) {
-      let s = createMatch(picks, 42, false, { training: true });
-      expect(s.practice).toBe(true);
-      for (let i = 0; i < 4000 && s.phase !== "win" && ownDone(s) < 32; i++) {
-        expect(metroOfferTurn(s)).toBeNull();
-        expect(reduce(s, { type: "METRO", result: "run", lives: 3 })).toBe(s);
-        s = step(s);
-      }
-      expect(Math.max(...s.players.map((p) => p.turns))).toBeGreaterThan(30);
+    let s = createMatch([AOI], 42, false, { training: true });
+    expect(s.practice).toBe(true);
+    for (let i = 0; i < 4000 && s.phase !== "win" && ownDone(s) < 32; i++) {
+      expect(metroOfferTurn(s)).toBeNull();
+      expect(reduce(s, { type: "METRO", result: "run", lives: 3 })).toBe(s);
+      s = step(s);
     }
-    const forced = withOwn(createMatch([AOI, REN], 1, false, { training: true }), 10, "pass");
+    expect(cur(s).turns).toBeGreaterThan(30);
+    const forced = withOwn(createMatch([AOI], 1, false, { training: true }), 11, "idle");
     expect(metroOfferTurn(forced)).toBeNull();
     expect(reduce(forced, { type: "METRO", result: "run", lives: 3 })).toBe(forced);
   });
 
   it("not on the menu, not with a card open, not after a win", () => {
-    const s = dueState([AOI, REN]);
+    const s = dueState([AOI]);
     expect(metroOfferTurn({ ...s, screen: "menu" })).toBeNull();
     expect(metroOfferTurn({ ...s, phase: "card" })).toBeNull();
     expect(metroOfferTurn({ ...s, phase: "win" })).toBeNull();
   });
 
   it("saves: old saves load fine and still get their offers; junk is dropped; the legacy table-wide flag is migrated", () => {
-    const s = dueState([AOI, REN]);
+    const s = dueState([AOI]);
     const roundTrip = (x: unknown) => hydrate(JSON.parse(JSON.stringify(x)) as GameState);
     const h = roundTrip({ ...s, players: s.players.map(noMetro) });
-    h.players.forEach((p) => expect(p.metroTurn).toBeUndefined());
+    expect(cur(h).metroTurn).toBeUndefined();
     expect(metroOfferTurn(h)).toBe(10);
     const answered = decline(s);
-    expect(roundTrip(answered).players[s.current]!.metroTurn).toBe(10);
+    expect(cur(roundTrip(answered)).metroTurn).toBe(10);
     expect(metroOfferTurn(roundTrip(answered))).toBeNull();
-    const junk = (v: unknown) => roundTrip(withOwn(s, 10, "pass", { metroTurn: v as number })).players[s.current]!.metroTurn;
+    const junk = (v: unknown) => cur(roundTrip(withOwn(s, 11, "idle", { metroTurn: v as number }))).metroTurn;
     expect(junk("x")).toBeUndefined();
     expect(junk(-4)).toBeUndefined();
     expect(junk(10.7)).toBe(10);
-    // first metro-run build: one table-wide `metroTurn`. Hot-seat: a different count, ignored (and dropped).
-    const legacyDuo = roundTrip({ ...s, metroTurn: 10 });
-    expect("metroTurn" in legacyDuo).toBe(false);
-    legacyDuo.players.forEach((p) => expect(p.metroTurn).toBeUndefined());
-    expect(metroOfferTurn(legacyDuo)).toBe(10);
-    // Solo: the same count as the player's own turns, so it moves onto the player (no second offer for turn 10).
-    const solo = dueState([AOI]);
-    const legacySolo = roundTrip({ ...solo, metroTurn: 10 });
+    // first metro-run build: one table-wide `metroTurn`, the same count as the player's own turns → moved onto them.
+    const legacySolo = roundTrip({ ...s, metroTurn: 10 });
     expect("metroTurn" in legacySolo).toBe(false);
     expect(legacySolo.players[0]!.metroTurn).toBe(10);
     expect(metroOfferTurn(legacySolo)).toBeNull();
-    expect(roundTrip({ ...solo, metroTurn: "x" }).players[0]!.metroTurn).toBeUndefined();
+    expect(roundTrip({ ...s, metroTurn: "x" }).players[0]!.metroTurn).toBeUndefined();
   });
 
-  it("the regular turn flow never changes by itself (the offer is read-only until answered)", () => {
-    let s = createMatch([AOI, REN], 7, false);
-    while (cur(s).turns < 10 || s.phase !== "pass") s = step(s);
-    expect(metroOfferTurn(s)).toBe(10);
-    const ready = reduce(s, { type: "READY" });
-    ready.players.forEach((p) => expect(p.metroTurn).toBeUndefined()); // ignoring the offer leaves no trace
-    expect(cur(ready).id).not.toBe(cur(s).id);
+  it("an old 2-player save becomes solo: its table-wide metro flag is dropped, the kept player's own flag stays", () => {
+    const duo = createMatch([AOI, REN], 3, false);
+    const saved = { ...duo, phase: "idle", intro: false, card: null, current: 1, metroTurn: 20, players: duo.players.map((p, i) => ({ ...p, turns: 11, metroTurn: i === 1 ? 10 : undefined })) };
+    const h = hydrate(JSON.parse(JSON.stringify(saved)) as GameState);
+    expect(h.players).toHaveLength(1);
+    expect(h.players[0]!.characterId).toBe("ren");
+    expect(h.players[0]!.metroTurn).toBe(10);
+    expect("metroTurn" in h).toBe(false);
+    expect(metroOfferTurn(h)).toBeNull();
   });
 });
 

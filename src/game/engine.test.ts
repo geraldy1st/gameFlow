@@ -106,16 +106,6 @@ describe("Social bonus when someone joins the circle", () => {
     expect(twice.players[0]!.vitals).toEqual(once.players[0]!.vitals);
     expect(twice.players[0]!.friends).toHaveLength(1);
   });
-
-  it("2 players: only the current player gets the bonus", () => {
-    const s0 = idle(7, [AOI, REN]);
-    const s = withFriendCard(s0, FRIEND, 50);
-    const other = (s.current + 1) % 2;
-    const before = clone(s.players[other]!.vitals);
-    const n = act(s, { type: "CHOICE", id: "friend" });
-    expect(n.players[s.current]!.vitals.social).toBe(60);
-    expect(n.players[other]!.vitals).toEqual(before);
-  });
 });
 
 describe("hydrate: old and partial saves", () => {
@@ -172,17 +162,17 @@ describe("simulation", () => {
       return x / 4294967296;
     };
   }
-  const PHASES = new Set(["idle", "rolling", "moving", "card", "pass", "broke", "win"]);
+  const PHASES = new Set(["idle", "rolling", "moving", "card", "broke", "win"]);
 
   it("idle helper reaches the board", () => {
     expect(idle().phase).toBe("idle");
-    expect(idle(7, [AOI, REN]).phase).toBe("idle");
   });
 
-  it("100 games (1 and 2 players): finite money, valid phases, vitals within [0, 100]", () => {
+  // v3: solo only (the 2-player games of this test became 50 more solo games, with Ren).
+  it("100 solo games: finite money, valid phases, vitals within [0, 100]", () => {
     const bad: string[] = [];
     for (let seed = 1; seed <= 50; seed++) {
-      for (const picks of [[AOI], [AOI, REN]]) {
+      for (const picks of [[AOI], [REN]]) {
         let s = createMatch(picks, seed, true);
         const rnd = prng(seed * 31 + 7);
         for (let i = 0; i < 3000 && s.phase !== "win"; i++) {
@@ -196,7 +186,6 @@ describe("simulation", () => {
             else if (p.level >= 2 && rnd() < 0.2) a = { type: "RETIRE" };
           } else if (s.phase === "rolling") a = { type: "REVEAL" };
           else if (s.phase === "moving") a = { type: "STEP" };
-          else if (s.phase === "pass") a = { type: "READY" };
           else if (s.phase === "broke") a = { type: "BREATHE" };
           s = act(s, a);
           if (!PHASES.has(s.phase)) bad.push(`seed ${seed}: phase ${s.phase}`);

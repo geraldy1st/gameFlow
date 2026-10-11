@@ -36,7 +36,7 @@ export const TUTORIAL_DONE_KEY = TUTORIAL_KEY; // on réutilise "gameflow-tutori
 // engine.ts — GameState NOUVEAU champ optionnel
 training: null | {
   turn: number;          // 1..TRAINING_TURNS, avancé dans advance()/READY pour le joueur en entraînement
-  player: number;        // index du joueur concerné (hot-seat, §9)
+  player: number;        // toujours 0 (solo uniquement depuis la v3, §10)
   skipped: boolean;      // true après « Passer » ; s.training est remis à null au début du tour suivant
 };
 ```
@@ -204,11 +204,11 @@ Pendant `s.training` actif :
 - **Fin naturelle.** Après la carte du T5, `finish()` → `advance()`. Au début du tour suivant, si `training.turn > TRAINING_TURNS`, on remet `s.training = null` (le moteur ne change pas). L'UI affiche la Porte puis la carte « Tutoriel terminé · À toi de jouer ». **« Jouer » jette la partie d'entraînement** et ramène la vraie partie, intacte.
 - **Première partie sur l'appareil (lancement automatique).** Si `TUTORIAL_KEY` est absent à l'action « Nouvelle partie » :
   1. la vraie partie est distribuée tout de suite à son **état initial** (tous les joueurs, métier tiré au hasard, tour 1, caisse de départ, journal « The board is set. First career dealt. ») et mise de côté sous `gameflow-save-v1:before-training` (`setAsideFreshGame`), exactement comme « Revoir » met de côté la partie en cours ;
-  2. le tutoriel se joue sur une partie **solo** jetable avec le personnage et le rêve du joueur 1 (le joueur 2 ne joue aucun tour pendant ce temps) ;
-  3. « Jouer » (carte de fin) ou « Passer le tutoriel » restaurent la vraie partie mise de côté : tour 1, caisse initiale, aucun actif, aucune dépense ajoutée, métier non imposé, aucune ligne du tutoriel dans le journal. Valable à 1 et 2 joueurs, tutoriel terminé ou passé.
+  2. le tutoriel se joue sur une partie **solo** jetable avec le personnage et le rêve du joueur ;
+  3. « Jouer » (carte de fin) ou « Passer le tutoriel » restaurent la vraie partie mise de côté : tour 1, caisse initiale, aucun actif, aucune dépense ajoutée, métier non imposé, aucune ligne du tutoriel dans le journal. Valable tutoriel terminé ou passé.
 - **Drapeau.** `TUTORIAL_KEY` (`"gameflow-tutorial-seen"`) vaut `"training-v1"`. Il est écrit dès la Porte du T5, à « Jouer » et à « Passer ». Toute valeur non vide = « vu » : les nouvelles parties suivantes ne lancent plus le tutoriel ; il reste accessible via Options › Revoir le tutoriel. C'est un réglage de l'appareil, pas de la partie.
 - **Rejouer depuis Options, à tout moment.** Le bouton « Revoir le tutoriel » est toujours présent dans Options (menu d'accueil, ou Menu › Options pendant une partie), qu'il y ait une partie en cours, aucune partie, une partie terminée ou un tutoriel déjà en cours, et autant de fois qu'on veut. « Revoir le tutoriel » demande confirmation dès qu'une partie serait remplacée, met la vraie partie en cours de côté (`gameflow-save-v1:before-training`, jamais une partie d'entraînement), puis lance une partie d'entraînement solo jetable avec le même personnage et le même rêve. « Jouer » ou « Passer » ramènent la partie mise de côté, à l'identique. S'il n'y avait aucune partie (Revoir depuis le menu sans sauvegarde), ils distribuent une partie neuve à l'état initial avec le même personnage.
-- **Impact nul (vérifié).** Après Revoir puis « Jouer » ou « Passer », la vraie partie est identique à celle d'avant (tour, joueur courant, caisse, actifs, dettes, journal, décisions, Registre affiché) : la copie mise de côté est restituée octet pour octet, seul le champ technique de son `sfx` (effet sonore en cours) peut repasser à `null` quand l'application la recharge ; `gameflow-passive-history-v1` et `gameflow-trophies-v1` ne bougent pas. Revoir une deuxième fois en plein tutoriel garde la copie de la vraie partie (jamais celle du tutoriel). Tests : `tutorial-save.test.ts` (« Options › Replay the tutorial: reachable at any time, zero impact »), `history.test.ts`, `trophies.test.ts` ; navigateur : `tut-iso.mjs` ISO-O (fr/es/en, 1 et 2 joueurs, terminer, passer, recharger, refuser).
+- **Impact nul (vérifié).** Après Revoir puis « Jouer » ou « Passer », la vraie partie est identique à celle d'avant (tour, joueur courant, caisse, actifs, dettes, journal, décisions, Registre affiché) : la copie mise de côté est restituée octet pour octet, seul le champ technique de son `sfx` (effet sonore en cours) peut repasser à `null` quand l'application la recharge ; `gameflow-passive-history-v1` et `gameflow-trophies-v1` ne bougent pas. Revoir une deuxième fois en plein tutoriel garde la copie de la vraie partie (jamais celle du tutoriel). Tests : `tutorial-save.test.ts` (« Options › Replay the tutorial: reachable at any time, zero impact »), `history.test.ts`, `trophies.test.ts` ; navigateur : `tut-iso.mjs` ISO-O (fr/es/en, terminer, passer, recharger, refuser ; les cas « 2 joueurs » de ce script datent d'avant la v3).
 - **Rechargement.** Pendant les tours scriptés, « Continuer » reprend l'entraînement ; sur la Porte ou la carte de fin, le coach revient (empreinte `gameflow-save-v1:tutorial-result`). La vraie partie reste de côté jusqu'à « Jouer » ou « Passer ».
 
 ---
@@ -221,11 +221,12 @@ Pendant `s.training` actif :
 
 ---
 
-## 10. Hot-seat à 2 joueurs
+## 10. Solo uniquement (v3 : fin du mode 2 joueurs sur le même écran)
 
-- Le tutoriel est **toujours solo** : seul le joueur 1 le joue, sur une partie jetable avec son personnage et son rêve. Le joueur 2 ne joue aucun tour pendant le tutoriel.
-- La vraie partie à 2 joueurs est distribuée à son état initial avant le tutoriel et ramenée intacte à la fin (§8) : tour 1 pour tout le monde.
-- Le moteur garde la prise en charge `training.player = 0` dans une partie à plusieurs joueurs (`trainingFor(s)` renvoie `null` si `s.current !== s.training.player`) pour les sauvegardes antérieures, mais l'UI ne crée plus de partie d'entraînement à plusieurs joueurs.
+- Depuis la v3, le jeu ne propose plus que **1 joueur** ; le multijoueur **en ligne** viendra plus tard. Le modèle à tableau (`players[]`, `current`, `winner`, `Player.turns`, `Player.metroTurn`) et `src/lib/multiplayer/` sont gardés pour cela.
+- Plus de phase `"pass"` ni d'action `READY` : chaque fin de tour ouvre directement le tour suivant.
+- Le tutoriel reste une partie **solo** jetable (§8), `training.player` vaut toujours 0.
+- **Anciennes sauvegardes à 2 joueurs** (`hydrate()`) : on garde un seul joueur, celui dont c'était le tour (`current`), ou le gagnant sur l'écran de victoire ; il devient `players[0]`, `current = winner = 0`. Une sauvegarde en phase `"pass"` ouvre le tour suivant comme le faisait `READY`. Un entraînement n'est gardé que s'il suivait ce joueur-là. Le `metroTurn` de table hérité est abandonné. Un toast prévient : « Cette partie à 2 continue désormais en solo. » Tests : `hydrate.test.ts` (« v3: 2-player (hot-seat) saves load as solo games »), `metro-run.test.ts`.
 
 ---
 
@@ -268,6 +269,6 @@ Les montants passent par `money()`. Pour fr/es, le mockup affiche « 1 705 $ » 
 5. Au T1, `restCard` n'expose que "rest". Aucune carte servie n'a de choix `borrow`.
 6. Les vitals sont identiques avant et après les 5 tours. Les `friends` restent vides.
 7. `SKIP_TRAINING` au T2 : au tour suivant, le dé redevient aléatoire, `s.training === null` et `drawDeal` est utilisé.
-8. 2 joueurs : J2 joue avec des dés aléatoires dès son premier tour, et J1 garde le script.
+8. (Retiré en v3 avec le mode 2 joueurs.)
 9. `hydrate()` d'une sauvegarde v1 sans `training` donne `training: null`.
 10. Partie normale, sans `training` : snapshot identique à `main`, donc aucune régression.

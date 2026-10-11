@@ -89,7 +89,7 @@ describe("DEF-I18N-01..04: engine text as key + variables, translated at display
         for (const ch of c.choices) seen.add(ch.label);
       }
     };
-    for (const picks of [[AOI], [AOI, REN]]) {
+    for (const picks of [[AOI], [REN]]) {
       for (const seed of [1, 7, 42, 99, 1234, 2026]) {
         let rng = seed;
         const rand = (n: number) => ((rng = (Math.imul(rng, 1103515245) + 12345) >>> 0) % n);
@@ -100,7 +100,6 @@ describe("DEF-I18N-01..04: engine text as key + variables, translated at display
           else if (s.phase === "idle") s = reduce(s, { type: "ROLL" });
           else if (s.phase === "rolling") s = reduce(s, { type: "REVEAL" });
           else if (s.phase === "moving") s = reduce(s, { type: "STEP" });
-          else if (s.phase === "pass") s = reduce(s, { type: "READY" });
           else if (s.phase === "broke") s = reduce(s, { type: "BREATHE" });
           else break;
         }

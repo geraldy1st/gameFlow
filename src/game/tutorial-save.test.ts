@@ -135,7 +135,6 @@ function playTutorial(s0: GameState): GameState {
     } else if (s.phase === "idle") s = E.reduce(s, { type: "ROLL" });
     else if (s.phase === "rolling") s = E.reduce(s, { type: "REVEAL" });
     else if (s.phase === "moving") s = E.reduce(s, { type: "STEP" });
-    else if (s.phase === "pass") s = E.reduce(s, { type: "READY" });
     else break;
   }
   return s;
@@ -144,11 +143,11 @@ function playTutorial(s0: GameState): GameState {
 describe("DEF-TUT-10: the first-game tutorial never touches the real game", () => {
   const AOI: Pick = { characterId: "aoi", dreamId: "cafe" };
   const REN: Pick = { characterId: "ren", dreamId: "studio" };
-  for (const picks of [[AOI], [AOI, REN]]) {
+  for (const picks of [[AOI], [REN]]) {
     for (const exit of ["finish", "skip"] as const) {
-      it(`${picks.length} player(s), tutorial ${exit === "finish" ? "finished" : "skipped"}: the real game starts at its initial state`, () => {
+      it(`${picks[0]!.characterId}, tutorial ${exit === "finish" ? "finished" : "skipped"}: the real game starts at its initial state`, () => {
         const kv = new Mem();
-        // startGame(): the real game is dealt first and set aside, then the throw-away tutorial runs for player 1 only.
+        // startGame(): the real game is dealt first and set aside, then the throw-away tutorial runs.
         const fresh = reduce(blankMenu(), { type: "NEW", picks, training: false });
         setAsideFreshGame(kv, fresh);
         let tut = reduce(fresh, { type: "NEW", picks: [picks[0]!], training: true });
@@ -217,14 +216,13 @@ describe("Options › Replay the tutorial: reachable at any time, zero impact on
       else if (s.phase === "idle") s = reduce(s, { type: "ROLL" });
       else if (s.phase === "rolling") s = reduce(s, { type: "REVEAL" });
       else if (s.phase === "moving") s = reduce(s, { type: "STEP" });
-      else if (s.phase === "pass") s = reduce(s, { type: "READY" });
       else if (s.phase === "broke") s = reduce(s, { type: "BREATHE" });
     }
     return s;
   }
-  for (const picks of [[AOI], [AOI, REN]]) {
+  for (const picks of [[AOI], [REN]]) {
     for (const exit of ["finish", "skip", "replay-twice"] as const) {
-      it(`${picks.length} player(s), replay then ${exit}: the real game comes back byte for byte, and Replay stays available`, () => {
+      it(`${picks[0]!.characterId}, replay then ${exit}: the real game comes back byte for byte, and Replay stays available`, () => {
         const kv = new Mem();
         const game = midGame(picks, 4242 + picks.length, 160);
         expect(game.turn).toBeGreaterThan(3);

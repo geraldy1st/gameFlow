@@ -10,6 +10,8 @@ import { CLOTH_PRICE, HOME_LEVEL, HOME_SHOP } from "@/game/shop";
 import { TROPHIES, TROPHY_KEY, recordsFor, type TrophyPeak } from "@/game/trophies";
 import {
   blankMenu,
+  hydrate,
+  wasMultiSave,
   cur,
   dreamOf,
   nameOf,
@@ -277,7 +279,7 @@ function RulesBody({ t }: { t: TFn }) {
           <p>{t(r.p)}</p>
         </section>
       ))}
-      <p>{t("Roll, then your token walks the ring. Space or Enter confirms. Esc closes a card you may refuse. Hot-seat: pass the table when asked. The game remembers itself on this device.")}</p>
+      <p>{t("Roll, then your token walks the ring. Space or Enter confirms. Esc closes a card you may refuse. The game remembers itself on this device.")}</p>
     </div>
   );
 }
@@ -780,7 +782,7 @@ export function GameFlow() {
         return;
       }
     }
-    if (prevPhase === "card" && (state.phase === "idle" || state.phase === "pass") && logLine && logLine !== prevLog) {
+    if (prevPhase === "card" && state.phase === "idle" && logLine && logLine !== prevLog) {
       // The training coach speaks for the player during the scripted turns.
       if (coachRef.current || (state.training && !state.training.skipped && state.current === state.training.player)) return;
       const p = state.players[state.current];
@@ -933,7 +935,6 @@ export function GameFlow() {
       e.preventDefault();
       unlockAudio();
       if (s.phase === "idle" && s.screen === "play") dispatch({ type: "ROLL" });
-      else if (s.phase === "pass") dispatch({ type: "READY" });
       else if (s.phase === "broke") dispatch({ type: "BREATHE" });
       else if (s.phase === "card" && s.card) {
         const kind = s.card.payload.t;
@@ -964,9 +965,13 @@ export function GameFlow() {
     try {
       const saved = JSON.parse(raw) as GameState;
       if (saved.version === 1 && saved.players?.length) {
+        // v3: the same-screen 2-player mode is gone; such a save goes on solo with one player (engine hydrate()).
+        const multi = wasMultiSave(saved);
+        const training = multi ? hydrate(saved).training : saved.training;
         go({ type: "CONTINUE", saved });
         // DEF-TUT-01: a reload on the Gate coachmark / done card comes back to it (the engine's training is already over).
-        setTut(saved.training && !saved.training.skipped ? FRESH_TUT : isTutorialResult(localStorage, saved) ? GATE_TUT : null);
+        setTut(training && !training.skipped ? FRESH_TUT : isTutorialResult(localStorage, saved) ? GATE_TUT : null);
+        if (multi) setToast(t("This 2-player game now goes on solo."));
       }
     } catch {
       setHasSave(false);
@@ -1511,21 +1516,6 @@ export function GameFlow() {
             go({ type: "METRO", result: "run", lives });
           }}
         />
-      )}
-
-      {state.screen === "play" && state.phase === "pass" && player && !coach && !metroBusy && (
-        <div className="overlay">
-          <div className="pass-gate">
-            <p className="kicker">{t("Hot-seat")}</p>
-            <h2>{t("Pass the table")}</h2>
-            <img src={portraitOf(state.players[(state.current + 1) % state.players.length]!)} alt="" />
-            <p>{t("Next ledger belongs to {name}.", { name: nameOf(state.players[(state.current + 1) % state.players.length]!) })}</p>
-            <button className="btn btn-gold" onClick={() => go({ type: "READY" })}>{t("I’m ready")}</button>
-            {state.training && state.current === state.training.player && (
-              <p className="tut-passnote">{fill(TS.passNote, { name: nameOf(player).split(" ")[0]! })}</p>
-            )}
-          </div>
-        </div>
       )}
 
       {state.screen === "play" && state.phase === "broke" && player && (

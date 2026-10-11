@@ -90,11 +90,9 @@ export const UI_FR: Record<string, string> = {
   "Board the express": "Monter dans l’express",
   "One more lap": "Encore un tour",
   // menu
-  "Original manga board · 1 or 2 players": "Plateau manga original · 1 ou 2 joueurs",
   "Ride Line 1 until your assets pay the month. When your passive income beats your expenses, the Gate opens onto the Freedom express.":
     "Prends la Ligne 1 jusqu’à ce que tes actifs paient le mois. Quand ton revenu passif dépasse tes dépenses, la Porte s’ouvre sur l’express Liberté.",
   Players: "Joueurs",
-  "2 players · same screen": "2 joueurs · même écran",
   "Finance quiz": "Quiz finance",
   "Pass a quiz": "Réussis un quiz",
   "Read their story": "Lire son histoire",
@@ -205,6 +203,8 @@ export const UI_FR: Record<string, string> = {
   "The metro left without you. No reward, and no second try for this offer.": "Le métro est parti sans toi. Pas de récompense, et pas de second essai pour cette offre.",
   "Journal": "Journal",
   "Back to the game": "Retour à la partie",
+  "Original manga board": "Plateau manga original",
+  "This 2-player game now goes on solo.": "Cette partie à 2 continue désormais en solo.",
 };
 
 export const UI_ES: Record<string, string> = {
@@ -291,11 +291,9 @@ export const UI_ES: Record<string, string> = {
   "{name}, proud": "{name}, con orgullo",
   "Board the express": "Subir al expreso",
   "One more lap": "Una vuelta más",
-  "Original manga board · 1 or 2 players": "Tablero manga original · 1 o 2 jugadores",
   "Ride Line 1 until your assets pay the month. When your passive income beats your expenses, the Gate opens onto the Freedom express.":
     "Recorre la Línea 1 hasta que tus activos paguen el mes. Cuando tu ingreso pasivo supere tus gastos, la Puerta se abre al expreso Libertad.",
   Players: "Jugadores",
-  "2 players · same screen": "2 jugadores · misma pantalla",
   "Finance quiz": "Quiz de finanzas",
   "Pass a quiz": "Aprueba un quiz",
   "Read their story": "Leer su historia",
@@ -404,4 +402,6 @@ export const UI_ES: Record<string, string> = {
   "The metro left without you. No reward, and no second try for this offer.": "El metro se fue sin ti. Sin premio, y sin segundo intento para esta oferta.",
   "Journal": "Diario",
   "Back to the game": "Volver a la partida",
+  "Original manga board": "Tablero manga original",
+  "This 2-player game now goes on solo.": "Esta partida a 2 sigue ahora en solitario.",
 };

@@ -6,7 +6,6 @@ import fixture from "./__tests__/normal-game.fixture.json";
 
 const E = { reduce: reduce as (s: GameState, a: { type: string; [k: string]: unknown }) => GameState };
 const AOI: Pick = { characterId: "aoi", dreamId: "cafe" };
-const REN: Pick = { characterId: "ren", dreamId: "studio" };
 const SEEDS = Array.from({ length: 100 }, (_, i) => i * 7919 + 1);
 
 /** Training game past the start card, at turn 1 idle. */
@@ -25,8 +24,7 @@ interface TurnLog {
 function turn(s0: GameState, choice?: string): { s: GameState; log: TurnLog } {
   const moved = rollAndMove(E, s0);
   const log = { die: moved.die, position: cur(moved).position, card: moved.card };
-  let s = answer(E, moved, (st) => (choice && st.card!.choices.some((c) => c.id === choice) ? choice : firstChoice(st)));
-  if (s.phase === "pass") s = reduce(s, { type: "READY" });
+  const s = answer(E, moved, (st) => (choice && st.card!.choices.some((c) => c.id === choice) ? choice : firstChoice(st)));
   return { s, log };
 }
 
@@ -144,34 +142,6 @@ describe("training mode (tutorial/RULES.md §13)", () => {
     expect(drew).toBeGreaterThan(0);
   });
 
-  it("8. two players: player 2 rolls random dice from turn one, player 1 keeps the script", () => {
-    const p2First = new Set<number>();
-    for (const seed of SEEDS.slice(0, 40)) {
-      let s = training(seed, [AOI, REN]);
-      expect(s.players[1]!.position).toBe(11);
-      const p1Dice: number[] = [];
-      const p1Pos: number[] = [];
-      for (let t = 1; t <= TRAINING_TURNS; t++) {
-        expect(s.current).toBe(0);
-        const a = turn(s);
-        p1Dice.push(a.log.die);
-        p1Pos.push(a.log.position);
-        s = a.s;
-        expect(s.current).toBe(1);
-        const b = turn(s);
-        if (t === 1) {
-          p2First.add(b.log.die);
-          expect(b.log.position).toBe((11 + b.log.die) % 24);
-        }
-        s = b.s;
-      }
-      expect(p1Dice).toEqual([...TRAINING_DICE]);
-      expect(p1Pos).toEqual([23, 0, 1, 2, 3]);
-      expect(s.training).toBeNull();
-    }
-    expect(p2First.size).toBeGreaterThan(3);
-  });
-
   it("9. hydrate() of an old v1 save without `training` gives training: null", () => {
     const old = createMatch([AOI], 42, false) as Partial<GameState>;
     delete old.training;
@@ -183,7 +153,8 @@ describe("training mode (tutorial/RULES.md §13)", () => {
   });
 
   it("10. normal game (training off) is unchanged: same snapshots as the base engine", () => {
-    const rosters: Record<string, Pick[]> = { solo: [AOI], duo: [AOI, REN] };
+    // v3: solo only. The 8 "duo" snapshots were removed with the 2-player mode (REMOVE-2P.md §6).
+    const rosters: Record<string, Pick[]> = { solo: [AOI] };
     const strip = (s: GameState) => {
       const { training: t, ...rest } = s;
       expect(t).toBeNull();
@@ -267,14 +238,5 @@ describe("DEF-TUT-04: engine guard while the script runs", () => {
     const s = E.reduce(training(SEEDS[1]!), { type: "SKIP_TRAINING" });
     const after = E.reduce({ ...s, players: s.players.map((p) => ({ ...p, cash: 5000 })) }, { type: "BUY_CLOTH", outfit: "tee" });
     expect(cur(after).ownedOutfits).toContain("tee");
-  });
-
-  it("player 2 of a hot-seat training game plays with normal rules", () => {
-    let s = training(SEEDS[2]!, [AOI, REN]);
-    s = turn(s).s; // player 1, scripted turn 1 → pass → READY
-    expect(s.current).toBe(1);
-    const rich = { ...s, players: s.players.map((p) => ({ ...p, cash: 5000 })) };
-    const after = E.reduce(rich, { type: "BUY_CLOTH", outfit: "tee" });
-    expect(after).not.toBe(rich);
   });
 });

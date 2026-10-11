@@ -66,7 +66,7 @@ import { CLOTH_PRICE, HOME_LEVEL, homeItem } from "./shop";
 
 export type TrackId = "grind" | "freedom" | "venture";
 export type Reaction = "idle" | "happy" | "stressed" | "love" | "proud";
-export type Phase = "idle" | "rolling" | "moving" | "card" | "pass" | "broke" | "win";
+export type Phase = "idle" | "rolling" | "moving" | "card" | "broke" | "win";
 export type Screen = "menu" | "rules" | "credits" | "play" | "win";
 export type Tone = "up" | "down" | "gold";
 export type SfxName = "dice" | "card" | "cash" | "whoosh" | "win" | null;
@@ -325,7 +325,7 @@ export function isPractice(s: { practice?: unknown }): boolean {
   return s.practice === true;
 }
 
-/** Training state when it applies to the current player, else null. */
+/** Training state when it applies to the current player, else null (the player guard is harmless in solo, kept for online play). */
 export function trainingFor(s: GameState): TrainingState | null {
   const t = s.training;
   if (!t || s.current !== t.player || t.turn < 1 || t.turn > TRAINING_TURNS) return null;
@@ -1907,8 +1907,8 @@ function finish(s: GameState, note: string, reaction: Reaction = "idle"): GameSt
   return advance(n);
 }
 
+/** Solo only (the same-screen 2-player mode was removed in v3): the next turn starts right away. */
 function advance(s: GameState): GameState {
-  if (s.players.length > 1) return blip({ ...s, phase: "pass", card: null }, "whoosh");
   return beginTurn({ ...s, turn: s.turn + 1 });
 }
 
@@ -2059,7 +2059,6 @@ export type Action =
   | { type: "REVEAL" }
   | { type: "STEP" }
   | { type: "CHOICE"; id: string }
-  | { type: "READY" }
   | { type: "BREATHE" }
   | { type: "BORROW" }
   | { type: "REPAY"; id: string }
@@ -2089,7 +2088,7 @@ export type Action =
  * script, so the engine itself guarantees the training's caps (RULES §0 and §7, DEF-TUT-04).
  */
 const TRAINING_ALLOWED: ReadonlySet<Action["type"]> = new Set<Action["type"]>([
-  "MENU", "RULES", "CREDITS", "MUTE", "NEW", "SKIP_TRAINING", "CONTINUE", "ROLL", "REVEAL", "STEP", "CHOICE", "READY", "BREATHE",
+  "MENU", "RULES", "CREDITS", "MUTE", "NEW", "SKIP_TRAINING", "CONTINUE", "ROLL", "REVEAL", "STEP", "CHOICE", "BREATHE",
 ]);
 
 /** True when `action` must be refused because the training script is running for the current player. */
@@ -2131,9 +2130,6 @@ export function reduce(state: GameState, action: Action): GameState {
       return doStep(state);
     case "CHOICE":
       return doChoice(state, action.id);
-    case "READY":
-      if (state.phase !== "pass") return state;
-      return beginTurn({ ...state, current: (state.current + 1) % state.players.length, turn: state.turn + 1, card: null });
     case "BREATHE":
       return doBreathe(state);
     case "BORROW":
@@ -2213,10 +2209,6 @@ function doChoice(s: GameState, id: string): GameState {
     return blip(log({ ...rebuilt, phase: "card" }, "Borrowed $1,000 at $100/mo."), "cash");
   }
   if (payload.t === "start") {
-    if (s.intro && s.current < s.players.length - 1) {
-      const next = { ...s, current: s.current + 1 };
-      return blip({ ...next, card: startCard(cur(next)) }, "card");
-    }
     return beginTurn({ ...s, current: 0, intro: false, turn: 1, card: null }, true);
   }
   if (payload.t === "ok" || payload.t === "letter") {
@@ -3308,14 +3300,37 @@ function hydratePlayer(raw0: Player): Player {
   };
 }
 
-function hydrateTraining(t: unknown, count: number): TrainingState | null {
+/** Solo only: the training always follows player 0 (a 2-player save keeps it only if that player is the one kept). */
+function hydrateTraining(t: unknown): TrainingState | null {
   if (!t || typeof t !== "object") return null;
   const x = t as Partial<TrainingState>;
-  if (typeof x.turn !== "number" || typeof x.player !== "number" || x.player < 0 || x.player >= count) return null;
-  return { turn: x.turn, player: x.player, skipped: !!x.skipped };
+  if (typeof x.turn !== "number" || x.player !== 0) return null;
+  return { turn: x.turn, player: 0, skipped: !!x.skipped };
 }
 
-export function hydrate(saved: GameState): GameState {
+/**
+ * v3 removed the same-screen 2-player mode. A save made with 2+ players keeps ONE player: the winner on a finished
+ * game, otherwise the player whose turn it was (`current`). That player becomes players[0] and the game goes on solo.
+ * The others are dropped (their ledgers lived only in that save). True when the save was converted.
+ */
+export function wasMultiSave(saved: Partial<GameState> | null | undefined): boolean {
+  return Array.isArray(saved?.players) && saved!.players.length > 1;
+}
+
+function soloFromMulti(saved: GameState): GameState {
+  const list = Array.isArray(saved.players) ? saved.players : [];
+  if (list.length <= 1) return saved;
+  const done = saved.screen === "win" || saved.phase === "win";
+  const raw = done ? saved.winner : saved.current;
+  const keep = Math.min(Math.max(typeof raw === "number" && Number.isInteger(raw) ? raw : 0, 0), list.length - 1);
+  const training = saved.training && typeof saved.training === "object" && saved.training.player === keep ? { ...saved.training, player: 0 } : null;
+  // Legacy table-wide metro marker (the hot-seat count of every player's turns): meaningless for one player, dropped.
+  const { metroTurn: _legacy, ...rest } = saved as GameState & { metroTurn?: unknown };
+  return { ...rest, players: [list[keep]!], current: 0, winner: 0, training };
+}
+
+export function hydrate(saved0: GameState): GameState {
+  const saved = soloFromMulti(saved0);
   const players = (saved.players ?? []).map((p) => hydratePlayer(p));
   let s: GameState = {
     ...blankMenu(),
@@ -3323,19 +3338,22 @@ export function hydrate(saved: GameState): GameState {
     players,
     sfx: null,
     history: Array.isArray(saved.history) ? saved.history : saved.log ?? [],
-    training: hydrateTraining(saved.training, players.length),
+    training: hydrateTraining(saved.training),
   };
   // A save from before DEF-TUT-10 whose script is still running is a tutorial game too.
   if (saved.practice === true || (s.training && !s.training.skipped)) s.practice = true;
   else delete s.practice;
   // Metro run: saves from the first metro-run build kept one table-wide `metroTurn` (multiples of GameState.turn).
-  // Solo: same count as the player's own turns, so it moves onto the player. Hot-seat: a different count, ignored.
+  // Solo: same count as the player's own turns, so it moves onto the player.
   const legacy = (saved as { metroTurn?: unknown }).metroTurn;
   delete (s as { metroTurn?: unknown }).metroTurn;
   if (players.length === 1 && players[0]!.metroTurn === undefined && validMetroTurn(legacy) !== undefined) {
     s = { ...s, players: [{ ...players[0]!, metroTurn: validMetroTurn(legacy) }] };
   }
   if (!players.length) return { ...blankMenu(), muted: !!saved.muted };
+  // v3: the hot-seat hand-over phase ("pass") is gone. Its player had finished the turn, so the next one opens now,
+  // as READY used to do.
+  if ((s.phase as string) === "pass") s = beginTurn({ ...s, current: 0, turn: s.turn + 1, card: null });
   if (s.screen === "win" || s.phase === "win") {
     const idx = Math.min(Math.max(s.winner ?? 0, 0), players.length - 1);
     const p = players[idx]!;

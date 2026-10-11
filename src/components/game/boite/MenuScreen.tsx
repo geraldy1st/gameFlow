@@ -2,7 +2,7 @@
  * Menu + character select in one screen ("Choose a life"): mode chips,
  * 4-portrait grid (locked faces open the finance quiz), the picked face's
  * story and the 3-step how-to, the box-lid board, dreams and the start row.
- * Two players pick one after the other (same flow as the old Setup).
+ * Solo only: the same-screen 2-player mode is gone (online multiplayer will come later, on players[]).
  */
 import { useState } from "react";
 import { CHARACTERS, DREAMS } from "@/game/data";
@@ -48,21 +48,11 @@ export function MenuScreen({
   onQuiz: () => void;
   onBio: (id: string) => void;
 }) {
-  const [count, setCount] = useState<1 | 2>(1);
-  const [step, setStep] = useState(0);
-  const [picks, setPicks] = useState<Draft[]>([{ characterId: "aoi", dreamId: DREAMS[0]?.id }, {}]);
+  const [current, setCurrent] = useState<Draft>({ characterId: "aoi", dreamId: DREAMS[0]?.id });
   const [creating, setCreating] = useState(false);
   const [draft, setDraft] = useState<CustomLook>(blankLook);
-  const current = picks[step] ?? {};
-  const taken = new Set(
-    picks
-      .slice(0, count)
-      .filter((_, i) => i !== step)
-      .map((p) => p.characterId)
-      .filter((id): id is string => !!id && id !== "custom"),
-  );
-  const ready = Boolean(current.dreamId && (current.characterId === "custom" ? current.custom?.name : current.characterId && unlocked.includes(current.characterId) && !taken.has(current.characterId)));
-  const setPick = (patch: Draft) => setPicks((prev) => prev.map((p, i) => (i === step ? { ...p, ...patch } : p)));
+  const ready = Boolean(current.dreamId && (current.characterId === "custom" ? current.custom?.name : current.characterId && unlocked.includes(current.characterId)));
+  const setPick = (patch: Draft) => setCurrent((prev) => ({ ...prev, ...patch }));
   const useFace = () => {
     const name = draft.name.trim();
     if (!name) return;
@@ -73,34 +63,27 @@ export function MenuScreen({
     setCreating(false);
   };
   const start = () => {
-    const used = picks.slice(0, count);
-    if (!used.every((p) => p.dreamId && (p.characterId === "custom" ? p.custom?.name : p.characterId))) return;
-    onStart(
-      used.map((p) => ({
+    const p = current;
+    if (!ready || !p.dreamId) return;
+    onStart([
+      {
         characterId: p.characterId === "custom" ? "custom" : p.characterId!,
-        dreamId: p.dreamId!,
+        dreamId: p.dreamId,
         custom: p.characterId === "custom" ? (p.custom ?? null) : null,
-      })),
-    );
+      },
+    ]);
   };
   const shown = CHARACTERS.find((c) => c.id === current.characterId);
   const c2 = colon(lang);
-  const twoFirst = count === 2 && step === 0;
 
   return (
     <main className="screen s-menu">
       <div className="menu-main">
         <div className="hero">
-          <p className="kick">{count === 2 ? (step === 0 ? t("Player one") : t("Player two")) : t("Original manga board · 1 or 2 players")}</p>
+          <p className="kick">{t("Original manga board")}</p>
           <h2>{t("Choose a life")}</h2>
           <p>{t("Ride Line 1 until your assets pay the month. When your passive income beats your expenses, the Gate opens onto the Freedom express.")}</p>
-          <div className="modes" role="group" aria-label={t("Players")}>
-            <button type="button" className={`chipbtn ${count === 1 ? "is-on" : ""}`} aria-pressed={count === 1} onClick={() => { setCount(1); setStep(0); }}>
-              {t("1 player")}
-            </button>
-            <button type="button" className={`chipbtn ${count === 2 ? "is-on" : ""}`} aria-pressed={count === 2} onClick={() => setCount(2)}>
-              {t("2 players · same screen")}
-            </button>
+          <div className="modes" role="group" aria-label={t("Options")}>
             <button type="button" className="chipbtn" onClick={onQuiz}>
               <Ico name="cap" />
               {t("Finance quiz")}
@@ -127,21 +110,18 @@ export function MenuScreen({
           {CHARACTERS.map((c) => {
             const open = unlocked.includes(c.id);
             const on = current.characterId === c.id;
-            const busy = taken.has(c.id);
             return (
               <button
                 key={c.id}
                 type="button"
                 role="radio"
                 aria-checked={on}
-                aria-disabled={busy || undefined}
                 className={`char ${on ? "on" : ""} ${open ? "" : "locked"}`}
                 onClick={() => {
                   if (!open) {
                     onQuiz();
                     return;
                   }
-                  if (busy) return;
                   setCreating(false);
                   setPick({ characterId: c.id, custom: null });
                 }}
@@ -156,7 +136,7 @@ export function MenuScreen({
                   </span>
                 )}
                 <strong>{c.name}</strong>
-                <span>{open ? (busy ? t("Player one") : t(c.title)) : t("Locked")}</span>
+                <span>{open ? t(c.title) : t("Locked")}</span>
               </button>
             );
           })}
@@ -311,36 +291,13 @@ export function MenuScreen({
           </div>
         </div>
         <div className="startrow">
-          {step === 1 ? (
-            <button type="button" className="btn" onClick={() => setStep(0)}>
-              {t("Back")}
-            </button>
-          ) : (
-            <button type="button" className="btn" disabled={!hasSave} onClick={onContinue}>
-              {t("Continue")}
-            </button>
-          )}
-          {twoFirst ? (
-            <button
-              type="button"
-              className="btn gold"
-              disabled={!ready}
-              onClick={() => {
-                setCreating(false);
-                setStep(1);
-                setDraft(picks[1]?.custom ?? blankLook());
-                setPicks((prev) => prev.map((p, i) => (i === 1 && !p.dreamId ? { ...p, dreamId: DREAMS[1]?.id } : p)));
-              }}
-            >
-              {t("Player two")}
-              <span className="d-only">&nbsp;→</span>
-            </button>
-          ) : (
-            <button type="button" className="btn gold" disabled={!ready} onClick={start}>
-              {t("Deal careers")}
-              <span className="d-only">&nbsp;→</span>
-            </button>
-          )}
+          <button type="button" className="btn" disabled={!hasSave} onClick={onContinue}>
+            {t("Continue")}
+          </button>
+          <button type="button" className="btn gold" disabled={!ready} onClick={start}>
+            {t("Deal careers")}
+            <span className="d-only">&nbsp;→</span>
+          </button>
         </div>
       </div>
     </main>
