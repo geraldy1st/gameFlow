@@ -1267,6 +1267,7 @@ const fr: Record<string, string> = {
   "{perfect} with no mistakes, otherwise {partial}": "{perfect} sans faute, sinon {partial}",
   "Skill points earned": "Compétences gagnées",
   "No answer right: no cash and no skill points this time.": "Aucune bonne réponse : ni argent ni points de compétence cette fois.",
+  "Where the money goes": "Où va l’argent",
 };
 
 const es: Record<string, string> = {
@@ -2532,6 +2533,7 @@ const es: Record<string, string> = {
   "{perfect} with no mistakes, otherwise {partial}": "{perfect} sin errores, si no {partial}",
   "Skill points earned": "Habilidades ganadas",
   "No answer right: no cash and no skill points this time.": "Ninguna respuesta correcta: ni dinero ni puntos de habilidad esta vez.",
+  "Where the money goes": "Adónde va el dinero",
 };
 
 const long: Record<Lang, Record<string, string>> = {

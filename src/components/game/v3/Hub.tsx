@@ -161,6 +161,20 @@ function IncomeTab({ p, t, lang }: { p: Player; t: TFn; lang: Lang }) {
   const st = statement(p);
   const gap = Math.max(0, st.expenses - st.passive);
   const ratio = st.expenses > 0 ? Math.min(1, st.passive / st.expenses) : 1;
+  // Fills the tab on tall phones: every income and expense line, paginated (never scrolls).
+  const breakdown: [string, number][] = (
+    [
+      [t("Cash"), p.cash],
+      ...p.assets.map((a) => [t(a.name), a.cashFlow] as [string, number]),
+      [t("Taxes"), -st.taxes],
+      [t("Rent"), -st.rent],
+      [t("Food & transport"), -(st.food + st.transport)],
+      [t("Other + lifestyle"), -(st.other + st.mods)],
+      [t("Partner"), -st.partnerExpense],
+      [t("Children"), -st.childCost],
+      [t("Debt payments"), -st.debtPay],
+    ] as [string, number][]
+  ).filter(([, v], i) => i === 0 || v !== 0);
   return (
     <div className="v3-income">
       <div className="v3-rows">
@@ -204,6 +218,21 @@ function IncomeTab({ p, t, lang }: { p: Player; t: TFn; lang: Lang }) {
         <p>{gap > 0 ? t("{amount} of passive income still to go.", { amount: fmtMoney(lang, gap) }) : t("Passive income covers your expenses: the Gate is open.")}</p>
         {!SKILL_RULES.creativity.countsTowardGate && st.gigIncome > 0 && <p className="v3-muted">{t("Side incomes are earned income: they do not open the Gate.")}</p>}
       </div>
+      <p className="v3-lg-sub">{t("Where the money goes")}</p>
+      <Pager
+        items={breakdown}
+        itemH={30}
+        minW={200}
+        maxCols={2}
+        t={t}
+        label={t("Expense lines")}
+        render={([label, v]) => (
+          <div className="v3-exp">
+            <span>{label}</span>
+            <span className="num">{fmtMoney(lang, v, true)}</span>
+          </div>
+        )}
+      />
     </div>
   );
 }
