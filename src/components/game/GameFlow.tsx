@@ -3,10 +3,9 @@ import { CHARACTERS, DREAMS, FORTUNE_CASH, FORTUNE_PASSIVE, FRIENDS, INTRO_KEY, 
 import { playSfx, resumeAudio, setMuted, unlockAudio } from "@/game/audio";
 import { LANG_KEY, readLang, tr, trKey, type Lang } from "@/game/i18n";
 import { CHATS, chatText } from "@/game/chats";
-import { BIRTHDAY_COST, MUSEUM_COST, OUTFITS, clothDelta, type OutfitId, type Vitals } from "@/game/life";
+import { OUTFITS, type Vitals } from "@/game/life";
 import { CREATE_CASH, QUIZ_UNLOCK, loadPassed, savePassed, unlockedIds } from "@/game/meta";
 import { PASS_AT, QUIZZES } from "@/game/quizzes";
-import { CLOTH_PRICE, HOME_LEVEL, HOME_SHOP } from "@/game/shop";
 import { TROPHIES, TROPHY_KEY, recordsFor, type TrophyPeak } from "@/game/trophies";
 import {
   blankMenu,
@@ -452,15 +451,6 @@ function LegendBody({ t }: { t: TFn }) {
   );
 }
 
-function vitalBits(bump: Partial<Vitals>, t: TFn): string {
-  const parts: string[] = [];
-  if (bump.content) parts.push(`${t("Happiness")} +${bump.content}`);
-  if (bump.social) parts.push(`${t("Social")} +${bump.social}`);
-  if (bump.mind) parts.push(`${t("Intelligence")} +${bump.mind}`);
-  if (bump.luck) parts.push(`${t("Luck")} +${bump.luck}`);
-  return parts.join(" · ");
-}
-
 function QuizDesk({
   lang,
   t,
@@ -586,11 +576,7 @@ export function GameFlow() {
   const [statusFor, setStatusFor] = useState<Player | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [friendId, setFriendId] = useState<string | null>(null);
-  const [circleOpen, setCircleOpen] = useState(false);
   const [confirmNew, setConfirmNew] = useState(false);
-  const [dayOpen, setDayOpen] = useState(false);
-  const [wardrobeOpen, setWardrobeOpen] = useState(false);
-  const [shopOpen, setShopOpen] = useState(false);
   // v3 navigation: bottom bar Day · Activities · Ledger · Menu, and the class quiz.
   const [hub, setHub] = useState<HubTab | null>(null);
   const [dayTab, setDayTab] = useState<DayTab>("income");
@@ -852,10 +838,6 @@ export function GameFlow() {
           setFriendId(null);
           return;
         }
-        if (circleOpen) {
-          setCircleOpen(false);
-          return;
-        }
         if (hub && !rules && !optionsOpen) {
           if (legendView) setLegendView(false);
           else setHub(null);
@@ -863,18 +845,6 @@ export function GameFlow() {
         }
         if (chat) {
           setChat(null);
-          return;
-        }
-        if (shopOpen) {
-          setShopOpen(false);
-          return;
-        }
-        if (wardrobeOpen) {
-          setWardrobeOpen(false);
-          return;
-        }
-        if (dayOpen) {
-          setDayOpen(false);
           return;
         }
         if (confirmNew) {
@@ -930,7 +900,7 @@ export function GameFlow() {
         });
         return;
       }
-      if (outcome || statusFor || historyOpen || friendId || circleOpen || confirmNew || dayOpen || wardrobeOpen || shopOpen || chat || ledgerOpen || legendOpen || rules || optionsOpen || bioId || trophyId || hub) {
+      if (outcome || statusFor || historyOpen || friendId || confirmNew || chat || ledgerOpen || legendOpen || rules || optionsOpen || bioId || trophyId || hub) {
         if (e.key === "Enter" || e.key === " ") setOutcome(null);
         return;
       }
@@ -948,7 +918,7 @@ export function GameFlow() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [rules, tutorial, bioId, optionsOpen, trophyId, outcome, statusFor, historyOpen, friendId, circleOpen, confirmNew, dayOpen, wardrobeOpen, shopOpen, chat, intro, friendEv, introMode, ledgerOpen, legendOpen, hub, legendView, classQuiz]);
+  }, [rules, tutorial, bioId, optionsOpen, trophyId, outcome, statusFor, historyOpen, friendId, confirmNew, chat, intro, friendEv, introMode, ledgerOpen, legendOpen, hub, legendView, classQuiz]);
 
   const go = (action: Action) => {
     unlockAudio();
@@ -1132,7 +1102,7 @@ export function GameFlow() {
   const passiveHistory = usePassiveHistory(state);
   const points: Point[] = player ? (passiveHistory[player.id] ?? []) : [];
   const isMobile = useIsMobile();
-  const otherOverlay = !!(hub || classQuiz || coach || outcome || friendEv || statusFor || historyOpen || friendId || circleOpen || dayOpen || shopOpen || wardrobeOpen || chat || ledgerOpen || legendOpen || rules || tutorial !== null || confirmNew || introMode || typeof intro === "number");
+  const otherOverlay = !!(hub || classQuiz || coach || outcome || friendEv || statusFor || historyOpen || friendId || chat || ledgerOpen || legendOpen || rules || tutorial !== null || confirmNew || introMode || typeof intro === "number");
   // Metro run offer: due at the end of every 10th turn (never in the training / practice), one per multiple of 10.
   const metroDue = metroOfferTurn(state);
   const metroOffer = metroDue !== null && !metroPlay && !otherOverlay && !optionsOpen;
@@ -1783,8 +1753,8 @@ export function GameFlow() {
                     </div>
                     {mine && (
                       <div className="menu-actions" style={{ marginTop: "0.8rem" }}>
-                        <button type="button" className="btn btn-gold" onClick={() => setWardrobeOpen(true)}>{t("Wardrobe")}</button>
-                        <button type="button" className="btn btn-ghost" onClick={() => setShopOpen(true)}>{t("Shop")}</button>
+                        <button type="button" className="btn btn-gold" onClick={() => { setStatusFor(null); setDayTab("goods"); setHub("day"); }}>{t("Goods")}</button>
+                        <button type="button" className="btn btn-ghost" onClick={() => { setStatusFor(null); setHub("acts"); }}>{t("Activities")}</button>
                       </div>
                     )}
                     <button type="button" className="btn btn-ghost" style={{ marginTop: "0.6rem" }} onClick={() => setStatusFor(null)}>{t("Close")}</button>
@@ -1826,34 +1796,6 @@ export function GameFlow() {
         </div>
       )}
 
-      {circleOpen && player && (
-        <div className="overlay" onClick={() => setCircleOpen(false)}>
-          <article className="rules-sheet" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
-            <p className="kicker">{t("Circle")}</p>
-            <h2 className="display" style={{ marginTop: 0 }}>{t("Your circle")}</h2>
-            {player.friends.length === 0 && !player.partner && <p>{t("Love, family, and friends show up on their squares.")}</p>}
-            <div className="people">
-              {player.partner && PARTNERS.some((p) => p.id === player.partner!.id) && (
-                <button type="button" className="person" onClick={() => { setCircleOpen(false); setFriendId(player.partner!.id); }}>
-                  <img src={PARTNERS.find((p) => p.id === player.partner!.id)!.portrait} alt="" />
-                  <span>{PARTNERS.find((p) => p.id === player.partner!.id)!.name.split(" ")[0]} · {t("partner")}</span>
-                </button>
-              )}
-              {player.friends.map((f) => {
-                const def = FRIENDS.find((x) => x.id === f.id);
-                if (!def) return null;
-                return (
-                  <button type="button" key={f.id} className="person" onClick={() => { setCircleOpen(false); setFriendId(f.id); }}>
-                    <img src={def.portrait} alt="" />
-                    <span>{def.name.split(" ")[0]} · {f.likes} ❤️</span>
-                  </button>
-                );
-              })}
-            </div>
-            <button type="button" className="btn btn-gold" style={{ marginTop: "0.8rem" }} onClick={() => setCircleOpen(false)}>{t("Close")}</button>
-          </article>
-        </div>
-      )}
 
       {friendId && player && circlePerson(friendId) && (player.friends.some((f) => f.id === friendId) || player.partner?.id === friendId) && (
         <div className="overlay" onClick={() => setFriendId(null)}>
@@ -1907,151 +1849,8 @@ export function GameFlow() {
         </div>
       )}
 
-      {dayOpen && player && state.phase === "idle" && (
-        <div className="overlay" onClick={() => setDayOpen(false)}>
-          <article className="rules-sheet" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
-            <p className="kicker">{t("Day")}</p>
-            <h2 className="display" style={{ marginTop: 0 }}>{t("Your day")}</h2>
-            <p>{t("One activity before you roll. Sleep skips the board.")}</p>
-            {player.lifeTurn === state.turn ? (
-              <p>{t("You already spent part of this day.")}</p>
-            ) : (
-              <div className="day-list">
-                <button
-                  type="button"
-                  className="outfit"
-                  disabled={player.friends.length === 0 || player.cash < BIRTHDAY_COST}
-                  onClick={() => { setDayOpen(false); go({ type: "LIFE", kind: "birthday" }); }}
-                >
-                  <strong>{t("A friend's birthday")}</strong>
-                  <span>{player.friends.length === 0 ? t("No one in the circle yet.") : player.cash < BIRTHDAY_COST ? t("Not enough cash") : `${money(BIRTHDAY_COST)} · ${t("Happiness")} + ${t("Social")}`}</span>
-                </button>
-                <button
-                  type="button"
-                  className="outfit"
-                  disabled={player.cash < MUSEUM_COST}
-                  onClick={() => { setDayOpen(false); go({ type: "LIFE", kind: "museum" }); }}
-                >
-                  <strong>{t("The museum")}</strong>
-                  <span>{player.cash < MUSEUM_COST ? t("Not enough cash") : `${money(MUSEUM_COST)} · ${t("Intelligence")}`}</span>
-                </button>
-                <button
-                  type="button"
-                  className="outfit"
-                  onClick={() => { setDayOpen(false); go({ type: "LIFE", kind: "sleep" }); }}
-                >
-                  <strong>{t("Sleep")}</strong>
-                  <span>{t("Free. Happiness rises. You miss this roll.")}</span>
-                </button>
-              </div>
-            )}
-            <button type="button" className="btn btn-ghost" style={{ marginTop: "0.8rem" }} onClick={() => setDayOpen(false)}>{t("Close")}</button>
-          </article>
-        </div>
-      )}
 
-      {shopOpen && player && (
-        <div className="overlay" onClick={() => setShopOpen(false)}>
-          <article className="rules-sheet" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
-            <p className="kicker">{t("Shop")}</p>
-            <h2 className="display" style={{ marginTop: 0 }}>{t("Clothes shop")}</h2>
-            <p>{t("Buy clothes here. They appear in the wardrobe.")}</p>
-            <div className="day-list">
-              {OUTFITS.filter((piece) => piece.id !== "jeans").map((piece) => {
-                const id = piece.id as Exclude<OutfitId, "jeans">;
-                const owned = (player.ownedOutfits ?? ["jeans"]).includes(piece.id);
-                const cost = CLOTH_PRICE[id];
-                const idle = state.phase === "idle";
-                return (
-                  <button
-                    key={piece.id}
-                    type="button"
-                    className={owned ? "outfit on" : "outfit"}
-                    disabled={!idle || owned || player.cash < cost}
-                    onClick={() => go({ type: "BUY_CLOTH", outfit: piece.id })}
-                  >
-                    <strong>{t(piece.name)}</strong>
-                    <span>{owned ? t("Owned") : player.cash < cost ? t("Not enough cash") : money(cost)}</span>
-                    <em>{clothDelta(piece.id) === 0 ? money(0) : money(clothDelta(piece.id), true)}{t("/mo")}</em>
-                  </button>
-                );
-              })}
-            </div>
-            <h2 className="display">{t("Home shop")}</h2>
-            {player.level < HOME_LEVEL ? (
-              <p>{t("The home shop opens at level 2.")}</p>
-            ) : (
-              <div className="day-list">
-                {HOME_SHOP.map((item) => {
-                  const owned = (player.homeOwned ?? []).includes(item.id);
-                  const on = (player.homeOn ?? []).includes(item.id);
-                  const idle = state.phase === "idle";
-                  return (
-                    <button
-                      key={item.id}
-                      type="button"
-                      className={on ? "outfit on" : "outfit"}
-                      disabled={!idle || (!owned && player.cash < item.cost)}
-                      onClick={() => {
-                        if (!owned) go({ type: "BUY_HOME", id: item.id });
-                        else go({ type: "TOGGLE_HOME", id: item.id });
-                      }}
-                    >
-                      <strong>{t(item.name)}</strong>
-                      <span>{vitalBits(item.bump, t)}</span>
-                      <em>{owned ? (on ? t("Equipped") : t("Equip")) : player.cash < item.cost ? t("Not enough cash") : money(item.cost)}</em>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-            <button type="button" className="btn btn-gold" style={{ marginTop: "0.8rem" }} onClick={() => setShopOpen(false)}>{t("Close")}</button>
-          </article>
-        </div>
-      )}
 
-      {wardrobeOpen && player && (
-        <div className="overlay" onClick={() => setWardrobeOpen(false)}>
-          <article className="rules-sheet" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
-            <p className="kicker">{t("Wardrobe")}</p>
-            <h2 className="display" style={{ marginTop: 0 }}>{t("Wardrobe")}</h2>
-            <p>{t("Only clothes you own are here. Jeans start with you. A professional shirt adds $300 a month on a property or a new job. The other outfits take $300 off.")}</p>
-            {state.phase !== "idle" && <p>{t("Change clothes before you roll.")}</p>}
-            <div className="wardrobe-layout">
-              <img
-                className="body-shot"
-                src={bodyPortrait(player)}
-                alt=""
-                onError={(e) => {
-                  e.currentTarget.onerror = null;
-                  e.currentTarget.src = dressedPortrait(player, player.reaction);
-                }}
-              />
-              <div className="wardrobe-grid">
-                {OUTFITS.filter((piece) => (player.ownedOutfits ?? ["jeans"]).includes(piece.id)).map((piece) => {
-                  const delta = clothDelta(piece.id);
-                  const on = player.outfit === piece.id;
-                  return (
-                    <button
-                      key={piece.id}
-                      type="button"
-                      className={on ? "outfit on" : "outfit"}
-                      disabled={state.phase !== "idle"}
-                      onClick={() => go({ type: "WEAR", outfit: piece.id as OutfitId })}
-                    >
-                      <strong>{t(piece.name)}</strong>
-                      <span>{t(piece.note)}</span>
-                      <em>{delta === 0 ? money(0) : money(delta, true)}</em>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-            <button type="button" className="btn btn-ghost" style={{ marginTop: "0.8rem" }} onClick={() => { setWardrobeOpen(false); setShopOpen(true); }}>{t("Shop")}</button>
-            <button type="button" className="btn btn-gold" style={{ marginTop: "0.8rem", marginLeft: "0.4rem" }} onClick={() => setWardrobeOpen(false)}>{t("Close")}</button>
-          </article>
-        </div>
-      )}
 
       {chat && player && circlePerson(chat.friendId) && (
         <div className="overlay" onClick={() => setChat(null)}>
