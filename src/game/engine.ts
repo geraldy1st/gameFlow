@@ -3751,8 +3751,50 @@ function soloFromMulti(saved: GameState): GameState {
   return { ...rest, players: [list[keep]!], current: 0, winner: 0, training };
 }
 
+/**
+ * PC-3: saves keep image paths as they were built (the Pages build prefixes "/game/…" with its base, the root host does not).
+ * A save made under one base and opened under another (e.g. an early-October save with a card open, loaded on
+ * GitHub Pages under /gameFlow/) would point at a 404. Rewrite every stored public-asset path onto `base`.
+ * Only strings that are exactly an asset path ("/<optional one segment>/game/<art|portraits|quiz|trophies|tokens>/…")
+ * are touched, so it is safe on free text and idempotent.
+ */
+const ASSET_PATH = /^(?:\/[A-Za-z0-9._-]+)?\/game\/((?:art|portraits|quiz|trophies|tokens)\/[^\s"'<>]+)$/;
+
+function appBase(): string {
+  // import.meta.env exists under Vite and vitest; plain Node / esbuild bundles fall back to "/".
+  const b = (typeof import.meta.env === "object" && import.meta.env?.BASE_URL) || "/";
+  return b.endsWith("/") ? b : `${b}/`;
+}
+
+export function rebaseAssetPath(v: string, base: string = appBase()): string {
+  const m = ASSET_PATH.exec(v);
+  return m ? `${base}game/${m[1]}` : v;
+}
+
+export function rebaseAssets<T>(v: T, base: string = appBase()): T {
+  if (typeof v === "string") return rebaseAssetPath(v, base) as T;
+  if (Array.isArray(v)) {
+    let changed = false;
+    const out = v.map((x) => {
+      const y = rebaseAssets(x, base);
+      if (y !== x) changed = true;
+      return y;
+    });
+    return (changed ? out : v) as T;
+  }
+  if (v && typeof v === "object") {
+    let out: Record<string, unknown> | null = null;
+    for (const [k, x] of Object.entries(v as Record<string, unknown>)) {
+      const y = rebaseAssets(x, base);
+      if (y !== x) (out ??= { ...(v as Record<string, unknown>) })[k] = y;
+    }
+    return (out ?? v) as T;
+  }
+  return v;
+}
+
 export function hydrate(saved0: GameState): GameState {
-  const saved = soloFromMulti(saved0);
+  const saved = soloFromMulti(rebaseAssets(saved0));
   const players = (saved.players ?? []).map((p) => hydratePlayer(p));
   let s: GameState = {
     ...blankMenu(),
