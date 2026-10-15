@@ -12,13 +12,23 @@ type AnyComp = ComponentType<any>;
 const cache = new Map<string, LazyExoticComponent<AnyComp>>();
 
 /** One lazy component per (game, piece), created once. */
+/** A failed download of the game's chunk (vs an error thrown while the game runs). */
+class ChunkLoadError extends Error {}
+
 function lazyPiece(id: string, part: string): LazyExoticComponent<AnyComp> | null {
   const loader = minigameById(id)?.parts?.[part];
   if (!loader) return null;
   const k = `${id}:${part}`;
   let c = cache.get(k);
   if (!c) {
-    c = lazy(() => loader().then((m) => ({ default: m })));
+    c = lazy(() =>
+      loader().then(
+        (m) => ({ default: m }),
+        (e: unknown) => {
+          throw new ChunkLoadError(e instanceof Error ? e.message : String(e));
+        },
+      ),
+    );
     cache.set(k, c);
   }
   return c;
@@ -31,18 +41,23 @@ interface BoundaryProps {
   children: ReactNode;
 }
 
-class LoadBoundary extends Component<BoundaryProps, { failed: boolean }> {
-  state = { failed: false };
-  static getDerivedStateFromError() {
-    return { failed: true };
+class LoadBoundary extends Component<BoundaryProps, { failed: null | "load" | "crash" }> {
+  state: { failed: null | "load" | "crash" } = { failed: null };
+  static getDerivedStateFromError(e: unknown) {
+    return { failed: e instanceof ChunkLoadError ? "load" : "crash" };
   }
   render() {
-    if (!this.state.failed) return this.props.children;
+    const failed = this.state.failed;
+    if (!failed) return this.props.children;
     const { t, onClose, onRetry } = this.props;
     return (
       <div className="overlay" role="alertdialog" aria-live="assertive">
         <div className="pass-gate">
-          <p>{t("The mini-game could not load. Check your connection.")}</p>
+          <p>
+            {failed === "load"
+              ? t("The mini-game could not load. Check your connection.")
+              : t("The mini-game stopped because of an error. Your game is saved.")}
+          </p>
           <button type="button" className="btn btn-gold" onClick={onRetry}>{t("Try again")}</button>
           {onClose && <button type="button" className="btn btn-ghost" onClick={onClose}>{t("Close")}</button>}
         </div>

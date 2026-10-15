@@ -43,7 +43,6 @@ import { MetroBoard, trackSpaces } from "./boite/MetroBoard";
 import { MinigameHost } from "@/minigames/MinigameHost";
 import { preloadMinigame } from "@/minigames/preload";
 import { ActivitiesPanel, BottomNav, DayPanel, FriendAffinity, HubLayer, LegendPanel, MenuPanel, Tabs, type DayTab, type HubTab, type MenuItem } from "./v3/Hub";
-import { ClassQuiz } from "./v3/ClassQuiz";
 import { Pager } from "./v3/Pager";
 import type { RunnerAudio } from "./boite/metro-audio";
 import { TrainingCoach, coachView, type TutLocal } from "./boite/TrainingCoach";
@@ -72,6 +71,22 @@ function metroDemoDriver(): ((s: RunState) => MetroAction | null) | undefined {
   if (!METRO_HOOK || typeof window === "undefined") return undefined;
   const v = new URLSearchParams(window.location.search).get("metro-demo");
   return v === "win" ? makeAutopilot() : v === "hurt" ? makeAutopilot({ miss: [3] }) : v === "crash" ? wrongGestures : undefined;
+}
+/**
+ * Same hook (dev / VITE_METRO_HOOK=1 builds only): `?metro-seed=<int>` picks the obstacle seed and
+ * `?metro-length=<metres>` shortens the track (30 to 260 m) so a scripted run ends in a few seconds.
+ * docs/refacto/TEST-HOOKS.md. In the public build METRO_HOOK is false and this returns {} (no effect).
+ */
+function metroDemoRun(): { seed?: number; length?: number } {
+  if (!METRO_HOOK || typeof window === "undefined") return {};
+  const q = new URLSearchParams(window.location.search);
+  const int = (k: string) => {
+    const v = q.get(k);
+    return v !== null && /^\d+$/.test(v) ? Number(v) : undefined;
+  };
+  const seed = int("metro-seed");
+  const len = int("metro-length");
+  return { seed, length: len === undefined ? undefined : Math.max(30, Math.min(260, len)) };
 }
 
 function MoodFace({
@@ -1115,6 +1130,10 @@ export function GameFlow() {
   useEffect(() => {
     if (metroDue !== null) preloadMinigame("metro", "offer");
   }, [metroDue]);
+  // Lazy class quiz chunk: start the download when Activités opens.
+  useEffect(() => {
+    if (hub === "acts") preloadMinigame("quiz", "play");
+  }, [hub]);
   const gateOpen = !!player && state.screen === "play" && state.phase === "idle" && player.track === "grind" && player.level < 2 && unlocked(player) && !gateSeen[player.id] && !otherOverlay && !metroBusy;
   const dismissGate = () => {
     if (player) setGateSeen((g) => ({ ...g, [player.id]: true }));
@@ -1460,16 +1479,22 @@ export function GameFlow() {
       )}
 
       {classQuiz && player && state.screen === "play" && (
-        <ClassQuiz
-          player={player}
-          lang={lang}
+        <MinigameHost
+          id="quiz"
+          part="play"
           t={t}
-          onFinish={(correct, creative) => {
-            go({ type: "QUIZ", correct, creative });
-            setClassQuiz(false);
-            setHub("acts");
-          }}
           onClose={() => setClassQuiz(false)}
+          props={{
+            player,
+            lang,
+            t,
+            onFinish: (correct: number, creative?: number) => {
+              go({ type: "QUIZ", correct, creative });
+              setClassQuiz(false);
+              setHub("acts");
+            },
+            onClose: () => setClassQuiz(false),
+          }}
         />
       )}
       {metroOffer && player && metroDue !== null && (
@@ -1510,6 +1535,7 @@ export function GameFlow() {
             gameMuted: state.muted,
             audio: metroPlay.audio,
             driver: metroPlay.driver,
+            ...metroDemoRun(),
             onDone: (lives: number) => {
               setMetroPlay(null);
               go({ type: "METRO", result: "run", lives });

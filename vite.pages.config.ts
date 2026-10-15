@@ -60,5 +60,17 @@ export default defineConfig({
   resolve: { tsconfigPaths: true },
   define: { "import.meta.env.VITE_STATIC": JSON.stringify("1"), "import.meta.env.VITE_INTRO_FILES": JSON.stringify(introFiles) },
   plugins: [basePublicAssets(), tailwindcss(), viteReact(), spaFallback()],
-  build: { outDir, emptyOutDir: true },
+  build: {
+    outDir,
+    emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        // Lazy mini-game chunks are named after their game (src/minigames/<id>/…): minigame-metro-<hash>.js.
+        chunkFileNames: (chunk) => {
+          const m = /\/src\/minigames\/([a-z0-9-]+)\//.exec(chunk.facadeModuleId ?? "");
+          return m ? `assets/minigame-${m[1]}-[hash].js` : "assets/[name]-[hash].js";
+        },
+      },
+    },
+  },
 });

@@ -180,6 +180,8 @@ export interface MetroRunProps {
   /** Active player's cash before the reward (result card counter). */
   cash: number;
   seed?: number;
+  /** Track length in metres (default RUN.length). Only set by the dev / VITE_METRO_HOOK test hook. */
+  length?: number;
   reduced: boolean;
   /** The game's own mute (default for the runner's ♪ until the player chooses). */
   gameMuted: boolean;
@@ -192,8 +194,8 @@ export interface MetroRunProps {
 
 type Pause = null | "user" | "hidden";
 
-export function MetroRun({ t, money, name, faces, skirt, cash, seed = RUN.seed, reduced, gameMuted, audio, onDone, driver }: MetroRunProps) {
-  const run = useRef<RunState>(newRun(seed));
+export function MetroRun({ t, money, name, faces, skirt, cash, seed = RUN.seed, length = RUN.length, reduced, gameMuted, audio, onDone, driver }: MetroRunProps) {
+  const run = useRef<RunState>(newRun(seed, length));
   const cam = useRef<Camera>({ x: 0, z: -4.2 });
   const fx = useRef<Fx[]>([]);
   const sparks = useRef<Spark[]>([]);
@@ -575,12 +577,12 @@ export function MetroRun({ t, money, name, faces, skirt, cash, seed = RUN.seed, 
             </div>
             <div className="mr-chip mr-meter">
               <span className="mr-lbl">{t("Metro")}</span>
-              <span className="mr-bar" ref={progBar} role="progressbar" aria-label={t("Distance to the metro")} aria-valuemin={0} aria-valuemax={RUN.length} aria-valuenow={0}>
+              <span className="mr-bar" ref={progBar} role="progressbar" aria-label={t("Distance to the metro")} aria-valuemin={0} aria-valuemax={length} aria-valuenow={0}>
                 <i ref={progFill} />
                 <img ref={progFace} src={faces.idle} alt="" />
                 <em aria-hidden="true">M</em>
               </span>
-              <b ref={progText}>{RUN.length} m</b>
+              <b ref={progText}>{length} m</b>
             </div>
             <div className="mr-chip mr-speed">
               <span className="mr-lbl">{t("Speed")}</span>

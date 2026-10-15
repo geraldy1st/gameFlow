@@ -1,16 +1,21 @@
 /**
  * Mini-game registry (PLAN.md §2). Batch 3: the metro run is registered and GameFlow renders its UI through
- * MinigameHost (lazy chunk). The engine does not read the registry yet (batch 5); the class quiz comes in batch 4. Display order = array order.
+ * MinigameHost (lazy chunk). Batch 4: the class quiz too, and Activités lists
+ * MINIGAME_REGISTRY + MINIGAME_SOON. The engine does not read the registry yet (batch 5). Display order = array order.
  */
 import { METRO_MINIGAME } from "./metro";
+import { QUIZ_MINIGAME } from "./quiz";
 import type { MinigameDefinition, MinigameId, MinigameSoon } from "./types";
 
 export type AnyMinigame = MinigameDefinition<any>;
 
-export const MINIGAME_REGISTRY: readonly AnyMinigame[] = [METRO_MINIGAME];
+export const MINIGAME_REGISTRY: readonly AnyMinigame[] = [METRO_MINIGAME, QUIZ_MINIGAME];
 
 /** Activités slots still to come. */
-export const MINIGAME_SOON: readonly MinigameSoon[] = [];
+export const MINIGAME_SOON: readonly MinigameSoon[] = [
+  { id: "soon1", soon: true },
+  { id: "soon2", soon: true },
+];
 
 export function minigameById(id: MinigameId, list: readonly AnyMinigame[] = MINIGAME_REGISTRY): AnyMinigame | undefined {
   return list.find((m) => m.id === id);

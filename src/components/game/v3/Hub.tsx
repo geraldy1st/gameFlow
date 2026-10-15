@@ -6,7 +6,8 @@ import { useLayoutEffect, useState, type CSSProperties, type ReactNode, type Ref
 import { FRIENDS, PARTNERS } from "@/game/data";
 import { cur, ownsGood, progressOf, quizOpen, quizWait, shopPrice, statement, type Action, type GameState, type Player } from "@/game/engine";
 import { formatCompact } from "@/game/format-compact";
-import { CLASS_QUIZ, CURVES, AFFINITY_SEED, GOODS, GOODS_CATEGORIES, MINIGAMES, SHOPS, SKILL_RULES, SOON_GOODS, type GoodsCategory, type ShopDef } from "@/game/tuning";
+import { MINIGAME_REGISTRY, MINIGAME_SOON } from "@/minigames/registry";
+import { CLASS_QUIZ, CURVES, AFFINITY_SEED, GOODS, GOODS_CATEGORIES, SHOPS, SKILL_RULES, SOON_GOODS, type GoodsCategory, type ShopDef } from "@/game/tuning";
 import { HOME_LEVEL, HOME_SHOP, CLOTH_PRICE } from "@/game/shop";
 import { BIRTHDAY_COST, MUSEUM_COST, OUTFITS, clothDelta, type OutfitId } from "@/game/life";
 import { SKILL_IDS, SKILL_NAMES, experienceXp, maxFriends, skillLevel, skillXp, type SkillId } from "@/game/skills";
@@ -580,7 +581,7 @@ function GamesTab({ state, p, t, onQuiz }: { state: GameState; p: Player; t: TFn
   const canQuiz = state.phase === "idle" && quizOpen(p) && !state.training && !state.practice;
   return (
     <div className="v3-games">
-      {MINIGAMES.map((g) =>
+      {[...MINIGAME_REGISTRY, ...MINIGAME_SOON].map((g) =>
         "soon" in g ? (
           <div key={g.id} className="v3-card v3-game soon">
             <span className="v3-ic" aria-hidden="true"><Ico name="unknown" /></span>
@@ -589,7 +590,7 @@ function GamesTab({ state, p, t, onQuiz }: { state: GameState; p: Player; t: TFn
               <small>{t("A new mini-game arrives in an update.")}</small>
             </span>
           </div>
-        ) : g.id === "metro" ? (
+        ) : g.entry === "offer" ? (
           <div key={g.id} className="v3-card v3-game" style={{ "--c": "var(--sky)" } as CSSProperties}>
             <span className="v3-ic tint" aria-hidden="true"><Ico name="run" /></span>
             <span className="v3-tx">
