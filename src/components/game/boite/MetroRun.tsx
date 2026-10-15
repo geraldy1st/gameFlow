@@ -17,7 +17,7 @@ type TFn = (text: string, vars?: Record<string, string | number>) => string;
 type MoneyFn = (n: number, signed?: boolean) => string;
 
 /** The only skin for now (Shibuya by day). */
-export const METRO_SKIN: RunnerSkin = SHIBUYA;
+const METRO_SKIN: RunnerSkin = SHIBUYA;
 
 /** Japanese shop signs: only these glyphs are fetched, and only once the minigame shows up. */
 function ensureJpFont(): void {

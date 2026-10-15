@@ -94,7 +94,7 @@ const noise = (i: number) => {
   return x - Math.floor(x);
 };
 
-export const FIREWORK_COLOURS = ["#FFC745", "#3DDC97", "#FF8A73", "#6C4AB6", "#8FD3FF", "#FFF6E5"];
+const FIREWORK_COLOURS = ["#FFC745", "#3DDC97", "#FF8A73", "#6C4AB6", "#8FD3FF", "#FFF6E5"];
 const SPOTS = [
   [0.16, 0.16],
   [0.84, 0.14],

@@ -29,10 +29,6 @@ export const SKILL_NAMES: Record<SkillId, string> = {
   reputation: "Reputation",
 };
 
-export function isSkill(id: unknown): id is SkillId {
-  return typeof id === "string" && (SKILL_IDS as readonly string[]).includes(id);
-}
-
 interface HasSkills {
   skills?: Skills;
 }
@@ -87,7 +83,7 @@ export function hydrateSkills(raw: unknown, gauges: Partial<Record<GaugeId, numb
 /* ------------------------------------------------------------------ effect formulas (SKILLS.md) */
 
 /** palier(niv, pas, max) = min(max, pas × (niv − 1)). */
-export function tier(level: number, step: number, max: number): number {
+function tier(level: number, step: number, max: number): number {
   return Math.min(max, step * Math.max(0, level - 1));
 }
 

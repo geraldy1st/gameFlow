@@ -5,7 +5,7 @@
  */
 import type { SkinMusic } from "./metro-skin";
 
-export const RUNNER_MUTE_KEY = "gameflow-runner-mute";
+const RUNNER_MUTE_KEY = "gameflow-runner-mute";
 export type Sfx = "jump" | "slide" | "hit" | "coin" | "win" | "fail";
 
 /** Saved choice; without one, follow the game's own mute. */

@@ -42,10 +42,6 @@ export function unlockText(st: UnlockState): { k: string; v: Record<string, stri
   return { k: "Open", v: {} };
 }
 
-export function shopById(id: string): ShopDef | undefined {
-  return SHOPS.find((s) => s.id === id);
-}
-
 export function goodById(id: string): GoodDef | undefined {
   return GOODS.find((g) => g.id === id);
 }

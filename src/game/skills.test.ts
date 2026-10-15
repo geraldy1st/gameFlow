@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { LIFESTYLE, SMALL_DEALS } from "./data";
-import { createMatch, cur, hydrate, marketFor, priceOf, quizOpen, reduce, spendOf, statement, unlocked, type GameState, type Player } from "./engine";
+import { createMatch, cur, hydrate, marketFor, priceOf, quizOpen, reduce, spendOf, statement, type GameState, type Player } from "./engine";
 import { affinityMult, antiFarm, experienceLevel, gainSkill, gigIncome, maxFriends, negoDiscount, quizCash, rewardPoints, skillLevel, type SkillId } from "./skills";
 import { CLASS_QUIZ, SKILL_REWARDS, SKILL_RULES } from "./tuning";
 

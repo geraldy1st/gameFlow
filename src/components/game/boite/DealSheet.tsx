@@ -16,12 +16,12 @@ import { rich } from "./PlayerMat";
 
 type TFn = (text: string, vars?: Record<string, string | number>) => string;
 
-export function dealDef(id: string): DealDef | undefined {
+function dealDef(id: string): DealDef | undefined {
   return [...SMALL_DEALS, ...BIG_DEALS, ...PREMIUM_DEALS].find((d) => d.id === id);
 }
 
 /** Pure before/after projection of taking a deal (mirrors engine takeDeal()). */
-export function projectDeal(p: Player, deal: DealDef, down: number, cashFlow: number) {
+function projectDeal(p: Player, deal: DealDef, down: number, cashFlow: number) {
   const st = statement(p);
   const passive = deal.passive ? st.passive + cashFlow : st.passive;
   const salary = deal.passive ? st.salary : st.salary + cashFlow;

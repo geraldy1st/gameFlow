@@ -57,7 +57,7 @@ export function lineName(p: Player, t: TFn): string {
 }
 
 /** Social bar value, with the +bonus badge right after someone joined the circle (shown for that turn). */
-export function SocialChip({ player, state, t, onlyFresh = false }: { player: Player; state: GameState; t: TFn; onlyFresh?: boolean }) {
+function SocialChip({ player, state, t, onlyFresh = false }: { player: Player; state: GameState; t: TFn; onlyFresh?: boolean }) {
   const social = player.vitals?.social;
   if (social === undefined) return null;
   // Joined since this player's previous turn (turn counts every player's turn), badge = Social actually gained
@@ -120,7 +120,7 @@ export function WhoBox({ player, state, t, lang, onStatus }: { player: Player; s
 
 const UNITS = [50, 100, 250, 500, 1000, 2500, 5000, 10000, 25000, 50000, 100000, 250000];
 
-export function coinUnit(...values: number[]): number {
+function coinUnit(...values: number[]): number {
   const top = Math.max(1, ...values);
   return UNITS.find((u) => top / u <= 14) ?? UNITS[UNITS.length - 1]!;
 }
@@ -173,7 +173,7 @@ export function FlowBox({ player, t, lang }: { player: Player; t: TFn; lang: Lan
   );
 }
 
-export function gateHint(player: Player, t: TFn, lang: Lang): ReactNode {
+function gateHint(player: Player, t: TFn, lang: Lang): ReactNode {
   const st = statement(player);
   const gap = st.expenses - st.passive;
   if (player.level >= 2) return <>{t("Level 2: grow, sell, or retire when you want.")}</>;

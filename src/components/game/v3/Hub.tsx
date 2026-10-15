@@ -25,13 +25,13 @@ export type HubTab = "day" | "acts" | "ledger" | "menu";
 type Go = (a: Action) => void;
 
 /** Compact money, localised order: $1.2K (en) · 1.2K $ (fr, es). */
-export function cmoney(lang: Lang, n: number): string {
+function cmoney(lang: Lang, n: number): string {
   const v = formatCompact(Math.abs(n));
   const sign = n < 0 ? "−" : "";
   return lang === "en" ? `${sign}$${v}` : `${sign}${v} $`;
 }
 
-export const SKILL_COLOR: Record<SkillId, string> = Object.fromEntries(SKILL_INFO.map((s) => [s.id, s.color])) as Record<SkillId, string>;
+const SKILL_COLOR: Record<SkillId, string> = Object.fromEntries(SKILL_INFO.map((s) => [s.id, s.color])) as Record<SkillId, string>;
 
 /* ------------------------------------------------------------------ bottom bar */
 
@@ -358,7 +358,7 @@ function GoodsTab({ state, p, t, lang, go }: { state: GameState; p: Player; t: T
 }
 
 /** Affinity XP of a friend (no engine field: derived from likes and loyalty, tuning.ts AFFINITY_SEED). */
-export function affinityXp(f: { likes: number; loyalty: number }): number {
+function affinityXp(f: { likes: number; loyalty: number }): number {
   return Math.max(0, f.likes) * AFFINITY_SEED.perLike + Math.max(0, f.loyalty) * AFFINITY_SEED.perLoyalty;
 }
 
@@ -736,4 +736,3 @@ export function FriendAffinity({ f, name, t }: { f: { likes: number; loyalty: nu
   );
 }
 
-export { SKILL_IDS, type SkillId };

@@ -41,8 +41,8 @@ function edgeLayout(R: Rect, counts: [number, number, number, number], inset = 0
   return out;
 }
 
-export const S1 = edgeLayout(L1, [7, 5, 7, 5], 0.1);
-export const S2 = edgeLayout(L2, [5, 3, 5, 3]);
+const S1 = edgeLayout(L1, [7, 5, 7, 5], 0.1);
+const S2 = edgeLayout(L2, [5, 3, 5, 3]);
 const GATE = (() => {
   const right = S1.filter((p) => p.x > L1.x + L1.w - 2).sort((a, b) => a.y - b.y);
   let gy = C.y;
@@ -105,7 +105,7 @@ function LineTag({ x, y, text, bg, fg, lock }: { x: number; y: number; text: str
 }
 
 /** Where a player's pawn stands. */
-export function pawnPoint(p: Player): { x: number; y: number } {
+function pawnPoint(p: Player): { x: number; y: number } {
   if (p.track === "grind") return S1[p.position % S1.length]!;
   return S2[p.position % S2.length]!;
 }
@@ -114,7 +114,7 @@ export function trackSpaces(p: Player): SpaceDef[] {
   return p.track === "grind" ? GRIND : p.track === "venture" ? VENTURE : FREEDOM;
 }
 
-export function Pawn({ player, idx, clip, x, y, hopKey }: { player: Player; idx: number; clip: string; x: number; y: number; hopKey?: string | number }) {
+function Pawn({ player, idx, clip, x, y, hopKey }: { player: Player; idx: number; clip: string; x: number; y: number; hopKey?: string | number }) {
   return (
     <g className="pawn" style={{ transform: `translate(${x - 2}px, ${y - 12}px)` }}>
       <g className="bob" key={hopKey}>
