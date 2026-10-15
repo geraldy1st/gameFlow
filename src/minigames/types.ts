@@ -57,8 +57,13 @@ export interface MinigameDefinition<R = unknown> {
   logLine: (result: R | "decline", cash: number) => string;
   /** A finished run feeds the Creativity "online content" gig (SKILLS.md §11.6). */
   feedsGig?: boolean;
-  /** The UI, loaded on demand (`() => import("./ui")`). */
-  load: () => Promise<{ default: ComponentType<MinigameUiProps<R>> }>;
+  /** The UI, loaded on demand (`() => import("./ui")`). Optional until batch 5 moves every game to MinigameUiProps. */
+  load?: () => Promise<{ default: ComponentType<MinigameUiProps<R>> }>;
+  /**
+   * Transitional (batches 3–4): named UI pieces with their own props, each loaded on demand from the game's chunk
+   * (metro: "offer" and "run"). MinigameHost renders them. Replaced by `load` in batch 5.
+   */
+  parts?: Record<string, () => Promise<ComponentType<any>>>;
 }
 
 /** Placeholder card in Activités ("Bientôt"). */

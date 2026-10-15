@@ -1,12 +1,13 @@
 /**
- * Mini-game registry (PLAN.md §2, batch 1). Empty and not wired yet: batches 3–5 move the metro run and the class
- * quiz here and make GameFlow / Hub / the engine read it. Display order = array order.
+ * Mini-game registry (PLAN.md §2). Batch 3: the metro run is registered and GameFlow renders its UI through
+ * MinigameHost (lazy chunk). The engine does not read the registry yet (batch 5); the class quiz comes in batch 4. Display order = array order.
  */
+import { METRO_MINIGAME } from "./metro";
 import type { MinigameDefinition, MinigameId, MinigameSoon } from "./types";
 
 export type AnyMinigame = MinigameDefinition<any>;
 
-export const MINIGAME_REGISTRY: readonly AnyMinigame[] = [];
+export const MINIGAME_REGISTRY: readonly AnyMinigame[] = [METRO_MINIGAME];
 
 /** Activités slots still to come. */
 export const MINIGAME_SOON: readonly MinigameSoon[] = [];

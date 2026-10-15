@@ -40,7 +40,8 @@ import { FAMILIES, IconDefs, Ico, type Family } from "./boite/icons";
 import { IntroVideo, probeIntro, type IntroPick } from "./boite/IntroVideo";
 import { MenuScreen } from "./boite/MenuScreen";
 import { MetroBoard, trackSpaces } from "./boite/MetroBoard";
-import { MetroOffer, MetroRun } from "./boite/MetroRun";
+import { MinigameHost } from "@/minigames/MinigameHost";
+import { preloadMinigame } from "@/minigames/preload";
 import { ActivitiesPanel, BottomNav, DayPanel, FriendAffinity, HubLayer, LegendPanel, MenuPanel, Tabs, type DayTab, type HubTab, type MenuItem } from "./v3/Hub";
 import { ClassQuiz } from "./v3/ClassQuiz";
 import { Pager } from "./v3/Pager";
@@ -593,6 +594,8 @@ export function GameFlow() {
   const [hasBackup, setHasBackup] = useState(false);
   const [outcome, setOutcome] = useState<{ mood: Reaction; line: string; fact: string; portrait: string; fallback: string; name: string } | null>(null);
   // Metro run: the accepted offer being played (the game state only changes when it is over).
+  // Offer closed because its chunk failed to load: hidden for this session only, no engine action (offer kept).
+  const [metroDeferred, setMetroDeferred] = useState<number | null>(null);
   const [metroPlay, setMetroPlay] = useState<{ turn: number; audio: RunnerAudio; driver?: (s: RunState) => MetroAction | null } | null>(null);
   const metroBusyRef = useRef(false);
   const reducedMotion = useReducedMotion();
@@ -1105,9 +1108,13 @@ export function GameFlow() {
   const otherOverlay = !!(hub || classQuiz || coach || outcome || friendEv || statusFor || historyOpen || friendId || chat || ledgerOpen || legendOpen || rules || tutorial !== null || confirmNew || introMode || typeof intro === "number");
   // Metro run offer: due at the end of every 10th turn (never in the training / practice), one per multiple of 10.
   const metroDue = metroOfferTurn(state);
-  const metroOffer = metroDue !== null && !metroPlay && !otherOverlay && !optionsOpen;
+  const metroOffer = metroDue !== null && metroDeferred !== metroDue && !metroPlay && !otherOverlay && !optionsOpen;
   const metroBusy = metroOffer || !!metroPlay;
   metroBusyRef.current = metroBusy;
+  // Lazy metro chunk: start the download as soon as an offer is due (offer and run share one chunk).
+  useEffect(() => {
+    if (metroDue !== null) preloadMinigame("metro", "offer");
+  }, [metroDue]);
   const gateOpen = !!player && state.screen === "play" && state.phase === "idle" && player.track === "grind" && player.level < 2 && unlocked(player) && !gateSeen[player.id] && !otherOverlay && !metroBusy;
   const dismissGate = () => {
     if (player) setGateSeen((g) => ({ ...g, [player.id]: true }));
@@ -1466,32 +1473,47 @@ export function GameFlow() {
         />
       )}
       {metroOffer && player && metroDue !== null && (
-        <MetroOffer
+        <MinigameHost
+          id="metro"
+          part="offer"
           t={t}
-          money={money}
-          portrait={portraitOf(player)}
-          reduced={reducedMotion}
-          gameMuted={state.muted}
-          onDecline={() => go({ type: "METRO", result: "decline" })}
-          onRun={(audio) => setMetroPlay({ turn: metroDue, audio, driver: metroDemoDriver() })}
+          onClose={() => setMetroDeferred(metroDue)}
+          props={{
+            t,
+            money,
+            portrait: portraitOf(player),
+            reduced: reducedMotion,
+            gameMuted: state.muted,
+            onDecline: () => go({ type: "METRO", result: "decline" }),
+            onRun: (audio: RunnerAudio) => setMetroPlay({ turn: metroDue, audio, driver: metroDemoDriver() }),
+          }}
         />
       )}
 
       {metroPlay && player && (
-        <MetroRun
+        <MinigameHost
+          id="metro"
+          part="run"
           t={t}
-          money={money}
-          name={nameOf(player)}
-          faces={{ idle: portraitOf(player), happy: expressionOf(player, "happy"), stressed: expressionOf(player, "stressed") }}
-          skirt={player.characterId === "aoi"}
-          cash={player.cash}
-          reduced={reducedMotion}
-          gameMuted={state.muted}
-          audio={metroPlay.audio}
-          driver={metroPlay.driver}
-          onDone={(lives) => {
+          onClose={() => {
+            // The run chunk failed to load: no result, the offer stays answerable (same as before the run started).
             setMetroPlay(null);
-            go({ type: "METRO", result: "run", lives });
+          }}
+          props={{
+            t,
+            money,
+            name: nameOf(player),
+            faces: { idle: portraitOf(player), happy: expressionOf(player, "happy"), stressed: expressionOf(player, "stressed") },
+            skirt: player.characterId === "aoi",
+            cash: player.cash,
+            reduced: reducedMotion,
+            gameMuted: state.muted,
+            audio: metroPlay.audio,
+            driver: metroPlay.driver,
+            onDone: (lives: number) => {
+              setMetroPlay(null);
+              go({ type: "METRO", result: "run", lives });
+            },
           }}
         />
       )}

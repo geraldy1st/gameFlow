@@ -1,6 +1,8 @@
 /** Strings added by the "La Boîte de Jeu" redesign. Merged into the fr/es tables in i18n.ts. */
 
 export const UI_FR: Record<string, string> = {
+  "Loading…": "Chargement…",
+  "The mini-game could not load. Check your connection.": "Le mini-jeu n’a pas pu se charger. Vérifie ta connexion.",
   // header / shell
   "A board game about cash flow": "Un jeu de plateau sur le flux d’argent",
   "Turn {turn}": "Tour {turn}",
@@ -247,6 +249,8 @@ export const UI_FR: Record<string, string> = {
 };
 
 export const UI_ES: Record<string, string> = {
+  "Loading…": "Cargando…",
+  "The mini-game could not load. Check your connection.": "El minijuego no se pudo cargar. Revisa tu conexión.",
   "A board game about cash flow": "Un juego de mesa sobre el flujo de dinero",
   "Turn {turn}": "Turno {turn}",
   Ledger: "Libro",
