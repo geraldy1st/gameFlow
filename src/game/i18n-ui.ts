@@ -92,7 +92,6 @@ export const UI_FR: Record<string, string> = {
   // menu
   "Ride Line 1 until your assets pay the month. When your passive income beats your expenses, the Gate opens onto the Freedom express.":
     "Prends la Ligne 1 jusqu’à ce que tes actifs paient le mois. Quand ton revenu passif dépasse tes dépenses, la Porte s’ouvre sur l’express Liberté.",
-  Players: "Joueurs",
   "Finance quiz": "Quiz finance",
   "Pass a quiz": "Réussis un quiz",
   "Read their story": "Lire son histoire",
@@ -333,7 +332,6 @@ export const UI_ES: Record<string, string> = {
   "One more lap": "Una vuelta más",
   "Ride Line 1 until your assets pay the month. When your passive income beats your expenses, the Gate opens onto the Freedom express.":
     "Recorre la Línea 1 hasta que tus activos paguen el mes. Cuando tu ingreso pasivo supere tus gastos, la Puerta se abre al expreso Libertad.",
-  Players: "Jugadores",
   "Finance quiz": "Quiz de finanzas",
   "Pass a quiz": "Aprueba un quiz",
   "Read their story": "Leer su historia",
