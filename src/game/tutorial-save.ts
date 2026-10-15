@@ -54,7 +54,7 @@ function parse(raw: string | null): SaveLike | null {
   }
 }
 
-export function fingerprint(s: SaveLike): SaveFingerprint | null {
+function fingerprint(s: SaveLike): SaveFingerprint | null {
   if (typeof s.seed !== "number" || typeof s.turn !== "number" || typeof s.moveSerial !== "number") return null;
   return { seed: s.seed, turn: s.turn, moveSerial: s.moveSerial };
 }
@@ -63,7 +63,7 @@ function sameMoment(a: SaveFingerprint | null, b: SaveFingerprint | null): boole
   return !!a && !!b && a.seed === b.seed && a.turn === b.turn && a.moveSerial === b.moveSerial;
 }
 
-export function classifyRaw(raw: string | null, resultMarker: string | null): SaveKind {
+function classifyRaw(raw: string | null, resultMarker: string | null): SaveKind {
   const s = parse(raw);
   if (!s || s.version !== 1 || !Array.isArray(s.players) || s.players.length === 0) return "none";
   if (s.training && typeof s.training === "object" && !s.training.skipped) return "training";

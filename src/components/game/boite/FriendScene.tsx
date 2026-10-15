@@ -62,7 +62,7 @@ function rng(seed: number) {
   };
 }
 
-export function perkText(ev: FriendEvent, t: TFn, lang: Lang): { icon: string; text: string } {
+function perkText(ev: FriendEvent, t: TFn, lang: Lang): { icon: string; text: string } {
   const b = statement(ev.before);
   const a = statement(ev.after);
   if (ev.role === "partner") {

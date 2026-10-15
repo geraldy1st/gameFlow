@@ -19,7 +19,7 @@ export const TROPHIES = [
   { id: "peak", art: "/game/trophies/peak.jpg", name: "The peak", hint: "Sell the company, or clear a level 2 goal." },
 ] as const;
 
-export function mergeTrophies(ids: string[], peak: TrophyPeak, players: Player[]): { ids: string[]; peak: TrophyPeak } {
+function mergeTrophies(ids: string[], peak: TrophyPeak, players: Player[]): { ids: string[]; peak: TrophyPeak } {
   let cash = peak.cash;
   let passive = peak.passive;
   const set = new Set(ids);

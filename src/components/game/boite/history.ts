@@ -7,7 +7,7 @@
 import { useEffect, useState } from "react";
 import { isPractice, statement, type GameState } from "@/game/engine";
 
-export const HISTORY_KEY = "gameflow-passive-history-v1";
+const HISTORY_KEY = "gameflow-passive-history-v1";
 const MAX_POINTS = 60;
 
 export type Point = { turn: number; passive: number };

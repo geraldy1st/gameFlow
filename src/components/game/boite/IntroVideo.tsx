@@ -15,7 +15,7 @@ import { useReducedMotion } from "./hooks";
 type TFn = (text: string, vars?: Record<string, string | number>) => string;
 
 /** Designer's choice: Skip / Escape jump to the end card ("end") or straight into the game ("game"). */
-export const SKIP_TO: "end" | "game" = "end";
+const SKIP_TO: "end" | "game" = "end";
 /** Beat length in ms (normal / reduced motion), per the intro spec. */
 const BEAT_MS = 2800;
 const BEAT_MS_REDUCED = 3400;
@@ -23,7 +23,7 @@ const BEAT_MS_REDUCED = 3400;
 const WORD_STAGGER = 42;
 
 const BASE = import.meta.env.BASE_URL.endsWith("/") ? import.meta.env.BASE_URL : `${import.meta.env.BASE_URL}/`;
-export const INTRO_FILES = {
+const INTRO_FILES = {
   landscape: `${BASE}intro/intro-landscape.mp4`,
   portrait: `${BASE}intro/intro-portrait.mp4`,
   fallback: `${BASE}intro/intro.mp4`,
@@ -31,7 +31,7 @@ export const INTRO_FILES = {
 };
 
 /** English source (cut from the intro slides); *word* = gold highlight. Translations live in i18n-ui.ts. */
-export const INTRO_BEATS = [
+const INTRO_BEATS = [
   { kicker: "Tokyo · 1/4", text: "Knowing how to *count* matters as much as knowing how to *work*." },
   { kicker: "Tokyo · 2/4", text: "Money *comes in*, money *goes out*, and no one does it for you." },
   { kicker: "Tokyo · 3/4", text: "School is over. The *diploma* is in the bag." },

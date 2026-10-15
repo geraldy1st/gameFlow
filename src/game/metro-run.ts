@@ -14,8 +14,8 @@ import type { GameState } from "./engine";
 /** An offer every 10 of a player's own finished turns (Player.turns), i.e. at their turns 10, 20, 30... */
 export const METRO_EVERY = 10;
 export const METRO_LIVES = 3;
-export const METRO_REWARD_FULL = 500;
-export const METRO_REWARD_HURT = 250;
+const METRO_REWARD_FULL = 500;
+const METRO_REWARD_HURT = 250;
 /**
  * Solo only: when the turn after a multiple of 10 opens on "broke" or on a rest card, the offer waits for the next
  * idle start, at most this many turns later; after that it is simply gone (an old save loaded at turn 57 is not
@@ -290,7 +290,7 @@ export function act(s: RunState, a: MetroAction): RunState {
 }
 
 /** True when the gesture in progress gets past this obstacle in its lane. */
-export function clears(kind: ObstacleKind, s: Pick<RunState, "jumpT" | "slideT">): boolean {
+function clears(kind: ObstacleKind, s: Pick<RunState, "jumpT" | "slideT">): boolean {
   if (kind === "barrier") return jumpY(s) > RUN.barrierClear; // feet above the fence (sliding fails)
   if (kind === "walker") return sliding(s); // under the plank (jumping hits it)
   return false; // cop: only another lane

@@ -13,7 +13,7 @@ export interface Vitals {
 
 export const BIRTHDAY_COST = 280;
 export const MUSEUM_COST = 60;
-export const CLOTH_SWING = 300;
+const CLOTH_SWING = 300;
 
 export const OUTFITS: { id: OutfitId; name: string; note: string }[] = [
   { id: "shorts", name: "Shorts", note: "Too casual for a contract or a first day." },

@@ -1,6 +1,6 @@
-export const QUIZ_KEY = "gameflow-quiz-v1";
+const QUIZ_KEY = "gameflow-quiz-v1";
 export const CREATE_CASH = 1_000_000;
-export const FREE_CHARACTER = "aoi";
+const FREE_CHARACTER = "aoi";
 
 /** Each passed quiz unlocks one face. Aoi is free. */
 export const QUIZ_UNLOCK: Record<string, string> = {
