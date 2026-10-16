@@ -702,7 +702,7 @@ export function MetroRun({ t: gameT, money, name, faces, skirt, cash, seed = RUN
                 ? result.lives === METRO_LIVES
                   ? t("{name} jumps into the train with all 3 lives. The trip pays the full bonus.", { name })
                   : t("{name} catches the train. Lives left: {n}/3. Reduced bonus.", { name, n: result.lives })
-                : t("The metro left without you. No bonus, and no second try for this offer (the coins you picked up are kept).")}
+                : practice ? t("The metro left without you.") : t("The metro left without you. No bonus, and no second try for this offer (the coins you picked up are kept).")}
             </p>
             {reward > 0 && (
               <div className="mr-rewardrow">
