@@ -1216,11 +1216,8 @@ export function GameFlow() {
           <button type="button" className="chipbtn" onClick={() => go({ type: "MUTE" })} aria-label={state.muted ? t("Unmute") : t("Mute")} aria-pressed={!state.muted}>
             <Ico name={state.muted ? "mute" : "sound"} />
           </button>
-          {state.screen !== "menu" && (
-            <button type="button" className="chipbtn" onClick={() => go({ type: "MENU" })}>
-              {t("Menu")}
-            </button>
-          )}
+          {/* Geraldy 16/10: no top-right "Menu" button; the bottom bar Menu › "Choose a life" opens the same menu screen
+              (rules / credits keep their "Back" button, the win screen its "Menu" button). */}
         </header>
 
         {state.screen === "menu" && (
