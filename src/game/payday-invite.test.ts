@@ -1,8 +1,8 @@
 /**
  * Payday invite (Geraldy, Oct 2026): after the salary of a payday square (landing on it or passing it), one random
  * not-yet-met friend is offered for PAYDAY_INVITE_COST: friend / partner / ignore. The offer is queued until the
- * move and its landing card are over, respects the circle slot limit (a full circle gets no meeting, at payday nor
- * on the social square), and never shows in a tutorial game. docs/tutorial/RULES.md §14.
+ * move and its landing card are over, is never offered with a full circle (Geraldy R-A: only the invite; the social
+ * and mentor squares stay as on main), and never shows in a tutorial game. docs/tutorial/RULES.md §14.
  */
 import { writeFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
@@ -114,7 +114,7 @@ describe("payday invite (RULES.md §14)", () => {
     expect(hits).toBeGreaterThan(0);
   });
 
-  it("full circle: no offer at payday, and never a meeting on the social square", () => {
+  it("full circle: no payday invite; the social and mentor squares behave as on main (Geraldy R-A)", () => {
     const slots = maxFriends(E.cur(idle()), 5);
     expect(slots).toBeLessThan(5); // starting Social level: some friends stay unmet
     const base = setFriends(idle(), POOL.slice(0, slots));
@@ -123,12 +123,18 @@ describe("payday invite (RULES.md §14)", () => {
     expect(atPay.phase).toBe("idle");
     const passing = settle(last(move(base, 10, [11, 12, 13])));
     expect(isInvite(passing)).toBe(false);
-    // social square, many seeds, with the mentor branch reachable: never a meeting card (lila / noa are unmet)
+    // unchanged vs main: with daichi unmet, the mentor square still offers his meeting even with a full circle
+    const full = setFriends(idle(), POOL.filter((id) => id !== "daichi").slice(0, slots));
+    expect(GRIND[14]!.kind).toBe("mentor");
+    const mentor = last(move(full, 13, [14]));
+    expect(isMeet(mentor)).toBe(true);
+    expect((mentor.card!.payload as { id: string }).id).toBe("daichi");
+    // unchanged vs main: on the social square, a full circle only ever meets through the mentor branch (daichi)
     for (let seed = 1; seed <= 300; seed++) {
-      const s = setFriends({ ...idle(1), seed: seed * 7919 }, POOL.filter((id) => id !== "daichi").slice(0, slots)); // daichi unmet → the mentor meeting used to be offered
+      const s = { ...full, seed: seed * 7919 };
       for (const at of [3, 17]) {
         const landed = last(move(s, at - 1, [at]));
-        expect(isMeet(landed)).toBe(false);
+        if (isMeet(landed)) expect((landed.card!.payload as { id: string }).id).toBe("daichi");
       }
     }
   });

@@ -1212,7 +1212,7 @@ function socialCard(s: GameState): CardView {
   if (mentor > 0) {
     const rm = rand(s.seed);
     s.seed = rm.seed;
-    if (rm.value < mentor && (circleHasRoom(p) || p.friends.some((f) => f.id === "daichi"))) {
+    if (rm.value < mentor) {
       const card = mentorCard(p);
       return { ...card, lines: [skillChip(p, "reputation", "mentor"), ...card.lines] };
     }
@@ -1227,7 +1227,7 @@ function socialCard(s: GameState): CardView {
       return { ...card, lines: [{ k: tl("Tip from {name}", { name: friendDef(friend.id).name }), v: "", tone: "gold", chip: "social" }, ...card.lines] };
     }
   }
-  if ((missing.length && (p.friends.length === 0 || r.value < 0.62)) && circleHasRoom(p)) {
+  if ((missing.length && (p.friends.length === 0 || r.value < 0.62)) && p.friends.length < maxFriends(p, MAX_FRIENDS)) {
     const r2 = rand(s.seed);
     s.seed = r2.seed;
     const person = missing[Math.floor(r2.value * missing.length)]!;
@@ -1404,8 +1404,7 @@ function meetCard(person: PersonDef): CardView {
 }
 
 function mentorCard(p: Player): CardView {
-  // A full circle is never offered a meeting: the plain mentorship card instead.
-  if (!p.friends.some((f) => f.id === "daichi") && circleHasRoom(p)) return meetCard(friendDef("daichi"));
+  if (!p.friends.some((f) => f.id === "daichi")) return meetCard(friendDef("daichi"));
   return {
     title: "Mentorship",
     story: "Someone who already escaped the Grind buys the tea and offers one useful thing.",
@@ -2101,7 +2100,7 @@ function finish(s: GameState, note: string, reaction: Reaction = "idle"): GameSt
   return advance(n);
 }
 
-/** Room left in the current player's circle (Geraldy: a full circle gets no offer, at payday nor on social). */
+/** Room left in the current player's circle. Geraldy (R-A): only the payday invite is blocked by a full circle. */
 function circleHasRoom(p: Player): boolean {
   return p.friends.length < maxFriends(p, MAX_FRIENDS);
 }
