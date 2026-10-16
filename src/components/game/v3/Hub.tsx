@@ -560,7 +560,7 @@ function StatsTab({ state, p, t, lang, go }: { state: GameState; p: Player; t: T
 
 /* ------------------------------------------------------------------ Activities */
 
-export function ActivitiesPanel({ state, t, lang, go, onQuiz, onClose }: { state: GameState; t: TFn; lang: Lang; go: Go; onQuiz: () => void; onClose: () => void }) {
+export function ActivitiesPanel({ state, t, lang, go, onQuiz, onMetroPractice, onClose }: { state: GameState; t: TFn; lang: Lang; go: Go; onQuiz: () => void; onMetroPractice?: () => void; onClose: () => void }) {
   const p = cur(state);
   const [tab, setTab] = useState<"shops" | "games">("shops");
   const [shop, setShop] = useState<string | null>(null);
@@ -621,7 +621,7 @@ export function ActivitiesPanel({ state, t, lang, go, onQuiz, onClose }: { state
             }}
           />
         ) : (
-          <GamesTab state={state} p={p} t={t} onQuiz={onQuiz} />
+          <GamesTab state={state} p={p} t={t} onQuiz={onQuiz} onMetroPractice={onMetroPractice} />
         )}
       </div>
     </div>
@@ -685,7 +685,7 @@ function ShopView({ shop, state, p, t, lang, go, onBack }: { shop: ShopDefinitio
   );
 }
 
-function GamesTab({ state, p, t, onQuiz }: { state: GameState; p: Player; t: TFn; onQuiz: () => void }) {
+function GamesTab({ state, p, t, onQuiz, onMetroPractice }: { state: GameState; p: Player; t: TFn; onQuiz: () => void; onMetroPractice?: () => void }) {
   const nextMetro = (Math.floor(Math.max(0, p.turns - 1) / METRO_EVERY) + 1) * METRO_EVERY;
   const wait = quizWait(p);
   const canQuiz = state.phase === "idle" && quizOpen(p) && !state.training && !state.practice;
@@ -702,13 +702,16 @@ function GamesTab({ state, p, t, onQuiz }: { state: GameState; p: Player; t: TFn
             </span>
           </div>
         ) : g.entry === "offer" ? (
-          <div key={g.id} className="v3-card v3-game" style={{ "--c": "var(--sky)" } as CSSProperties}>
+          // Free play (practice: nothing credited); the every-10-turns offer still pays.
+          <button key={g.id} type="button" className="v3-card v3-game" style={{ "--c": "var(--sky)" } as CSSProperties} disabled={!onMetroPractice || state.screen !== "play"} onClick={onMetroPractice} aria-describedby={`${g.id}-practice-note`}>
             <span className="v3-ic tint" aria-hidden="true"><Ico name="run" /></span>
             <span className="v3-tx">
               <strong>{t(g.name)}</strong>
               <small>{t(g.note)} · {t("next after turn {n}", { n: nextMetro })}</small>
+              <small id={`${g.id}-practice-note`}>{t("Free play: practice, no gains")}</small>
             </span>
-          </div>
+            {onMetroPractice && <span className="v3-tag act">{t("Play")}</span>}
+          </button>
         ) : (
           <button key={g.id} type="button" className="v3-card v3-game" style={{ "--c": "var(--lilac)" } as CSSProperties} disabled={!canQuiz} onClick={onQuiz}>
             <span className="v3-ic tint" aria-hidden="true"><Ico name="quiz" /></span>

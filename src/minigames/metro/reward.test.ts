@@ -67,3 +67,20 @@ describe("metro v6.1 — coins in the engine", () => {
     expect(metroOfferTurn(fresh)).toBe(10);
   });
 });
+
+describe("metro free play (Activités › Mini-games › Play)", () => {
+  it("practice sends nothing to the engine: state, cash and the offer stay identical", async () => {
+    const { metroDoneAction } = await import("./index");
+    const s = due();
+    const before = JSON.stringify(s);
+    for (const [lives, coins] of [[3, 53], [2, 10], [0, 3]] as const) {
+      const a = metroDoneAction(true, lives, coins);
+      expect(a).toBeNull();
+      const after = a ? E.reduce(s, a) : s;
+      expect(JSON.stringify(after)).toBe(before);
+      expect(metroOfferTurn(after)).toBe(10); // the every-10-turns offer is still due and still pays
+    }
+    const real = metroDoneAction(false, 3, 2)!;
+    expect(E.reduce(s, real).players[0]!.cash - s.players[0]!.cash).toBe(510);
+  });
+});

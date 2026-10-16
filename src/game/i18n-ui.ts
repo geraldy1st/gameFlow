@@ -1,6 +1,7 @@
 /** Strings added by the "La Boîte de Jeu" redesign. Merged into the fr/es tables in i18n.ts. */
 
 export const UI_FR: Record<string, string> = {
+  "Free play: practice, no gains": "Jeu libre : entraînement, sans gains",
   "Loading…": "Chargement…",
   "The mini-game could not load. Check your connection.": "Le mini-jeu n’a pas pu se charger. Vérifie ta connexion.",
   "The mini-game stopped because of an error. Your game is saved.": "Le mini-jeu s’est arrêté à cause d’une erreur. Ta partie est sauvegardée.",
@@ -250,6 +251,7 @@ export const UI_FR: Record<string, string> = {
 };
 
 export const UI_ES: Record<string, string> = {
+  "Free play: practice, no gains": "Juego libre: práctica, sin ganancias",
   "Loading…": "Cargando…",
   "The mini-game could not load. Check your connection.": "El minijuego no se pudo cargar. Revisa tu conexión.",
   "The mini-game stopped because of an error. Your game is saved.": "El minijuego se detuvo por un error. Tu partida está guardada.",
