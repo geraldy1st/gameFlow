@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest";
 import * as E from "./engine";
 import type { GameState, Player } from "./engine";
+import { HOME_SHOP } from "./shop";
 import { FURNITURE, HOME_SLOTS_PER_TURN, residentFor } from "./home-data";
 
 function idle(seed = 3, cash = 5000): GameState {
@@ -103,5 +104,23 @@ describe("Chez Aoi: saves", () => {
     expect(residentFor("aoi").id).toBe("aoi");
     expect(residentFor("ren").id).toBe("aoi");
     expect(residentFor(undefined).id).toBe("aoi");
+  });
+});
+
+describe("Chez Aoi: legacy home items (R4)", () => {
+  it("an old save with homeOwned/homeOn loads and keeps its bonuses", () => {
+    const old = JSON.parse(JSON.stringify(idle()));
+    const [a, b] = [HOME_SHOP[0]!.id, HOME_SHOP[1]!.id];
+    Object.assign(old.players[0], { level: 2, homeOwned: [a, b], homeOn: [a], vitals: { ...old.players[0].vitals } });
+    for (const k of ["housing", "homeCurrent", "furniture", "homeDay"]) delete old.players[0][k];
+    const h = E.hydrate(old);
+    const p = h.players[0]!;
+    expect(p.homeOwned).toEqual([a, b]);
+    expect(p.homeOn).toEqual([a]);
+    expect(p.vitals).toEqual(old.players[0].vitals);
+    for (const k of ["housing", "homeCurrent", "furniture", "homeDay"]) expect(k in p).toBe(false);
+    expect(E.hydrate(JSON.parse(JSON.stringify(h)))).toEqual(h);
+    const t = E.reduce(h, { type: "TOGGLE_HOME", id: b } as E.Action);
+    expect(t.players[0]!.homeOn).toContain(b);
   });
 });
