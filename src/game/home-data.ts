@@ -38,11 +38,11 @@ export const FURNITURE: FurnitureDef[] = [
   { id: "sofa", name: "Three-seat sofa", price: 420, wM: 2.1, ar: 0.3496, icon: "house" },
   { id: "futon", name: "Futon", price: 180, wM: 1.9, ar: 0.4395, icon: "moon" },
   { id: "bookshelf", name: "Bookshelf", price: 220, wM: 1.4, ar: 0.916, icon: "book" },
-  { id: "tv-stand", name: "TV stand and screen", price: 320, wM: 1.5, ar: 0.4961, icon: "board" },
+  { id: "tv-stand", name: "TV stand and screen", price: 320, wM: 1.5, ar: 0.4961, icon: "game" },
   { id: "desk", name: "Work desk", price: 380, wM: 1.6, ar: 0.6758, icon: "brush" },
-  { id: "plant", name: "Green plant", price: 60, wM: 0.62, ar: 1.3223, icon: "plant" },
+  { id: "plant", name: "Green plant", price: 60, wM: 0.62, ar: 1.3223, icon: "clover" },
   { id: "coffee-table", name: "Coffee table", price: 120, wM: 1.2, ar: 0.3672, icon: "star" },
-  { id: "dining-table", name: "Dining table", price: 300, wM: 1.6, ar: 0.5938, icon: "pan" },
+  { id: "dining-table", name: "Dining table", price: 300, wM: 1.6, ar: 0.5938, icon: "people" },
 ];
 
 /** Resale from the inventory: 50 % of the purchase price, rounded down to the dollar (Geraldy). */

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useReducer, useRef, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { CHARACTERS, DREAMS, FORTUNE_CASH, FORTUNE_PASSIVE, FRIENDS, INTRO_KEY, PARTNERS, PASSIVE_WIN, SAVE_KEY, TRAINING_TURNS, TUTORIAL_KEY, TUTORIAL_SEEN_VALUE, VENTURE_GOAL } from "@/game/data";
 import { playSfx, resumeAudio, setMuted, unlockAudio } from "@/game/audio";
 import { LANG_KEY, readLang, tr, trKey, type Lang } from "@/game/i18n";
@@ -41,6 +41,9 @@ import { IntroVideo, probeIntro, type IntroPick } from "./boite/IntroVideo";
 import { MenuScreen } from "./boite/MenuScreen";
 import { MetroBoard, trackSpaces } from "./boite/MetroBoard";
 import { MinigameHost } from "@/minigames/MinigameHost";
+
+/** Chez Aoi home layer: its own chunk, loaded when the player enters a home. */
+const HomeLayer = lazy(() => import("@/scenes/home/HomeLayer"));
 import { preloadMinigame } from "@/minigames/preload";
 import { ActivitiesPanel, BottomNav, DayPanel, FriendAffinity, HubLayer, LegendPanel, MenuPanel, Tabs, type DayTab, type HubTab, type MenuItem } from "./v3/Hub";
 import { Pager } from "./v3/Pager";
@@ -598,6 +601,7 @@ export function GameFlow() {
   const [dayTab, setDayTab] = useState<DayTab>("income");
   const [legendView, setLegendView] = useState(false);
   const [classQuiz, setClassQuiz] = useState(false);
+  const [homeOpen, setHomeOpen] = useState<string | null>(null);
   const navRef = useRef<HTMLElement | null>(null);
   const asideRef = useRef<HTMLElement | null>(null);
   const [chat, setChat] = useState<{ friendId: string; index: number; step: number } | null>(null);
@@ -1308,7 +1312,7 @@ export function GameFlow() {
         )}
         {state.screen === "play" && player && hub && !coach && !classQuiz && (
           <HubLayer anchor={asideRef} nav={navRef} label={t(hub === "day" ? "Day" : hub === "acts" ? "Activities" : "Menu")} onClose={() => setHub(null)}>
-            {hub === "day" && <DayPanel state={state} tab={dayTab} setTab={setDayTab} t={t} lang={lang} go={go} onFriend={(id) => setFriendId(id)} onClose={() => setHub(null)} />}
+            {hub === "day" && <DayPanel state={state} tab={dayTab} setTab={setDayTab} t={t} lang={lang} go={go} onFriend={(id) => setFriendId(id)} onHome={(id) => { go({ type: "HOME_ENTER", homeId: id }); setHub(null); setHomeOpen(id); }} onClose={() => setHub(null)} />}
             {hub === "acts" && <ActivitiesPanel state={state} t={t} lang={lang} go={go} onQuiz={() => setClassQuiz(true)} onClose={() => setHub(null)} />}
             {hub === "menu" &&
               (legendView ? (
@@ -1317,6 +1321,11 @@ export function GameFlow() {
                 <MenuPanel items={menuItems} t={t} onClose={() => setHub(null)} />
               ))}
           </HubLayer>
+        )}
+        {state.screen === "play" && player && homeOpen && (
+          <Suspense fallback={null}>
+            <HomeLayer state={state} homeId={homeOpen} t={t} go={go} onClose={() => setHomeOpen(null)} />
+          </Suspense>
         )}
 
         {state.screen === "win" && player && (
