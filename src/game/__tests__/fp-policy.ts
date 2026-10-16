@@ -2,7 +2,7 @@
  * Engine fingerprint play policies (refacto batch 5bis), shared by the fingerprint tests.
  *
  * - "v1": the original policy (ROLL / CHOICE / BORROW / SELL / REPAY / LIFE / QUIZ / METRO / ENTER / DREAM / RETIRE),
- *   identical to engine-fingerprint.test.ts and Crypto's engine-fp.mjs: c5b22799e4ee85a3. Kept as a regression.
+ *   identical to engine-fingerprint.test.ts and Crypto's engine-fp.mjs: 844f62971aa0030a since the payday invite (was c5b22799e4ee85a3). Kept as a regression.
  * - "v2": v1 plus the goods / home / circle actions at a low weight (6 % of idle steps that v1 would ROLL), so
  *   BUY_GOOD, BUY_CLOTH, WEAR, BUY_HOME, TOGGLE_HOME, HOUSE, CIRCLE and SKIP_TRAINING are covered.
  *   Every 10th seed of v2 / goods starts as a tutorial game (createMatch …, { training: true }).

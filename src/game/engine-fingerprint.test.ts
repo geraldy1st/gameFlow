@@ -4,7 +4,7 @@
  * Same oracle as Crypto's recette script (gameflow-recette/deadcode/scripts/engine-fp.mjs): 200 seeded games,
  * the same xorshift policy (ROLL / CHOICE / BORROW / SELL / REPAY / LIFE / QUIZ / METRO / ENTER / DREAM / RETIRE),
  * SHA-1 of every state, chain of the 200 game chains. Both must print the same value
- * (c5b22799e4ee85a3 on main 24b5a39 and 4515dea).
+ * (c5b22799e4ee85a3 on main 24b5a39 … 6ac2294; 844f62971aa0030a since the payday invite).
  * Also: hydrate of the repo's save fixtures, and the public export list of src/game/engine.ts.
  *
  * A deliberate behaviour change updates EXPECTED here, in its own commit, with the reason.
@@ -18,10 +18,12 @@ import { describe, expect, it } from "vitest";
 import * as E from "./engine";
 import type { Action, GameState } from "./engine";
 
+// payday-friends (Oct 2026): the payday invite (docs/tutorial/RULES.md §14) changes the rules on purpose.
+// Before: 102806 states, c5b22799e4ee85a3.
 const EXPECTED = {
   games: 200,
-  states: 102806,
-  chainAll: "c5b22799e4ee85a3",
+  states: 93335,
+  chainAll: "844f62971aa0030a",
 };
 
 const HERE = dirname(fileURLToPath(import.meta.url));

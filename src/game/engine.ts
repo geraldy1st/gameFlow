@@ -21,6 +21,7 @@ import {
   MAX_CHILDREN,
   MAX_FRIENDS,
   FRIEND_SOCIAL_BONUS,
+  PAYDAY_INVITE_COST,
   PARTNERS,
   PASSIVE_WIN,
   PREMIUM_DEALS,
@@ -263,7 +264,7 @@ export type Payload =
   | { t: "breakup" }
   | { t: "help" }
   | { t: "child"; name: string }
-  | { t: "friend"; id: string }
+  | { t: "friend"; id: string; cost?: number }
   | { t: "friendAct"; id: string }
   | { t: "circle"; friendId: string; kind: "party" | "movies" | "gift" | "mission" | "stocks" | "shop"; cost: number; gain: number; down: number; cashFlow: number; assetName: string }
   | { t: "rate"; friendId: string }
@@ -374,6 +375,12 @@ export interface GameState {
    * (trophies) nor the passive-income chart history. Absent in normal games and old saves.
    */
   practice?: boolean;
+  /**
+   * Payday invite: the table turn in which the current player collected a payday square (landing or passing).
+   * The offer is queued and only shown once the move and its landing card are over (see `finish`). Absent in old
+   * saves and whenever no invite is pending.
+   */
+  paydayInviteTurn?: number;
 }
 
 export interface TrainingState {
@@ -874,7 +881,8 @@ function collect(s: GameState, index: number, finalSpace: boolean): GameState {
   const space = spaces[index]!;
   if (!isStipend(p.track, index, space.kind)) return { ...s, players: s.players.map((pl, i) => (i === s.current ? { ...pl, position: index } : pl)) };
   const amount = statement(p).cashFlow;
-  const next = withP(s, (pl) => ({ ...pl, position: index, cash: pl.cash + amount }));
+  const base = space.kind === "payday" && !trainingFor(s) && !s.practice ? { ...s, paydayInviteTurn: s.turn } : s;
+  const next = withP(base, (pl) => ({ ...pl, position: index, cash: pl.cash + amount }));
   if (finalSpace) return { ...next, passedPay: s.passedPay + amount };
   return log({ ...next, passedPay: next.passedPay + amount }, tl("Passed payday {amount}.", { amount: money(amount, true) }));
 }
@@ -2080,7 +2088,44 @@ function finish(s: GameState, note: string, reaction: Reaction = "idle"): GameSt
   }
   const mile = checkMilestone(n);
   if (mile) return mile;
+  if (n.paydayInviteTurn !== undefined) {
+    const queued = n.paydayInviteTurn === n.turn;
+    n = { ...n };
+    delete n.paydayInviteTurn;
+    if (queued) {
+      const invite = paydayInvite(n);
+      if (invite) return invite;
+    }
+  }
   return advance(n);
+}
+
+/** Room left in the current player's circle. Geraldy (R-A): only the payday invite is blocked by a full circle. */
+function circleHasRoom(p: Player): boolean {
+  return p.friends.length < maxFriends(p, MAX_FRIENDS);
+}
+
+/**
+ * The queued payday invite: one random not-yet-met friend, for PAYDAY_INVITE_COST, after the salary. Never in a
+ * tutorial game, never with a full circle, nobody left to meet, or less cash than the price. Null = no offer.
+ */
+function paydayInvite(s: GameState): GameState | null {
+  if (trainingFor(s) || s.practice) return null;
+  const p = cur(s);
+  const known = new Set(p.friends.map((f) => f.id));
+  const missing = FRIENDS.filter((f) => !known.has(f.id));
+  if (!missing.length || !circleHasRoom(p) || p.cash < PAYDAY_INVITE_COST) return null;
+  const r = rand(s.seed);
+  const person = missing[Math.floor(r.value * missing.length)]!;
+  const meet = meetCard(person);
+  const card: CardView = {
+    ...meet,
+    tag: "Payday invite",
+    story: tl("Payday leaves room for one more evening. {blurb}", { blurb: person.blurb }),
+    lines: [{ k: "Invitation", v: money(-PAYDAY_INVITE_COST), tone: "down" }, ...meet.lines],
+    payload: { t: "friend", id: person.id, cost: PAYDAY_INVITE_COST },
+  };
+  return blip({ ...s, seed: r.seed, phase: "card", card }, "card");
 }
 
 /** Solo only (the same-screen 2-player mode was removed in v3): the next turn starts right away. */
@@ -2662,10 +2707,12 @@ function doChoice(s: GameState, id: string): GameState {
     if (id === "decline" || id === "ignore") return finish(s, "You let the introduction pass.", "idle");
     if (p.friends.some((f) => f.id === payload.id)) return finish(s, "You already know them.", "idle");
     if (p.friends.length >= maxFriends(p, MAX_FRIENDS)) return finish(s, "Your circle is already full.", "idle");
+    const cost = payload.cost ?? 0;
+    if (cost > 0 && p.cash < cost) return finish(s, "Not enough cash for the invitation.", "idle");
     const role = id === "biz" ? "partner" : "friend";
     const name = friendDef(payload.id).name;
     return finish(
-      withP(s, (pl) => {
+      withP(cost > 0 ? log(withP(s, (pl) => ({ ...pl, cash: pl.cash - cost })), tl("Invitation paid {amount}.", { amount: money(cost) })) : s, (pl) => {
         const vitals = bumpVitals(pl.vitals, { social: FRIEND_SOCIAL_BONUS });
         const socialGain = Math.max(0, vitals.social - (pl.vitals?.social ?? 50));
         return { ...pl, friends: [...pl.friends, { ...blankFriend(payload.id, role, s.turn), socialGain }], calm: 2, vitals };

@@ -175,8 +175,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .dock .ctx, .mdock .ctx { grid-column: 1 / -1; display: flex; gap: 8px; flex-wrap: wrap; }
 .dock .ctx .btn, .mdock .ctx .btn { flex: 1; font-size: 17px; }
 .dicecell { display: grid; min-height: 0; place-items: center; background: var(--felt-2); border: 3px solid var(--navy); border-radius: 20px; box-shadow: inset 0 4px 0 rgba(0,0,0,.25); }
-.bdie { width: 62px; height: 62px; background: var(--paper); border: 3.5px solid var(--navy); border-radius: 15px; box-shadow: 0 6px 0 var(--navy); display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); padding: 7px; }
-.bdie i { width: 11px; height: 11px; border-radius: 50%; background: var(--navy); margin: auto; visibility: hidden; }
+.bdie { width: 62px; height: 62px; background: var(--paper); border: 3.5px solid var(--navy); border-radius: 15px; box-shadow: 0 6px 0 var(--navy); display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: repeat(3, minmax(0, 1fr)); padding: 7px; }
+.bdie i { width: min(11px, 85%); height: auto; aspect-ratio: 1; border-radius: 50%; background: var(--navy); margin: auto; visibility: hidden; }
 .bdie i.o { visibility: visible; }
 .bdie.rolling { animation: tumble .75s cubic-bezier(.3,.7,.4,1); }
 @keyframes tumble { 0% { transform: translateY(0) rotate(0) scale(1); } 25% { transform: translateY(-34px) rotate(160deg) scale(1.1, .9); } 55% { transform: translateY(-8px) rotate(300deg) scale(.92, 1.08); } 75% { transform: translateY(0) rotate(350deg) scale(1.08, .9); } 100% { transform: rotate(360deg) scale(1); } }
@@ -715,7 +715,12 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   .tstop .tile.is-big { outline: 3px solid var(--navy); outline-offset: 3px; }
   .tstop .tile svg { width: 32px; height: 32px; }
   .tstop b { font: 700 13px/1.1 var(--display); text-align: center; margin-top: 9px; min-height: 30px; }
-  .tstop .n { position: absolute; top: -20px; width: 24px; height: 24px; border-radius: 50%; background: var(--paper); border: 2.5px solid var(--navy); font: 800 12px var(--body); display: grid; place-items: center; z-index: 2; }
+  .tstop .n { position: absolute; top: -20px; width: 24px; height: 24px; border-radius: 50%; background: var(--paper); border: 2.5px solid var(--navy); font: 800 12px/1 var(--body); font-variant-numeric: lining-nums tabular-nums; display: grid; place-items: center; padding-top: .75px; z-index: 2; }
+  /* Centre the digit on its cap height, whatever font actually rendered (Nunito or the Android Roboto fallback).
+     Without text-box support the grid + line-height:1 + .75px nudge stays within ~0.8px (pixel-snapped). */
+  @supports (text-box: trim-both cap alphabetic) {
+    .tstop .n { display: block; text-align: center; text-box: trim-both cap alphabetic; padding-block: calc((24px - 5px - 1cap) / 2); }
+  }
   .tstop.here .tile { outline: 4px solid var(--gold); outline-offset: 3px; }
   .tstop .mpawn { position: absolute; top: -44px; z-index: 3; width: 34px; height: 34px; border-radius: 50%; border: 3px solid var(--navy); overflow: hidden; background: var(--coral); }
   .tstop .mpawn img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 12%; }
@@ -725,7 +730,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   .mdock { display: block; position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; padding: 10px 12px calc(14px + env(safe-area-inset-bottom)); background: var(--felt-2); border-top: 3px solid var(--navy); box-shadow: 0 -8px 20px rgba(0,0,0,.2); }
   .mdock .ctx { margin-bottom: 10px; }
   .mdock .row { display: grid; grid-template-columns: 74px 1fr; gap: 10px; align-items: center; }
-  .mdock .bdie { width: 56px; height: 56px; margin: auto; }
+  .mdock .bdie { width: 56px; height: 56px; margin: auto; padding: 4px; } /* 50/44px in v3.css: 3×11px pips no longer fit 7px padding */
   .mdock .btn.roll { font-size: 22px; min-height: 62px; grid-column: auto; }
   .mdock .sec { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 10px; }
   .mdock .sec .btn { flex-direction: column; gap: 2px; font-size: 13px; padding: 6px 2px; min-height: 52px; }

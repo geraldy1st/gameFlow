@@ -276,3 +276,17 @@ Les montants passent par `money()`. Pour fr/es, le mockup affiche « 1 705 $ » 
 8. (Retiré en v3 avec le mode 2 joueurs.)
 9. `hydrate()` d'une sauvegarde v1 sans `training` donne `training: null`.
 10. Partie normale, sans `training` : snapshot identique à `main`, donc aucune régression.
+
+## 14. Invitation du jour de paie (hors tutoriel, payday-friends, 16/10/2026)
+
+Décision Geraldy : à chaque jour de paie, on peut agrandir son cercle d'amis.
+
+- **Déclencheur** : une case `payday` encaissée par `collect()` (Payday du Grind, cases 0 et 12 ; « Books » de la Venture), en s'y arrêtant **ou** en passant dessus. La case 0 de Freedom (versement sans case `payday`) n'en déclenche pas.
+- **File d'attente** : `collect()` pose seulement `GameState.paydayInviteTurn = turn` (champ optionnel). **Aucune carte en plein déplacement** : la carte de la case d'arrivée passe d'abord (carte Payday, rencontre sociale, affaire…), puis `finish()` montre l'invitation, après le prêt éventuel et un palier. Le champ est effacé dès qu'il est lu ; un champ d'un autre tour est ignoré.
+- **Offre** : un ami pas encore rencontré tiré au hasard (jun, daichi, omar, lila, noa), pour **150 $** (`PAYDAY_INVITE_COST`), avec les choix « Devenir amis » / « Associé » / « Ignorer ». Ignorer ne coûte rien. Les gains sont ceux de la rencontre sociale (Social +10, calme 2 ; associé +480 $/mois et 160 $/mois de frais).
+- **Conditions** : il reste quelqu'un à rencontrer, le cercle a une place libre (`maxFriends`) et la caisse après salaire est d'au moins 150 $ (149 → pas d'offre).
+- **Limite de places (décision Geraldy R-A, 16/10/2026)** : un cercle plein bloque **seulement l'invitation du jour de paie**. La case sociale et la rencontre de Daichi par le mentor restent exactement comme sur main. Avec un cercle plein, la rencontre de Daichi peut donc encore apparaître, et l'accepter répond « Ton cercle est déjà complet ».
+- **Double jour de paie impossible** : un lancer fait au plus 6 cases, et deux cases `payday` sont toujours à plus de 6 cases l'une de l'autre (Grind 12, Venture 16). Il y a donc au plus une invitation par déplacement ; c'est vérifié par un test.
+- **Tutoriel** : jamais pendant l'entraînement (`trainingFor`) ni dans une partie d'entraînement (`practice`), récapitulatif compris. Le T2 (arrivée sur le Payday) reste inchangé.
+- **Sauvegardes** : les anciennes sauvegardes n'ont pas le champ, donc il n'y a pas d'invitation en attente. Une invitation en attente survit à `hydrate`.
+- Tests : `src/game/payday-invite.test.ts`. Le changement de règles a ses propres EXPECTED v1/v2/goods.
