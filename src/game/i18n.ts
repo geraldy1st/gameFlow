@@ -5,6 +5,8 @@ export type Lang = "en" | "fr" | "es";
 export const LANG_KEY = "gameflow-lang";
 
 const fr: Record<string, string> = {
+  "Nap done: +{n} on every gauge.": "Sieste faite : +{n} sur chaque barre.",
+  "Nap: +{n} on every gauge": "Sieste : +{n} sur chaque barre",
   "Home": "Maison",
   "Enter": "Entrer",
   "{n} of {max} time slots left today": "{n} créneau(x) sur {max} restant(s) aujourd’hui",
@@ -24,7 +26,6 @@ const fr: Record<string, string> = {
   "Store": "Ranger",
   "Nothing to place here. Immo Dada sells home supplies.": "Rien à poser ici. Immo Dada vend des fournitures maison.",
   "Cancel": "Annuler",
-  "Nap": "Sieste",
   "Pick a slot to change the furniture.": "Choisis un emplacement pour changer les meubles.",
   "Everything is empty! Pick a slot to place furniture.": "Tout est vide ! Choisis un emplacement pour poser un meuble.",
   "Bought {item} for {amount}. It is empty for now.": "{item} acheté pour {amount}. Il est vide pour l’instant.",
@@ -1295,6 +1296,8 @@ const fr: Record<string, string> = {
 };
 
 const es: Record<string, string> = {
+  "Nap done: +{n} on every gauge.": "Siesta hecha: +{n} en cada barra.",
+  "Nap: +{n} on every gauge": "Siesta: +{n} en cada barra",
   "Home": "Casa",
   "Enter": "Entrar",
   "{n} of {max} time slots left today": "Quedan {n} de {max} franjas hoy",
@@ -1314,7 +1317,6 @@ const es: Record<string, string> = {
   "Store": "Guardar",
   "Nothing to place here. Immo Dada sells home supplies.": "Nada que colocar aquí. Immo Dada vende artículos para el hogar.",
   "Cancel": "Cancelar",
-  "Nap": "Siesta",
   "Pick a slot to change the furniture.": "Elige un hueco para cambiar los muebles.",
   "Everything is empty! Pick a slot to place furniture.": "¡Todo está vacío! Elige un hueco para colocar un mueble.",
   "Bought {item} for {amount}. It is empty for now.": "{item} comprado por {amount}. Por ahora está vacío.",

@@ -180,7 +180,7 @@ export function HomeTab({ state, p, t, lang, go, onHome }: { state: GameState; p
             <strong>{t(housingById(id)!.name)}</strong>
             <small>{t("{n} of {max} time slots left today", { n: HOME_SLOTS_PER_TURN - d.used, max: HOME_SLOTS_PER_TURN })}</small>
           </span>
-          <button type="button" className="v3-tag act" disabled={!idle || !onHome} onClick={() => onHome?.(id)}>{t("Enter")}</button>
+          <button type="button" className="v3-tag act" data-home-enter={id} disabled={!idle || !onHome} onClick={() => onHome?.(id)}>{t("Enter")}</button>
         </div>
       ),
     })),
@@ -203,7 +203,7 @@ export function HomeTab({ state, p, t, lang, go, onHome }: { state: GameState; p
   if (!rows.length) return <p className="v3-muted">{t("No home yet. Immo Dada (Activities › Shops) sells apartments and home supplies.")}</p>;
   return (
     <>
-      <p className="v3-muted">{t("Nap: +{n} on every gauge, no turn spent.", { n: napPoints(p) })}</p>
+      <p className="v3-muted">{t("Nap: +{n} on every gauge, no turn spent.", { n: napPoints(p) })} {t("{n} of {max} time slots left today", { n: HOME_SLOTS_PER_TURN - d.used, max: HOME_SLOTS_PER_TURN })}</p>
       <Pager items={rows} minW={200} itemH={62} t={t} label={t("Home")} render={(r) => r.node} />
     </>
   );

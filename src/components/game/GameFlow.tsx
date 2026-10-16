@@ -1324,7 +1324,20 @@ export function GameFlow() {
         )}
         {state.screen === "play" && player && homeOpen && (
           <Suspense fallback={null}>
-            <HomeLayer state={state} homeId={homeOpen} t={t} go={go} onClose={() => setHomeOpen(null)} />
+            <HomeLayer
+              state={state}
+              homeId={homeOpen}
+              t={t}
+              go={go}
+              onClose={() => {
+                // R2: back to Day › Home with the focus on this home's "Enter" (the trigger), else on the panel.
+                const id = homeOpen;
+                setHomeOpen(null);
+                setDayTab("home");
+                setHub("day");
+                setTimeout(() => (document.querySelector<HTMLElement>(`[data-home-enter="${id}"]`) ?? document.querySelector<HTMLElement>(".v3-panel button"))?.focus(), 0);
+              }}
+            />
           </Suspense>
         )}
 

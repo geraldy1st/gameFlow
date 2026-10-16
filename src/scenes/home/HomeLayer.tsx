@@ -82,7 +82,6 @@ export default function HomeLayer({ state, homeId, t, go, onClose }: { state: Ga
   const [napping, setNapping] = useState(false);
   const [say, setSay] = useState("");
   const rootRef = useRef<HTMLDivElement>(null);
-  const opener = useRef<Element | null>(typeof document !== "undefined" ? document.activeElement : null);
   const room = HOME_TYPE.rooms.find((r) => r.id === roomId)!;
   const resident = residentFor(p.characterId).def;
   const outfit = resident.outfits.includes(p.outfit) ? p.outfit : "jeans";
@@ -91,8 +90,6 @@ export default function HomeLayer({ state, homeId, t, go, onClose }: { state: Ga
 
   useEffect(() => {
     rootRef.current?.querySelector<HTMLElement>("button")?.focus();
-    const back = opener.current;
-    return () => (back as HTMLElement | null)?.focus?.();
   }, []);
   useEffect(() => {
     const k = (e: KeyboardEvent) => {
@@ -112,25 +109,39 @@ export default function HomeLayer({ state, homeId, t, go, onClose }: { state: Ga
   const inSlot = pick ? home.slots[pick] : undefined;
   const choices = slotOf ? FURNITURE.filter((f) => furnitureFree(p, f.id) > 0 && (!slotOf.only || slotOf.only.includes(f.id))) : [];
   const [sx, sy] = room.stand;
+  // DEF-HOME-02: the nap lies on a sofa / futon of this room when there is one (its slot and size), else on the floor.
+  const bed = room.slots.find((sl) => home.slots[sl.id] === "sofa") ?? room.slots.find((sl) => home.slots[sl.id] === "futon");
+  const bedDef = bed ? furnitureById(home.slots[bed.id]!) : undefined;
+  const napBox = (() => {
+    if (bed && bedDef) {
+      const w = bedDef.wM * ppm(room, bed.y);
+      const h = w * bedDef.ar;
+      const cw = w * 1.02;
+      // clip feet on the cushion line (~55 % of the sofa height from its bottom)
+      return { left: bed.x - cw / 2, top: bed.y - h * 0.55 - cw * (200 / 660), width: cw, z: Math.round(bed.y) + 1 };
+    }
+    const cw = 1.75 * ppm(room, sy);
+    return { left: sx - cw / 2, top: sy - cw * (200 / 660), width: cw, z: 2000 };
+  })();
   const bodyH = resident.hM * ppm(room, sy);
   const nap = () => {
     const pts = napPoints(p);
     go({ type: "HOME_ACT", id: "nap" });
-    setSay(t("Nap at home: +{n} on every gauge.", { n: pts }));
+    setSay(t("Nap done: +{n} on every gauge.", { n: pts }));
     if (resident.nap) setNapping(true);
   };
 
   return (
     <div className="ho-layer" ref={rootRef} role="dialog" aria-modal="true" aria-label={t(housingById(homeId)?.name ?? "Home")}>
-      <header className="ho-head">
+      <div className="ho-head">
         <strong>{t(housingById(homeId)?.name ?? "Home")}</strong>
-        <span className="ho-count" aria-label={t("{n} of {max} time slots left today", { n: HOME_SLOTS_PER_TURN - d.used, max: HOME_SLOTS_PER_TURN })}>
+        <span className="ho-count" role="img" aria-label={t("{n} of {max} time slots left today", { n: HOME_SLOTS_PER_TURN - d.used, max: HOME_SLOTS_PER_TURN })}>
           {Array.from({ length: HOME_SLOTS_PER_TURN }, (_, i) => (
             <i key={i} className={i < HOME_SLOTS_PER_TURN - d.used ? "on" : ""} />
           ))}
         </span>
         <button type="button" className="ho-x" onClick={onClose} aria-label={t("Close")}>✕</button>
-      </header>
+      </div>
       <nav className="ho-rooms" aria-label={t("Rooms")}>
         {HOME_TYPE.rooms.map((r) => (
           <button key={r.id} type="button" aria-pressed={r.id === roomId} onClick={() => { setRoomId(r.id); setPick(null); }}>
@@ -160,9 +171,15 @@ export default function HomeLayer({ state, homeId, t, go, onClose }: { state: Ga
             </button>
           );
         })}
-        <div className="ho-res" style={{ left: pct(sx, W), top: pct(sy, H), height: pct(bodyH, H), zIndex: napping ? 2000 : Math.round(sy) + 1 }}>
-          {napping && resident.nap ? <NapClip clip={resident.nap} reduce={reduce || outfit !== resident.nap.outfit} onDone={done} /> : <img src={resident.body.replace("{outfit}", outfit)} alt="" />}
-        </div>
+        {napping && resident.nap ? (
+          <div className="ho-napbox" style={{ left: pct(napBox.left, W), top: pct(napBox.top, H), width: pct(napBox.width, W), zIndex: napBox.z }}>
+            <NapClip clip={resident.nap} reduce={reduce || outfit !== resident.nap.outfit} onDone={done} />
+          </div>
+        ) : (
+          <div className="ho-res" style={{ left: pct(sx, W), top: pct(sy, H), height: pct(bodyH, H), zIndex: Math.round(sy) + 1 }}>
+            <img src={resident.body.replace("{outfit}", outfit)} alt="" />
+          </div>
+        )}
       </div>
       <div className="ho-dock">
         {slotOf ? (
@@ -183,8 +200,9 @@ export default function HomeLayer({ state, homeId, t, go, onClose }: { state: Ga
         ) : (
           <div className="ho-acts">
             <button type="button" className="gold" disabled={!idle || napping || d.used >= HOME_SLOTS_PER_TURN} onClick={nap}>
-              {t("Nap")} · +{napPoints(p)}
+              {t("Nap: +{n} on every gauge", { n: napPoints(p) })}
             </button>
+            <span className="ho-left">{t("{n} of {max} time slots left today", { n: HOME_SLOTS_PER_TURN - d.used, max: HOME_SLOTS_PER_TURN })}</span>
             <span>{Object.keys(home.slots).length ? t("Pick a slot to change the furniture.") : t("Everything is empty! Pick a slot to place furniture.")}</span>
           </div>
         )}
