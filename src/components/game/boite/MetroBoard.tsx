@@ -145,7 +145,8 @@ export function MetroBoard({ state, t, lang, lid = false }: { state: GameState; 
       reach.push(
         <g key={k} transform={`translate(${p.x + 24} ${p.y - 26})`}>
           <circle r={12} fill="var(--paper)" stroke="var(--navy)" strokeWidth={2.5} />
-          <text y={4.5} textAnchor="middle">
+          {/* baseline at half the cap height: font-independent (dominant-baseline:central measured ~1px high) */}
+          <text y="0.355em" textAnchor="middle">
             {k}
           </text>
         </g>,
