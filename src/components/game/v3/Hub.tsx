@@ -7,12 +7,13 @@ import { FRIENDS, PARTNERS } from "@/game/data";
 import { cur, ownsGood, progressOf, quizOpen, quizWait, shopPrice, statement, type Action, type GameState, type Player } from "@/game/engine";
 import { formatCompact } from "@/game/format-compact";
 import { MINIGAME_REGISTRY, MINIGAME_SOON } from "@/minigames/registry";
-import { CLASS_QUIZ, CURVES, AFFINITY_SEED, GOODS, GOODS_CATEGORIES, SHOPS, SKILL_RULES, SOON_GOODS, type GoodsCategory, type ShopDef } from "@/game/tuning";
-import { HOME_LEVEL, HOME_SHOP, CLOTH_PRICE } from "@/game/shop";
+import { CLASS_QUIZ, CURVES, AFFINITY_SEED, GOODS_CATEGORIES, SKILL_RULES, SOON_GOODS, type GoodsCategory } from "@/game/tuning";
+import { ARTICLES, SHOP_DEFINITIONS, articlesOfShop, shopById, shopOfArticle, shopOfType, type ShopDefinition } from "@/game/articles";
+import { HOME_LEVEL, HOME_SHOP } from "@/game/shop";
 import { BIRTHDAY_COST, MUSEUM_COST, OUTFITS, clothDelta, type OutfitId } from "@/game/life";
 import { SKILL_IDS, SKILL_NAMES, experienceXp, maxFriends, skillLevel, skillXp, type SkillId } from "@/game/skills";
 import { SKILL_INFO, skillInfo } from "@/game/skills-info";
-import { goodById, unlockState, unlockText } from "@/game/shops";
+import { unlockState, unlockText } from "@/game/shops";
 import { METRO_EVERY } from "@/game/metro-run";
 import type { Lang } from "@/game/i18n";
 import { Ico } from "../boite/icons";
@@ -254,7 +255,7 @@ interface GoodRow {
 function goodsRows(state: GameState, p: Player, cat: GoodsCategory, t: TFn, lang: Lang, go: Go): GoodRow[] {
   const idle = state.phase === "idle";
   const pr = progressOf(p);
-  const shopNote = (shop: ShopDef | undefined) => {
+  const shopNote = (shop: ShopDefinition | undefined) => {
     if (!shop) return t("Coming in an update");
     const u = unlockState(shop.unlock, pr);
     if (u.open) return t("On sale at: {shop}", { shop: t(shop.name) });
@@ -270,7 +271,7 @@ function goodsRows(state: GameState, p: Player, cat: GoodsCategory, t: TFn, lang
       rows.push({
         id: o.id,
         name: has ? t(o.name) : "???",
-        note: has ? (d === 0 ? t("Changes nothing") : t("{amount}/mo on an offer", { amount: fmtMoney(lang, d, true) })) : shopNote(SHOPS.find((s) => s.sells === "clothes")),
+        note: has ? (d === 0 ? t("Changes nothing") : t("{amount}/mo on an offer", { amount: fmtMoney(lang, d, true) })) : shopNote(shopOfType("cloth")),
         icon: o.id === "night" ? "dress" : o.id === "shirt" || o.id === "tee" ? "shirt" : "jeans",
         owned: has,
         on: p.outfit === o.id,
@@ -287,7 +288,7 @@ function goodsRows(state: GameState, p: Player, cat: GoodsCategory, t: TFn, lang
       rows.push({
         id: h.id,
         name: has ? t(h.name) : "???",
-        note: has ? (on ? t("Equipped") : t("Stored")) : shopNote(SHOPS.find((s) => s.sells === "home")),
+        note: has ? (on ? t("Equipped") : t("Stored")) : shopNote(shopOfType("home-item")),
         icon: "lamp",
         owned: has,
         on,
@@ -297,11 +298,11 @@ function goodsRows(state: GameState, p: Player, cat: GoodsCategory, t: TFn, lang
       });
     }
   }
-  for (const g of GOODS.filter((x) => x.cat === cat)) {
+  for (const g of ARTICLES.filter((x) => x.type === "good" && x.cat === cat)) {
     const has = ownsGood(p, g.id);
-    const shop = SHOPS.find((s) => Array.isArray(s.sells) && s.sells.includes(g.id));
+    const shop = shopOfArticle("good", g.id);
     const n = p.goodsCount?.[g.id] ?? 0;
-    rows.push({ id: g.id, name: has ? t(g.name) + (n > 1 ? ` ×${n}` : "") : "???", note: has ? t(g.note) : shopNote(shop), icon: g.icon, owned: has, locked: has ? undefined : "1" });
+    rows.push({ id: g.id, name: has ? t(g.name) + (n > 1 ? ` ×${n}` : "") : "???", note: has ? t(g.note ?? "") : shopNote(shop), icon: g.icon, owned: has, locked: has ? undefined : "1" });
   }
   for (const s of SOON_GOODS.filter((x) => x.cat === cat)) rows.push({ id: s.id, name: "???", note: t(s.when), icon: s.icon, owned: false, locked: "1" });
   // owned first, then silhouettes
@@ -467,7 +468,7 @@ export function ActivitiesPanel({ state, t, lang, go, onQuiz, onClose }: { state
   const p = cur(state);
   const [tab, setTab] = useState<"shops" | "games">("shops");
   const [shop, setShop] = useState<string | null>(null);
-  const open = shop ? SHOPS.find((s) => s.id === shop) : undefined;
+  const open = shop ? shopById(shop) : undefined;
   const pr = progressOf(p);
   return (
     <div className="v3-panel">
@@ -489,7 +490,7 @@ export function ActivitiesPanel({ state, t, lang, go, onQuiz, onClose }: { state
           <ShopView shop={open} state={state} p={p} t={t} lang={lang} go={go} onBack={() => setShop(null)} />
         ) : tab === "shops" ? (
           <Pager
-            items={SHOPS}
+            items={SHOP_DEFINITIONS}
             minW={200}
             itemH={62}
             t={t}
@@ -517,23 +518,19 @@ export function ActivitiesPanel({ state, t, lang, go, onQuiz, onClose }: { state
   );
 }
 
-function ShopView({ shop, state, p, t, lang, go, onBack }: { shop: ShopDef; state: GameState; p: Player; t: TFn; lang: Lang; go: Go; onBack: () => void }) {
+function ShopView({ shop, state, p, t, lang, go, onBack }: { shop: ShopDefinition; state: GameState; p: Player; t: TFn; lang: Lang; go: Go; onBack: () => void }) {
   const idle = state.phase === "idle";
   type Item = { id: string; name: string; note: string; icon: string; price: number; base: number; owned: boolean; buy: () => void; locked?: string };
   const items: Item[] = [];
-  if (shop.sells === "clothes") {
-    for (const o of OUTFITS.filter((x) => x.id !== "jeans")) {
-      const base = CLOTH_PRICE[o.id as Exclude<OutfitId, "jeans">];
-      const d = clothDelta(o.id);
-      items.push({ id: o.id, name: t(o.name), note: t("{amount}/mo on an offer", { amount: fmtMoney(lang, d, true) }), icon: o.id === "night" ? "dress" : o.id === "shirt" || o.id === "tee" ? "shirt" : "jeans", base, price: shopPrice(p, base), owned: (p.ownedOutfits ?? ["jeans"]).includes(o.id), buy: () => go({ type: "BUY_CLOTH", outfit: o.id }) });
-    }
-  } else if (shop.sells === "home") {
-    for (const h of HOME_SHOP) items.push({ id: h.id, name: t(h.name), note: t("Mood at home"), icon: "lamp", base: h.cost, price: shopPrice(p, h.cost), owned: (p.homeOwned ?? []).includes(h.id), buy: () => go({ type: "BUY_HOME", id: h.id }), locked: p.level < HOME_LEVEL ? t("Opens once the Gate is crossed") : undefined });
-  } else {
-    for (const id of shop.sells) {
-      const g = goodById(id);
-      if (!g) continue;
-      items.push({ id, name: t(g.name), note: t(g.note), icon: g.icon, base: g.price, price: shopPrice(p, g.price), owned: !g.repeat && ownsGood(p, id), buy: () => go({ type: "BUY_GOOD", id }) });
+  // Batch 6: every shop lists its articles through the article model (articles.ts), in the same order as before.
+  for (const a of articlesOfShop(shop)) {
+    if (a.type === "cloth") {
+      const d = clothDelta(a.id as OutfitId);
+      items.push({ id: a.id, name: t(a.name), note: t("{amount}/mo on an offer", { amount: fmtMoney(lang, d, true) }), icon: a.icon, base: a.price, price: shopPrice(p, a.price), owned: (p.ownedOutfits ?? ["jeans"]).includes(a.id as OutfitId), buy: () => go({ type: "BUY_CLOTH", outfit: a.id as OutfitId }) });
+    } else if (a.type === "home-item") {
+      items.push({ id: a.id, name: t(a.name), note: t("Mood at home"), icon: a.icon, base: a.price, price: shopPrice(p, a.price), owned: (p.homeOwned ?? []).includes(a.id), buy: () => go({ type: "BUY_HOME", id: a.id }), locked: p.level < HOME_LEVEL ? t("Opens once the Gate is crossed") : undefined });
+    } else if (a.type === "good") {
+      items.push({ id: a.id, name: t(a.name), note: t(a.note ?? ""), icon: a.icon, base: a.price, price: shopPrice(p, a.price), owned: !a.repeat && ownsGood(p, a.id), buy: () => go({ type: "BUY_GOOD", id: a.id }) });
     }
   }
   const nego = skillLevel(p, "nego");
