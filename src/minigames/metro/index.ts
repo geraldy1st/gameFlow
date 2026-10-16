@@ -6,10 +6,12 @@
 import { moneyText } from "@/game/minigame-rules";
 import { tl } from "@/game/text";
 import type { MinigameDefinition, SkillAward } from "../types";
-import { METRO_LIVES, metroOfferTurn, metroReward } from "./logic";
+import { METRO_COIN_VALUE, METRO_LIVES, metroCoins, metroOfferTurn, metroReward } from "./logic";
 
 export interface MetroResult {
   lives: number;
+  /** v6.1: coins picked up, an integer 0..53 ($5 each, kept on a failed run). 0 for the old METRO action. */
+  coins: number;
 }
 
 const ui = () => import("./ui");
@@ -22,10 +24,12 @@ export const METRO_MINIGAME: MinigameDefinition<MetroResult> = {
   entry: "offer",
   isDue: (s) => metroOfferTurn(s) !== null,
   sanitize: (raw) => {
-    const lives = typeof raw === "object" && raw !== null ? (raw as { lives?: unknown }).lives : raw;
-    return { lives: Math.max(0, Math.min(METRO_LIVES, Math.floor(Number(lives) || 0))) };
+    const obj = typeof raw === "object" && raw !== null ? (raw as { lives?: unknown; coins?: unknown }) : null;
+    const lives = obj ? obj.lives : raw;
+    return { lives: Math.max(0, Math.min(METRO_LIVES, Math.floor(Number(lives) || 0))), coins: metroCoins(obj?.coins) };
   },
-  cash: (r) => metroReward(r.lives),
+  // Credited once per offer: the engine only pays while the offer is due, and the answer moves the marker.
+  cash: (r) => metroReward(r.lives) + r.coins * METRO_COIN_VALUE,
   skillKeys: (r) => {
     const out: SkillAward[] = [{ key: "runner.finish" }];
     if (r.lives > 0) out.push({ key: "runner.win" });

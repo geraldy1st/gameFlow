@@ -14,6 +14,10 @@ import type { GameState } from "@/game/engine";
 /** An offer every 10 of a player's own finished turns (Player.turns), i.e. at their turns 10, 20, 30... */
 export const METRO_EVERY = 10;
 export const METRO_LIVES = 3;
+/** v6: gold coins on the street, $5 each, kept even on a failed run. 53 on the validated level; the engine never
+ *  credits more (MetroResult.coins is clamped to 0..METRO_MAX_COINS). */
+export const METRO_MAX_COINS = 53;
+export const METRO_COIN_VALUE = 5;
 const METRO_REWARD_FULL = 500;
 const METRO_REWARD_HURT = 250;
 /**
@@ -55,6 +59,13 @@ export function metroReward(lives: number): number {
   return l === METRO_LIVES ? METRO_REWARD_FULL : METRO_REWARD_HURT;
 }
 
+/** Coins as the engine credits them: an integer 0..53 (anything else is clamped; NaN / non-numbers count 0). */
+export function metroCoins(raw: unknown): number {
+  const n = typeof raw === "number" ? raw : typeof raw === "string" && raw.trim() !== "" ? Number(raw) : NaN;
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(METRO_MAX_COINS, Math.floor(n)));
+}
+
 /* ------------------------------------------------------------------ runner */
 /*
  * Pure runner, tuned on Mirage's validated mockup (gameflow-bc/runner/runner.js, SPEC-NOTES.md). Units: metres,
@@ -74,15 +85,15 @@ export type RunPhase = "count" | "run" | "enter" | "fall" | "done";
 export const RUN = {
   laneW: 1.7,
   /** Metres to the threshold of the metro entrance. */
-  length: 260,
-  /** 8 → 11.5 m/s at +0.13 m/s² (cap reached at ≈ 26.9 s); ≈ 26.7 s clean run, ≈ 27.3 s with one hit. */
-  speed0: 8,
-  speedMax: 11.5,
-  accel: 0.13,
+  length: 195,
+  /** v4: 5.8 → 8.2 m/s at +0.085 m/s² (cap reached at ≈ 28 s); ≈ 27.9 s clean run. */
+  speed0: 5.8,
+  speedMax: 8.2,
+  accel: 0.085,
   laneTime: 0.15,
-  jump: 0.62,
+  jump: 0.7,
   jumpH: 1.25,
-  slide: 0.45,
+  slide: 0.55,
   invuln: 0.6,
   /** A hit pushes back 4 m over 0.25 s in the same lane (controls ignored meanwhile)… */
   knock: 4,
@@ -94,18 +105,27 @@ export const RUN = {
   laneHit: 0.45,
   /** Feet above 0.55 m clear the barrier (≈ 0.46 s of the 0.62 s jump). */
   barrierClear: 0.55,
-  /** The walker's plank, metres above the street (slide under it). */
-  plank: [1.25, 1.42] as const,
+  /** v3: the movers' wardrobe, metres above the street (slide under it: the sliding box is 0.85 m high). */
+  plank: [1.12, 2.8] as const,
+  /** Runner box height standing / sliding, metres. */
+  bodyH: 1.6,
+  slideH: 0.85,
   depth: { walker: 0.6, cop: 0.6, barrier: 0.4 } as Record<ObstacleKind, number>,
-  firstRow: 30,
-  endClear: 28,
+  firstRow: 26,
+  endClear: 22,
   /** Seconds of running between two rows, start → end of the street, +0.5 s breather every 6 rows. */
   gapT0: 1.45,
   gapT1: 1.0,
   doubleP: 0.45,
   breatherEvery: 6,
   breatherT: 0.5,
-  countdown: 1.2,
+  /** v6.1: "3", "2", "1", one second each, then the start word. */
+  countdown: 3,
+  /** Coins: pick-up half depth / lateral reach, metres; smile on pick-up (0.5 s, at most every 1.5 s). */
+  coinPickZ: 0.55,
+  coinPickX: 0.5,
+  smile: 0.5,
+  smileCooldown: 1.5,
   enterTime: 1.6,
   fallTime: 1.3,
   /** Fixed physics step, seconds (rendering frames are cut into these). */
@@ -128,6 +148,16 @@ export interface Obstacle {
   hit: boolean;
   /** Behind the runner (or crossed while invulnerable). */
   passed: boolean;
+}
+
+export interface Coin {
+  id: number;
+  lane: Lane;
+  z: number;
+  /** Height above the street, metres. */
+  y: number;
+  tag: "arc" | "under" | "line";
+  got: boolean;
 }
 
 export interface RunState {
@@ -160,6 +190,12 @@ export interface RunState {
   outcome: RunOutcome;
   hits: number;
   lastHit: ObstacleKind | null;
+  coins: Coin[];
+  /** Coins picked up so far. */
+  coinN: number;
+  /** Seconds into the pick-up smile (−1: none) and cooldown before the next one. */
+  smileT: number;
+  smileCd: number;
 }
 
 /** mulberry32, same as the mockup. */
@@ -234,8 +270,52 @@ export function generateObstacles(seed: number = RUN.seed, length: number = RUN.
   return out;
 }
 
+/**
+ * Coins (port of the mockup's buildCoins, v6), deterministic, never where picking them up leads into a hit:
+ * arcs of 5 over 75 % of the barriers (jump height), 3 under 60 % of the wardrobes (slide), and lines of 5 in a
+ * free lane of 55 % of the rows from the 3rd (no obstacle within 2 m, never within 4 m of a cop).
+ */
+export function generateCoins(rows: Obstacle[], seed: number = RUN.seed): Coin[] {
+  const R = prng(seed * 13 + 5);
+  const out: Coin[] = [];
+  const busy = (lane: number, z0: number, z1: number, pad: number) => rows.some((o) => o.lane === lane && o.z + o.depth + pad > z0 && o.z - pad < z1);
+  const byRow = new Map<number, Obstacle[]>();
+  for (const o of rows) {
+    if (!byRow.has(o.row)) byRow.set(o.row, []);
+    byRow.get(o.row)!.push(o);
+  }
+  // Never more than the engine credits (METRO_MAX_COINS): the mockup's placement gives 67 on the validated level,
+  // the coins past the 53rd (the last rows) are not placed.
+  const add = (lane: Lane, z: number, y: number, tag: Coin["tag"]) => {
+    if (out.length < METRO_MAX_COINS) out.push({ id: out.length, lane, z, y, tag, got: false });
+  };
+  for (const [ri, its] of byRow) {
+    const z = its[0]!.z;
+    for (const o of its) {
+      if (o.kind === "barrier" && R() < 0.75) {
+        for (let k = -2; k <= 2; k++) {
+          const u = 0.5 + k * 0.16;
+          add(o.lane, o.z + o.depth / 2 + k * 0.85, 0.5 + 4 * RUN.jumpH * u * (1 - u), "arc");
+        }
+      }
+      if (o.kind === "walker" && R() < 0.6) for (let k = -1; k <= 1; k++) add(o.lane, o.z + o.depth / 2 + k * 0.5, 0.45, "under");
+    }
+    if (ri >= 2 && R() < 0.55) {
+      const free = ([0, 1, 2] as Lane[]).filter((l) => !its.some((o) => o.lane === l));
+      const lane = free[Math.floor(R() * free.length)];
+      if (lane !== undefined) {
+        const z0 = z - 7;
+        const z1 = z + 1;
+        const cop = rows.some((o) => o.kind === "cop" && o.lane === lane && Math.abs(o.z - z) < 4);
+        if (!cop && !busy(lane, z0, z1, 2)) for (let k = 0; k < 5; k++) add(lane, z0 + k * 1.8, 0.7, "line");
+      }
+    }
+  }
+  return out;
+}
+
 export function newRun(seed: number = RUN.seed, length: number = RUN.length): RunState {
-  return {
+  const run: RunState = {
     phase: "count",
     phaseT: 0,
     t: 0,
@@ -257,7 +337,13 @@ export function newRun(seed: number = RUN.seed, length: number = RUN.length): Ru
     outcome: "running",
     hits: 0,
     lastHit: null,
+    coins: [],
+    coinN: 0,
+    smileT: -1,
+    smileCd: 0,
   };
+  run.coins = generateCoins(run.obstacles, seed);
+  return run;
 }
 
 /** Height of the feet, metres (parabolic jump). */
@@ -366,6 +452,28 @@ function runStep(s0: RunState, dt: number): RunState {
     }
     return s;
   }
+  // coins: same lane (|x − centre| < 0.5 m), depth ±0.55 m, height inside the runner's box ±0.25 m; none while knocked back
+  if (s.knock <= 0) {
+    const y0 = jumpY(s);
+    const top = y0 + (sliding(s) ? RUN.slideH : RUN.bodyH) + 0.25;
+    let coins = s.coins;
+    for (const cn of s.coins) {
+      if (cn.got || Math.abs(cn.z - s.z) > RUN.coinPickZ || Math.abs(s.x - laneX(cn.lane)) > RUN.coinPickX) continue;
+      if (cn.y < y0 - 0.25 || cn.y > top) continue;
+      coins = coins.map((q) => (q.id === cn.id ? { ...q, got: true } : q));
+      s.coinN += 1;
+      if (s.smileCd <= 0 && s.jumpT < 0 && s.slideT < 0) {
+        s.smileT = 0;
+        s.smileCd = RUN.smileCooldown;
+      }
+    }
+    s.coins = coins;
+  }
+  if (s.smileT >= 0) {
+    s.smileT += dt;
+    if (s.smileT >= RUN.smile || s.jumpT >= 0 || s.slideT >= 0) s.smileT = -1;
+  }
+  s.smileCd = Math.max(0, s.smileCd - dt);
   if (s.z >= s.length) {
     s.phase = "enter";
     s.phaseT = 0;
