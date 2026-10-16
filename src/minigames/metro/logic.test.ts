@@ -1,25 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createMatch, cur, hydrate, reduce, type GameState, type Pick, type Player } from "@/game/engine";
-import {
-  RUN,
-  act,
-  advanceRun,
-  currentSpeed,
-  generateObstacles,
-  jumpY,
-  makeAutopilot,
-  metroOfferTurn,
-  metroReward,
-  newRun,
-  sliding,
-  speedAt,
-  wrongGestures,
-  type Lane,
-  type MetroAction,
-  type Obstacle,
-  type ObstacleKind,
-  type RunState,
-} from "./logic";
+import { metroOfferTurn, metroReward } from "./logic";
+import { RUN, act, advanceRun, currentSpeed, generateObstacles, jumpY, makeAutopilot, newRun, sliding, speedAt, wrongGestures, type Lane, type MetroAction, type Obstacle, type ObstacleKind, type RunState } from "./runner";
 import { parseText } from "@/game/text";
 import { tr } from "@/game/i18n";
 import { firstChoice } from "@/game/__tests__/drive";
@@ -347,25 +329,25 @@ describe("metro run — runner (mockup tuning)", () => {
     expect(new Set(o.map((x) => x.row)).size).toBe(17);
     expect(o.length).toBe(22);
     expect(o.slice(0, 3).map((x) => [x.kind, x.lane, x.z])).toEqual([
-      ["barrier", 1, 30],
-      ["walker", 1, expect.closeTo(41.8, 1)],
-      ["cop", 1, expect.closeTo(53.8, 1)],
+      ["barrier", 1, 26],
+      ["walker", 1, expect.closeTo(34.6, 1)],
+      ["cop", 1, expect.closeTo(43.2, 1)],
     ]);
   });
 
-  it("clean run ≈ 26.7 s (≈ 29.5 s on the clock with the countdown and the stairs), one hit ≈ 27.3 s", () => {
+  it("v4 pace: clean run ≈ 27.9 s (≈ 32.5 s on the clock with the 3-2-1 countdown and the stairs), one hit ≈ 28.7 s", () => {
     const clean = play(RUN.seed, makeAutopilot());
     expect(clean.outcome).toBe("won");
     expect(clean.lives).toBe(3);
-    expect(clean.runT).toBeCloseTo(26.7, 0);
-    expect(clean.t).toBeCloseTo(29.5, 0);
+    expect(clean.runT).toBeCloseTo(27.9, 0);
+    expect(clean.t).toBeCloseTo(32.5, 0);
     const hurt = play(RUN.seed, makeAutopilot({ miss: [3] }));
     expect(hurt.outcome).toBe("won");
     expect(hurt.lives).toBe(2);
-    expect(hurt.runT).toBeCloseTo(27.3, 0);
+    expect(hurt.runT).toBeCloseTo(28.7, 0);
   });
 
-  it("every street is fair: never 3 in a row or 2 in a lane, nothing before 30 m or in the last 28 m, winnable without a hit", () => {
+  it("every street is fair: never 3 in a row or 2 in a lane, nothing before 26 m or in the last 22 m, winnable without a hit", () => {
     for (let seed = 1; seed <= 200; seed++) {
       const obs = generateObstacles(seed);
       const rows = new Map<number, Obstacle[]>();
@@ -385,9 +367,9 @@ describe("metro run — runner (mockup tuning)", () => {
     }
   });
 
-  it("the speed rises slightly (8 → 11.5 m/s) and stays capped", () => {
+  it("the speed rises slightly (5.8 → 8.2 m/s) and stays capped", () => {
     expect(speedAt(0)).toBe(RUN.speed0);
-    expect(speedAt(10)).toBeCloseTo(9.3, 5);
+    expect(speedAt(10)).toBeCloseTo(6.65, 5);
     expect(speedAt(60)).toBe(RUN.speedMax);
   });
 

@@ -1,0 +1,11 @@
+/* Metro run v6.1 (Mirage's mockup runner.css v6): coin chip and result coin line. Lazy: imported by ui.tsx only. */
+.mr-coinchip { gap: 6px; padding: 5px 9px; }
+.mr-coinchip b { min-width: 22px; text-align: left; }
+.mr-cico { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: radial-gradient(circle at 35% 30%, #FFF2B0, #FFC745 45%, #C98418); border: 2px solid #6B3E0A; color: #4A2A05; font: 700 11px/1 "Noto Sans JP", sans-serif; }
+.mr-result .mr-coinline { margin: -.3rem 0 .7rem; font-weight: 800; font-size: 14px; color: var(--navy); }
+@media (max-width: 430px) {
+  .mr-hud .mr-chip { padding: 4px 6px; gap: 4px; }
+  .mr-hud { gap: 5px; }
+  .mr-lives .mr-heart { width: 19px; height: 19px; }
+  .mr-coinchip .mr-cico { width: 19px; height: 19px; font-size: 10px; }
+}
