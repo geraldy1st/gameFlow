@@ -1111,7 +1111,7 @@ export function GameFlow() {
     { label: state.muted ? t("Sound off") : t("Sound on"), icon: state.muted ? "mute" : "sound", pressed: !state.muted, onClick: () => go({ type: "MUTE" }) },
     { label: t("Options"), icon: "wrench", onClick: () => { setOptTab("lang"); setOptionsOpen(true); } },
     { label: t("Finance quiz"), icon: "quiz", onClick: () => { setOptTab("quiz"); setQuizId(null); setQuizDone(false); setOptionsOpen(true); } },
-    { label: t("Choose a life"), icon: "house", onClick: () => { setHub(null); go({ type: "MENU" }); } },
+    { label: t("Main menu"), icon: "house", onClick: () => { setHub(null); go({ type: "MENU" }); } },
     { label: t("Credits"), icon: "star", onClick: () => { setHub(null); go({ type: "CREDITS" }); } },
   ];
   const player = state.players.length ? cur(state) : null;
@@ -1216,7 +1216,7 @@ export function GameFlow() {
           <button type="button" className="chipbtn" onClick={() => go({ type: "MUTE" })} aria-label={state.muted ? t("Unmute") : t("Mute")} aria-pressed={!state.muted}>
             <Ico name={state.muted ? "mute" : "sound"} />
           </button>
-          {/* Geraldy 16/10: no top-right "Menu" button; the bottom bar Menu › "Choose a life" opens the same menu screen
+          {/* Geraldy 16/10: no top-right "Menu" button; the bottom bar Menu › "Main menu" opens the same menu screen
               (rules / credits keep their "Back" button, the win screen its "Menu" button). */}
         </header>
 

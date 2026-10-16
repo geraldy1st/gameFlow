@@ -40,6 +40,7 @@ const fr: Record<string, string> = {
   "Aoi, Ren, Mio, and Sora, plus the people who might share their month, are original faces. Sound is synthesized in the browser. Progress stays on this device.":
     "Aoi, Ren, Mio et Sora, et ceux qui peuvent partager leur mois, sont des visages originaux. Le son est synthétisé dans le navigateur. La partie reste sur cet appareil.",
   "Choose a life": "Choisis une vie",
+  "Main menu": "Menu principal",
   Character: "Personnage",
   Dream: "Rêve",
   "Deal careers": "Distribuer les métiers",
@@ -1278,6 +1279,7 @@ const es: Record<string, string> = {
   "Aoi, Ren, Mio, and Sora, plus the people who might share their month, are original faces. Sound is synthesized in the browser. Progress stays on this device.":
     "Aoi, Ren, Mio y Sora, y quienes pueden compartir su mes, son rostros originales. El sonido se sintetiza en el navegador. El progreso se queda en este aparato.",
   "Choose a life": "Elige una vida",
+  "Main menu": "Menú principal",
   Character: "Personaje",
   Dream: "Sueño",
   "Deal careers": "Repartir oficios",

@@ -221,6 +221,10 @@ Pendant `s.training` actif :
 
 ---
 
+### Accès au menu pendant le coach (16/10/2026)
+- Pendant le coach, le plateau **et la barre du bas sont désactivés** (`inert`, DEF-TUT-04). Depuis le retrait du bouton « Menu » en haut à droite (Geraldy, 16/10), il n'y a plus de raccourci vers le menu principal pendant le coach.
+- Pour atteindre le menu (« Revoir le tutoriel », langue, nouvelle partie), le joueur doit d'abord cliquer **« Passer le tutoriel »**, puis Menu › « Menu principal » dans la barre du bas.
+
 ## 10. Solo uniquement (v3 : fin du mode 2 joueurs sur le même écran)
 
 - Depuis la v3, le jeu ne propose plus que **1 joueur** ; le multijoueur **en ligne** viendra plus tard. Le modèle à tableau (`players[]`, `current`, `winner`, `Player.turns`, `Player.metroTurn`) et `src/lib/multiplayer/` sont gardés pour cela.
