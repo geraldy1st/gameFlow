@@ -28,7 +28,7 @@ import {
   type Player,
   type Reaction,
 } from "@/game/engine";
-import { makeAutopilot, metroOfferTurn, wrongGestures, type MetroAction, type RunState } from "@/game/metro-run";
+import { metroOfferTurn } from "@/game/metro-run";
 import { arrivalLine, arrivalMood, bodyPortrait, dressedPortrait, expressionOf, outcomeLine, phraseSalt, speakerIsNpc } from "@/game/speech";
 import { DealSheet } from "./boite/DealSheet";
 import { fmtMoney, localizeMoney } from "./boite/format";
@@ -70,10 +70,11 @@ type TFn = (text: string, vars?: Record<string, string | number>) => string;
 // public one). `?metro-demo=win` lets a bot play the right gestures, `?metro-demo=crash` the wrong ones.
 // `?metro-demo=hurt` takes one hit (+$250).
 const METRO_HOOK = import.meta.env.DEV || import.meta.env.VITE_METRO_HOOK === "1";
-function metroDemoDriver(): ((s: RunState) => MetroAction | null) | undefined {
+// v6.1: the bots themselves live in the lazy metro chunk (runner.ts); only the hook's name is passed.
+function metroDemoDriver(): "win" | "hurt" | "crash" | undefined {
   if (!METRO_HOOK || typeof window === "undefined") return undefined;
   const v = new URLSearchParams(window.location.search).get("metro-demo");
-  return v === "win" ? makeAutopilot() : v === "hurt" ? makeAutopilot({ miss: [3] }) : v === "crash" ? wrongGestures : undefined;
+  return v === "win" || v === "hurt" || v === "crash" ? v : undefined;
 }
 /**
  * Same hook (dev / VITE_METRO_HOOK=1 builds only): `?metro-seed=<int>` picks the obstacle seed and
@@ -615,7 +616,7 @@ export function GameFlow() {
   // Metro run: the accepted offer being played (the game state only changes when it is over).
   // Offer closed because its chunk failed to load: hidden for this session only, no engine action (offer kept).
   const [metroDeferred, setMetroDeferred] = useState<number | null>(null);
-  const [metroPlay, setMetroPlay] = useState<{ turn: number; audio: RunnerAudio; driver?: (s: RunState) => MetroAction | null } | null>(null);
+  const [metroPlay, setMetroPlay] = useState<{ turn: number; audio: RunnerAudio; demo?: "win" | "hurt" | "crash" } | null>(null);
   const metroBusyRef = useRef(false);
   const reducedMotion = useReducedMotion();
   const phaseRef = useRef(state.phase);
@@ -1529,7 +1530,7 @@ export function GameFlow() {
             reduced: reducedMotion,
             gameMuted: state.muted,
             onDecline: () => go({ type: "MINIGAME", id: "metro", result: "decline" }),
-            onRun: (audio: RunnerAudio) => setMetroPlay({ turn: metroDue, audio, driver: metroDemoDriver() }),
+            onRun: (audio: RunnerAudio) => setMetroPlay({ turn: metroDue, audio, demo: metroDemoDriver() }),
           }}
         />
       )}
@@ -1553,11 +1554,11 @@ export function GameFlow() {
             reduced: reducedMotion,
             gameMuted: state.muted,
             audio: metroPlay.audio,
-            driver: metroPlay.driver,
+            demo: metroPlay.demo,
             ...metroDemoRun(),
-            onDone: (lives: number) => {
+            onDone: (lives: number, coins: number) => {
               setMetroPlay(null);
-              go({ type: "MINIGAME", id: "metro", result: { lives } });
+              go({ type: "MINIGAME", id: "metro", result: { lives, coins } });
             },
           }}
         />

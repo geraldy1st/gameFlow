@@ -1,25 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createMatch, cur, hydrate, reduce, type GameState, type Pick, type Player } from "@/game/engine";
-import {
-  RUN,
-  act,
-  advanceRun,
-  currentSpeed,
-  generateObstacles,
-  jumpY,
-  makeAutopilot,
-  metroOfferTurn,
-  metroReward,
-  newRun,
-  sliding,
-  speedAt,
-  wrongGestures,
-  type Lane,
-  type MetroAction,
-  type Obstacle,
-  type ObstacleKind,
-  type RunState,
-} from "./logic";
+import { metroOfferTurn, metroReward } from "./logic";
+import { RUN, act, advanceRun, currentSpeed, generateObstacles, jumpY, makeAutopilot, newRun, sliding, speedAt, wrongGestures, type Lane, type MetroAction, type Obstacle, type ObstacleKind, type RunState } from "./runner";
 import { parseText } from "@/game/text";
 import { tr } from "@/game/i18n";
 import { firstChoice } from "@/game/__tests__/drive";

@@ -4,7 +4,7 @@
  * entrance « MÉTRO 地下鉄 », the walker with his plank, the police officer, the works barrier, and the runner seen
  * from the front with the player's portrait as a medallion face. Pure drawing: reads RunState, never changes it.
  */
-import { RUN, jumpY, currentSpeed, laneX, sliding, type Obstacle, type RunState } from "../logic";
+import { RUN, jumpY, currentSpeed, laneX, sliding, type Obstacle, type RunState } from "../runner";
 import type { Camera, DrawInput, FaceSet, RunnerSkin, SkinLabels } from "./types";
 
 const C = {

@@ -4,9 +4,9 @@ Actifs **uniquement** en dev (`npm run dev`) ou dans un build fait avec `VITE_ME
 
 | Paramètre d'URL | Effet |
 |---|---|
-| `?metro-demo=win` | un bot fait les bons gestes : arrivée sans perte de vie → **+500 $** |
-| `?metro-demo=hurt` | le bot rate le 3e obstacle : une vie perdue → **+250 $** |
-| `?metro-demo=crash` | le bot fait les mauvais gestes : 0 vie → **ratée**, aucun gain |
+| `?metro-demo=win` | un bot fait les bons gestes : arrivée sans perte de vie → **+500 $** + 5 $ par pièce ramassée (v6.1) |
+| `?metro-demo=hurt` | le bot rate le 4e obstacle rencontré : une vie perdue → **+250 $** + pièces |
+| `?metro-demo=crash` | le bot fait les mauvais gestes : 0 vie → **ratée**, pas de prime (les pièces ramassées sont gardées) |
 | `?metro-seed=<entier>` | graine des obstacles (défaut `RUN.seed` = 1008, déjà déterministe) |
 | `?metro-length=<mètres>` | longueur de la piste, bornée à 30–260 m (défaut 260 m, ~27 s). Avec 60 m, la course dure quelques secondes |
 
@@ -22,3 +22,5 @@ npx vite preview --config vite.pages.config.ts  # ou tout serveur statique sur d
 3. Attendre l'écran de victoire, puis cliquer « Retour à la partie » : la caisse augmente de 500 $ et le journal affiche « Course vers le métro : +500 $ ».
 
 La course est entièrement déterministe à graine et longueur égales : le bot joue sur l'état pur (`RunState`), pas sur le temps réel de l'écran.
+
+v6.1 : les bots vivent dans le chunk paresseux (`src/minigames/metro/runner.ts`, `demoDriver`) ; GameFlow ne passe que le nom (`demo`). Tests à graine : `src/minigames/metro/v61.test.ts`.

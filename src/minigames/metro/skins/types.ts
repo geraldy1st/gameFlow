@@ -4,7 +4,7 @@
  * ("Shibuya by day", metro-skin-shibuya.ts, after Mirage's mockup); another one (e.g. motorbike delivery) only has
  * to implement RunnerSkin.
  */
-import type { RunState } from "../logic";
+import type { RunState } from "../runner";
 
 export interface FaceSet {
   idle: HTMLImageElement | null;
@@ -26,7 +26,11 @@ export interface SkinLabels {
 
 /** Comic words (hit "BONK!", "DING!" at the entrance). */
 export interface Fx {
-  kind: "bam" | "word";
+  /** spark: coin pick-up (v6), at world position x / y / z. */
+  kind: "bam" | "word" | "spark";
+  x?: number;
+  y?: number;
+  z?: number;
   word: string;
   age: number;
   life: number;

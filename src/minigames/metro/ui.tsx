@@ -7,17 +7,21 @@
  *   sound = metro-audio.ts; this file only wires input, loop, HUD, result and accessibility.
  * Nothing here touches the game state: onDone(lives) hands control back to GameFlow, which dispatches METRO.
  */
-import { useCallback, useEffect, useRef, useState } from "react";
-import { METRO_LIVES, RUN, act, advanceRun, currentSpeed, metroReward, newRun, type MetroAction, type RunState } from "./logic";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { METRO_COIN_VALUE, METRO_LIVES, metroCoins, metroReward } from "./logic";
+import { RUN, act, countdownDigit, advanceRun, currentSpeed, demoDriver, laneX, newRun, type MetroAction, type RunState } from "./runner";
 import { RunnerAudio, readRunnerMute, saveRunnerMute } from "./audio";
 import { FIREWORK_MARKS, fireworkBurst, staticSparkles, updateSparks, type Camera, type FaceSet, type Fx, type RunnerSkin, type SkinLabels, type Spark } from "./skins/types";
-import { SHIBUYA } from "./skins/shibuya";
+import { NEON, loadNeonAssets } from "./skins/neon";
+import "./metro-v61.css";
+import { withV61 } from "./i18n-v61";
 
 type TFn = (text: string, vars?: Record<string, string | number>) => string;
 type MoneyFn = (n: number, signed?: boolean) => string;
 
-/** The only skin for now (Shibuya by day). */
-const METRO_SKIN: RunnerSkin = SHIBUYA;
+/** v6.1 (Mirage, approved by Geraldy): Akihabara by night, painted backdrop and Drive sprites. The v1 "Shibuya by
+ *  day" skin (skins/shibuya.ts) stays available. */
+const METRO_SKIN: RunnerSkin = NEON;
 
 /** Japanese shop signs: only these glyphs are fetched, and only once the minigame shows up. */
 function ensureJpFont(): void {
@@ -34,7 +38,7 @@ function skinLabels(t: TFn): SkinLabels {
     metro: t("METRO"),
     line: t("Line 2 · Freedom"),
     ready: t("On your marks"),
-    go: t("Run!"),
+    go: t("Let’s go!"),
     ding: t("DING!"),
     stop: t("STOP"),
     bonk: t("BONK!"),
@@ -76,7 +80,8 @@ export interface MetroOfferProps {
   onDecline: () => void;
 }
 
-export function MetroOffer({ t, money, portrait, reduced, gameMuted, onRun, onDecline }: MetroOfferProps) {
+export function MetroOffer({ t: gameT, money, portrait, reduced, gameMuted, onRun, onDecline }: MetroOfferProps) {
+  const t = useMemo(() => withV61(gameT), [gameT]);
   const canvas = useRef<HTMLCanvasElement>(null);
   const labels = useRef(skinLabels(t));
   labels.current = skinLabels(t);
@@ -95,6 +100,7 @@ export function MetroOffer({ t, money, portrait, reduced, gameMuted, onRun, onDe
   useCanvasSize(canvas, draw);
   useEffect(() => {
     ensureJpFont();
+    loadNeonAssets();
     if (reduced) {
       draw();
       const id = window.setTimeout(draw, 600); // fonts
@@ -130,12 +136,12 @@ export function MetroOffer({ t, money, portrait, reduced, gameMuted, onRun, onDe
           </div>
           <p id="metro-offer-desc">
             {t("Three lanes, three lives, one street to the metro entrance.")} {t("Arrive without a hit:")} <b>{money(500, true)}</b>.{" "}
-            {t("With one or two lives left:")} <b>{money(250, true)}</b>. {t("Saying no costs nothing.")}
+            {t("With one or two lives left:")} <b>{money(250, true)}</b>. {t("Each coin: {amount}, kept even if you miss.", { amount: money(METRO_COIN_VALUE, true) })} {t("Saying no costs nothing.")}
           </p>
           <ul className="mr-legend">
             <li>
               <i className="mr-lg walker" aria-hidden="true">↓</i>
-              <span><b>{t("Passer-by with a plank")}</b> : {t("slide under it, or change lane")}</span>
+              <span><b>{t("Movers and their wardrobe")}</b> : {t("slide under it, or change lane")}</span>
             </li>
             <li>
               <i className="mr-lg cop" aria-hidden="true">⇆</i>
@@ -186,15 +192,17 @@ export interface MetroRunProps {
   /** The game's own mute (default for the runner's ♪ until the player chooses). */
   gameMuted: boolean;
   audio: RunnerAudio | null;
-  /** Called once, from « Retour à la partie »: lives left (0 = missed). */
-  onDone: (lives: number) => void;
-  /** Dev-only bot (hidden ?metro-demo hook); never passed in production builds. */
-  driver?: (s: RunState) => MetroAction | null;
+  /** Called once, from « Retour à la partie »: lives left (0 = missed) and coins picked up. */
+  onDone: (lives: number, coins: number) => void;
+  /** Dev-only bot (hidden ?metro-demo=win|hurt|crash hook); never passed in production builds. */
+  demo?: "win" | "hurt" | "crash";
 }
 
 type Pause = null | "user" | "hidden";
 
-export function MetroRun({ t, money, name, faces, skirt, cash, seed = RUN.seed, length = RUN.length, reduced, gameMuted, audio, onDone, driver }: MetroRunProps) {
+export function MetroRun({ t: gameT, money, name, faces, skirt, cash, seed = RUN.seed, length = RUN.length, reduced, gameMuted, audio, onDone, demo }: MetroRunProps) {
+  const t = useMemo(() => withV61(gameT), [gameT]);
+  const driver = useMemo(() => demoDriver(demo), [demo]);
   const run = useRef<RunState>(newRun(seed, length));
   const cam = useRef<Camera>({ x: 0, z: -4.2 });
   const fx = useRef<Fx[]>([]);
@@ -208,8 +216,9 @@ export function MetroRun({ t, money, name, faces, skirt, cash, seed = RUN.seed, 
   const [paused, setPaused] = useState<Pause>(null);
   const pausedRef = useRef<Pause>(null);
   pausedRef.current = paused;
-  const [result, setResult] = useState<null | { won: boolean; lives: number }>(null);
-  const [say, setSay] = useState(t("On your marks. 3 lives."));
+  const [result, setResult] = useState<null | { won: boolean; lives: number; coins: number }>(null);
+  const [coinN, setCoinN] = useState(0);
+  const [say, setSay] = useState("");
   const [muted, setMutedState] = useState(() => readRunnerMute(gameMuted));
   const [shownCash, setShownCash] = useState(cash);
   const [cashBump, setCashBump] = useState(false);
@@ -280,13 +289,16 @@ export function MetroRun({ t, money, name, faces, skirt, cash, seed = RUN.seed, 
   const finish = useCallback(
     (s: RunState) => {
       const won = s.outcome === "won";
-      setResult({ won, lives: won ? s.lives : 0 });
+      const coins = metroCoins(s.coinN);
+      setResult({ won, lives: won ? s.lives : 0, coins });
       audio?.sfx(won ? "win" : "fail");
-      const reward = won ? metroReward(s.lives) : 0;
+      const reward = (won ? metroReward(s.lives) : 0) + coins * METRO_COIN_VALUE;
       setSay(
         won
-          ? t("You made the metro. Lives left: {n}/3. {amount} won.", { n: s.lives, amount: money(reward) })
-          : t("Missed. No reward."),
+          ? t("You made the metro with {n} lives and {c} coins. {amount} won.", { n: s.lives, c: coins, amount: money(reward) })
+          : coins
+            ? t("Missed. {c} coins kept: {amount}.", { c: coins, amount: money(reward) })
+            : t("Missed. No reward."),
       );
       fw.current = { t: 0, i: 0 };
       sparks.current = won && reduced ? staticSparkles() : [];
@@ -316,13 +328,32 @@ export function MetroRun({ t, money, name, faces, skirt, cash, seed = RUN.seed, 
           }
         }
         run.current = s;
-        audio?.pump(dt);
+        // music from bar 1 when the run starts; during the countdown only the beeps
+        if (s.phase !== "count") audio?.pump(dt);
+        // R3: "3", "2", "1" announced once each (aria-live), with a beep
+        if (s.phase === "count") {
+          const digit = countdownDigit(s);
+          const was = before.t > 0 ? countdownDigit(before) : 0;
+          if (digit !== was) {
+            audio?.sfx("beep");
+            setSay(String(digit));
+          }
+        }
+        if (s.coinN > before.coinN) {
+          audio?.sfx("pickup");
+          setCoinN(s.coinN);
+          for (const cn of s.coins) if (cn.got && !before.coins[cn.id]!.got) fx.current.push({ kind: "spark", word: "", x: laneX(cn.lane), y: cn.y, z: cn.z, age: 0, life: 0.45 });
+        }
         fx.current = fx.current.filter((f) => (f.age += dt) < f.life);
         const k = fxT.current;
         k.shake = Math.max(0, k.shake - dt);
         k.flash = Math.max(0, k.flash - dt);
         k.vign = Math.max(0, k.vign - dt);
-        if (before.phase === "count" && s.phase === "run") setSay(t("Run! 3 lives. The metro is {m} metres away.", { m: s.length }));
+        if (before.phase === "count" && s.phase === "run") {
+          audio?.restartMusic();
+          audio?.sfx("go");
+          setSay(t("{go} 3 lives. The metro is {m} metres away.", { go: labels.current.go, m: s.length }));
+        }
         if (s.hits > before.hits) {
           const kind = s.lastHit;
           fx.current.push({ kind: "bam", age: 0, life: 0.7, word: kind === "cop" ? t("STOP!") : kind === "barrier" ? labels.current.bonk : labels.current.oops });
@@ -476,7 +507,7 @@ export function MetroRun({ t, money, name, faces, skirt, cash, seed = RUN.seed, 
   useEffect(() => {
     if (!result) return;
     window.setTimeout(() => backBtn.current?.focus({ preventScroll: true }), 30);
-    const reward = result.won ? metroReward(result.lives) : 0;
+    const reward = (result.won ? metroReward(result.lives) : 0) + result.coins * METRO_COIN_VALUE;
     if (!reward) {
       const id = window.setTimeout(() => setJournalShown(true), reduced ? 0 : 450);
       return () => window.clearTimeout(id);
@@ -544,15 +575,17 @@ export function MetroRun({ t, money, name, faces, skirt, cash, seed = RUN.seed, 
     if (doneRef.current || !result) return;
     doneRef.current = true;
     audio?.close();
-    onDone(result.won ? result.lives : 0);
+    onDone(result.won ? result.lives : 0, result.coins);
   };
 
-  const reward = result?.won ? metroReward(result.lives) : 0;
-  const journal = result ? (result.won ? t("Metro run: +{amount}", { amount: money(reward) }) : t("Metro run: missed")) : "";
+  const prime = result?.won ? metroReward(result.lives) : 0;
+  const coinCash = (result?.coins ?? 0) * METRO_COIN_VALUE;
+  const reward = prime + coinCash;
+  const journal = result ? (reward > 0 ? t("Metro run: +{amount}", { amount: money(reward) }) : t("Metro run: missed")) : "";
   const controls: { a: MetroAction; label: string; hint: string; kbd: string; path: string }[] = [
     { a: "left", label: t("left"), hint: t("Change lane to the left"), kbd: "← A", path: "M15 5l-7 7 7 7" },
     { a: "jump", label: t("jump"), hint: t("Jump over a barrier"), kbd: "↑ W", path: "M5 16l7-8 7 8" },
-    { a: "slide", label: t("slide"), hint: t("Slide under a passer-by’s plank"), kbd: "↓ S", path: "M5 8l7 8 7-8" },
+    { a: "slide", label: t("slide"), hint: t("Slide under the movers’ wardrobe"), kbd: "↓ S", path: "M5 8l7 8 7-8" },
     { a: "right", label: t("right"), hint: t("Change lane to the right"), kbd: "D →", path: "M9 5l7 7-7 7" },
   ];
   const heart = "M12 21s-7.5-4.6-9.6-9.3C.8 8.1 3 4.5 6.6 4.5c2.1 0 3.6 1.1 5.4 3.1 1.8-2 3.3-3.1 5.4-3.1 3.6 0 5.8 3.6 4.2 7.2C19.5 16.4 12 21 12 21z";
@@ -574,6 +607,10 @@ export function MetroRun({ t, money, name, faces, skirt, cash, seed = RUN.seed, 
                   <path d={heart} />
                 </svg>
               ))}
+            </div>
+            <div className="mr-chip mr-coinchip" role="img" aria-label={t("{n} coins picked up", { n: coinN })}>
+              <span className="mr-cico" aria-hidden="true">円</span>
+              <b aria-hidden="true">{coinN}</b>
             </div>
             <div className="mr-chip mr-meter">
               <span className="mr-lbl">{t("Metro")}</span>
@@ -650,9 +687,9 @@ export function MetroRun({ t, money, name, faces, skirt, cash, seed = RUN.seed, 
                 ? result.lives === METRO_LIVES
                   ? t("{name} jumps into the train with all 3 lives. The trip pays the full bonus.", { name })
                   : t("{name} catches the train. Lives left: {n}/3. Reduced bonus.", { name, n: result.lives })
-                : t("The metro left without you. No reward, and no second try for this offer.")}
+                : t("The metro left without you. No bonus, and no second try for this offer (the coins you picked up are kept).")}
             </p>
-            {result.won && (
+            {reward > 0 && (
               <div className="mr-rewardrow">
                 <span className="mr-reward" ref={rewardEl}>{money(reward, true)}</span>
                 <span className={`mr-cash${cashBump ? " bump" : ""}`}>
@@ -660,6 +697,13 @@ export function MetroRun({ t, money, name, faces, skirt, cash, seed = RUN.seed, 
                   <b ref={cashEl}>{money(shownCash)}</b>
                 </span>
               </div>
+            )}
+            {result.coins > 0 && (
+              <p className="mr-coinline">
+                {result.won
+                  ? t("Bonus {prime} + {c} coins × {v} ({sum})", { prime: money(prime), c: result.coins, v: money(METRO_COIN_VALUE), sum: money(coinCash) })
+                  : t("{c} coins × {v}: {sum} kept", { c: result.coins, v: money(METRO_COIN_VALUE), sum: money(coinCash) })}
+              </p>
             )}
             <p className="mr-jline">{journalShown ? `${t("Journal")} · ${journal}` : "\u00a0"}</p>
             <button type="button" className="mr-btn gold" ref={backBtn} data-autofocus onClick={back}>{t("Back to the game")}</button>
