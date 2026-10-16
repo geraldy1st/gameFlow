@@ -4,7 +4,8 @@
  * - "v1": the original policy (ROLL / CHOICE / BORROW / SELL / REPAY / LIFE / QUIZ / METRO / ENTER / DREAM / RETIRE),
  *   identical to engine-fingerprint.test.ts and Crypto's engine-fp.mjs: 844f62971aa0030a since the payday invite (was c5b22799e4ee85a3). Kept as a regression.
  * - "v2": v1 plus the goods / home / circle actions at a low weight (6 % of idle steps that v1 would ROLL), so
- *   BUY_GOOD, BUY_CLOTH, WEAR, BUY_HOME, TOGGLE_HOME, HOUSE, CIRCLE and SKIP_TRAINING are covered.
+ *   BUY_GOOD, BUY_CLOTH, WEAR, BUY_HOME, TOGGLE_HOME, HOUSE, CIRCLE and SKIP_TRAINING are covered, and since home-aoi
+ *   the Chez Aoi actions (BUY_HOUSING, BUY_FURNITURE, HOME_PLACE, HOME_STORE, SELL_FURNITURE, HOME_ENTER, HOME_ACT).
  *   Every 10th seed of v2 / goods starts as a tutorial game (createMatch …, { training: true }).
  * - "goods": the same extra actions at a strong weight (50 %), to catch any goods / home rule change.
  *
@@ -14,13 +15,18 @@
  */
 import { createHash } from "node:crypto";
 
-export type PolicyName = "v1" | "v2" | "goods";
+export type PolicyName = "v1" | "v2" | "goods" | "home";
 
-export const POLICY_EXTRA_WEIGHT: Record<PolicyName, number> = { v1: 0, v2: 0.06, goods: 0.5 };
+export const POLICY_EXTRA_WEIGHT: Record<PolicyName, number> = { v1: 0, v2: 0.06, goods: 0.5, home: 0.5 };
 
 export const FP_GOODS = ["bike", "scooter", "kei", "duplex", "book", "gym", "canvas", "atelier", "nope"];
 export const FP_CLOTHES = ["tee", "shorts", "jog", "night", "shirt", "jeans"];
 export const FP_HOME = ["lamp", "plant", "sofa", "desk", "charm", "nope"];
+/** Chez Aoi (home-data.ts): housings, supplies and slots, plus one unknown id each. */
+/** "home" policy (home-aoi): same weight as goods, Chez Aoi actions only (Crypto: a strong-weight home policy). */
+export const FP_HOUSING = ["kichijoji", "nakameguro", "nope"];
+export const FP_FURN = ["sofa", "futon", "plant", "desk", "nope"];
+export const FP_SLOTS = ["salon-fl", "salon-br", "chambre-bl", "sdb-c", "nope"];
 
 interface Engine {
   createMatch: (picks: { characterId: string; dreamId: string }[], seed: number, muted: boolean, opts?: { training?: boolean }) => any;
@@ -42,9 +48,9 @@ export function prng(seed: number) {
 const CH = ["aoi", "ren", "mio", "sora"], DR = ["cafe", "studio", "retreat", "scholar"];
 
 /** One extra action (v2 / goods), drawn from `rnd`. */
-export function extraAction(rnd: () => number, p: any): unknown {
+export function extraAction(rnd: () => number, p: any, homeOnly = false): unknown {
   const pick = <T,>(xs: T[]) => xs[Math.floor(rnd() * xs.length)]!;
-  switch (Math.floor(rnd() * 8)) {
+  switch (homeOnly ? 8 : Math.floor(rnd() * 9)) {
     case 0: return { type: "BUY_GOOD", id: pick(FP_GOODS) };
     case 1: return { type: "BUY_CLOTH", outfit: pick(FP_CLOTHES) };
     case 2: return { type: "WEAR", outfit: pick(FP_CLOTHES) };
@@ -52,7 +58,18 @@ export function extraAction(rnd: () => number, p: any): unknown {
     case 4: return { type: "TOGGLE_HOME", id: pick(FP_HOME) };
     case 5: return { type: "HOUSE" };
     case 6: return { type: "CIRCLE", friendId: p.friends?.length ? pick(p.friends as { id: string }[]).id : "nobody" };
-    default: return { type: "SKIP_TRAINING" };
+    case 7: return { type: "SKIP_TRAINING" };
+    default:
+      // Chez Aoi (home-aoi): one draw for the family, one for the action.
+      switch (Math.floor(rnd() * 7)) {
+        case 0: return { type: "BUY_HOUSING", id: pick(FP_HOUSING) };
+        case 1: return { type: "BUY_FURNITURE", id: pick(FP_FURN) };
+        case 2: return { type: "HOME_PLACE", homeId: "kichijoji", slot: pick(FP_SLOTS), itemId: pick(FP_FURN) };
+        case 3: return { type: "HOME_STORE", homeId: "kichijoji", slot: pick(FP_SLOTS) };
+        case 4: return { type: "SELL_FURNITURE", id: pick(FP_FURN) };
+        case 5: return { type: "HOME_ENTER", homeId: pick(FP_HOUSING) };
+        default: return { type: "HOME_ACT", id: "nap" };
+      }
   }
 }
 
@@ -84,7 +101,7 @@ export function playGame(E: Engine, seed: number, policy: PolicyName) {
       else if (r < 0.14) a = { type: "LIFE", kind: ["birthday", "museum", "sleep"][Math.floor(rnd() * 3)] };
       else if (r < 0.16) a = { type: "QUIZ", correct: Math.floor(rnd() * 6), creative: Math.floor(rnd() * 2) };
       else if (r < 0.18) a = { type: "METRO", result: rnd() < 0.5 ? "decline" : "run", lives: Math.floor(rnd() * 4) };
-      else if (w > 0 && r < 0.18 + w) a = extraAction(rnd, p);
+      else if (w > 0 && r < 0.18 + w) a = extraAction(rnd, p, policy === "home");
       else a = { type: "ROLL" };
     } else if (s.phase === "rolling") a = { type: "REVEAL" };
     else if (s.phase === "moving") a = { type: "STEP" };

@@ -5,12 +5,13 @@
 import { sceneOfMinigame } from "@/scenes/registry";
 import { useLayoutEffect, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { FRIENDS, PARTNERS } from "@/game/data";
-import { cur, ownsGood, progressOf, quizOpen, quizWait, shopPrice, statement, type Action, type GameState, type Player } from "@/game/engine";
+import { cur, furnitureFree, homeDayOf, napPoints, ownsGood, progressOf, quizOpen, quizWait, shopPrice, statement, type Action, type GameState, type Player } from "@/game/engine";
 import { formatCompact } from "@/game/format-compact";
 import { MINIGAME_REGISTRY, MINIGAME_SOON } from "@/minigames/registry";
 import { CLASS_QUIZ, CURVES, AFFINITY_SEED, GOODS_CATEGORIES, SKILL_RULES, SOON_GOODS, type GoodsCategory } from "@/game/tuning";
 import { ARTICLES, SHOP_DEFINITIONS, articlesOfShop, shopById, shopOfArticle, shopOfType, type ShopDefinition } from "@/game/articles";
 import { HOME_LEVEL, HOME_SHOP } from "@/game/shop";
+import { FURNITURE, HOME_SLOTS_PER_TURN, HOUSING, RESALE_RATE, housingById } from "@/game/home-data";
 import { BIRTHDAY_COST, MUSEUM_COST, OUTFITS, clothDelta, type OutfitId } from "@/game/life";
 import { SKILL_IDS, SKILL_NAMES, experienceXp, maxFriends, skillLevel, skillXp, type SkillId } from "@/game/skills";
 import { SKILL_INFO, skillInfo } from "@/game/skills-info";
@@ -131,19 +132,20 @@ export function Tabs<T extends string>({ tabs, value, onChange, t, label }: { ta
 
 /* ------------------------------------------------------------------ Day */
 
-export type DayTab = "income" | "goods" | "circle" | "stats";
+export type DayTab = "income" | "goods" | "circle" | "stats" | "home";
 
-export function DayPanel({ state, tab, setTab, t, lang, go, onFriend, onClose }: { state: GameState; tab: DayTab; setTab: (t: DayTab) => void; t: TFn; lang: Lang; go: Go; onFriend: (id: string) => void; onClose: () => void }) {
+export function DayPanel({ state, tab, setTab, t, lang, go, onFriend, onHome, onClose }: { state: GameState; tab: DayTab; setTab: (t: DayTab) => void; t: TFn; lang: Lang; go: Go; onFriend: (id: string) => void; onHome?: (homeId: string) => void; onClose: () => void }) {
   const p = cur(state);
   return (
     <div className="v3-panel">
-      <PanelHead kicker={t("Day")} title={t(tab === "income" ? "Income" : tab === "goods" ? "Goods" : tab === "circle" ? "Circle" : "Stats")} t={t} onClose={onClose} />
+      <PanelHead kicker={t("Day")} title={t(tab === "income" ? "Income" : tab === "goods" ? "Goods" : tab === "circle" ? "Circle" : tab === "home" ? "Home" : "Stats")} t={t} onClose={onClose} />
       <Tabs<DayTab>
         tabs={[
           ["income", "Income"],
           ["goods", "Goods"],
           ["circle", "Circle"],
           ["stats", "Stats"],
+          ["home", "Home"],
         ]}
         value={tab}
         onChange={setTab}
@@ -155,8 +157,101 @@ export function DayPanel({ state, tab, setTab, t, lang, go, onFriend, onClose }:
         {tab === "goods" && <GoodsTab state={state} p={p} t={t} lang={lang} go={go} />}
         {tab === "circle" && <CircleTab state={state} p={p} t={t} onFriend={onFriend} />}
         {tab === "stats" && <StatsTab state={state} p={p} t={t} lang={lang} go={go} />}
+        {tab === "home" && <HomeTab state={state} p={p} t={t} lang={lang} go={go} onHome={onHome} />}
       </div>
     </div>
+  );
+}
+
+/** Chez Aoi: owned housings (Enter), the home counter, and the inventory with resale at 50 %. */
+export function HomeTab({ state, p, t, lang, go, onHome }: { state: GameState; p: Player; t: TFn; lang: Lang; go: Go; onHome?: (homeId: string) => void }) {
+  const idle = state.phase === "idle" && !state.practice;
+  const homes = Object.keys(p.housing ?? {}).filter((id) => !!housingById(id));
+  const d = homeDayOf(p);
+  const free = FURNITURE.filter((f) => furnitureFree(p, f.id) > 0);
+  type Row = { id: string; node: ReactNode };
+  const rows: Row[] = [
+    ...homes.map((id) => ({
+      id: `h:${id}`,
+      node: (
+        <div className="v3-card">
+          <span className="v3-ic" aria-hidden="true"><Ico name="house" /></span>
+          <span className="v3-tx">
+            <strong>{t(housingById(id)!.name)}</strong>
+            <small>{t("{n} of {max} time slots left today", { n: HOME_SLOTS_PER_TURN - d.used, max: HOME_SLOTS_PER_TURN })}</small>
+          </span>
+          <button type="button" className="v3-tag act" data-home-enter={id} disabled={!idle || !onHome} onClick={() => onHome?.(id)}>{t("Enter")}</button>
+        </div>
+      ),
+    })),
+    ...free.map((f) => ({
+      id: `f:${f.id}`,
+      node: (
+        <div className="v3-card">
+          <span className="v3-ic" aria-hidden="true"><Ico name={f.icon} /></span>
+          <span className="v3-tx">
+            <strong>{t(f.name)} × {furnitureFree(p, f.id)}</strong>
+            <small>{t("In the inventory")}</small>
+          </span>
+          <button type="button" className="v3-tag act" disabled={!idle} onClick={() => go({ type: "SELL_FURNITURE", id: f.id })} aria-label={t("Sell {item} for {amount}", { item: t(f.name), amount: fmtMoney(lang, Math.floor(f.price * RESALE_RATE)) })}>
+            {t("Sell")} {cmoney(lang, Math.floor(f.price * RESALE_RATE))}
+          </button>
+        </div>
+      ),
+    })),
+  ];
+  if (!rows.length) return <p className="v3-muted">{t("No home yet. Immo Dada (Activities › Shops) sells apartments and home supplies.")}</p>;
+  return (
+    <>
+      <p className="v3-muted">{t("Nap: +{n} on every gauge, no turn spent.", { n: napPoints(p) })} {t("{n} of {max} time slots left today", { n: HOME_SLOTS_PER_TURN - d.used, max: HOME_SLOTS_PER_TURN })}</p>
+      <Pager items={rows} minW={200} itemH={62} t={t} label={t("Home")} render={(r) => r.node} />
+    </>
+  );
+}
+
+/** Immo Dada: housing (one in stock, the others "out of stock") and home supplies; same design as the shops. */
+function ImmoView({ state, p, t, lang, go, onBack }: { state: GameState; p: Player; t: TFn; lang: Lang; go: Go; onBack: () => void }) {
+  const idle = state.phase === "idle" && !state.practice;
+  type Item = { id: string; name: string; note: string; icon: string; price: number; owned?: boolean; out?: boolean; buy: () => void };
+  const items: Item[] = [
+    ...HOUSING.map((h) => ({ id: h.id, name: t(h.name), note: h.inStock ? t("Empty on purchase") : fmtMoney(lang, h.price), icon: "house", price: h.price, owned: !!p.housing?.[h.id], out: !h.inStock, buy: () => go({ type: "BUY_HOUSING", id: h.id }) })),
+    ...FURNITURE.map((f) => ({ id: f.id, name: t(f.name), note: t("Home supply · resale {amount}", { amount: fmtMoney(lang, Math.floor(f.price * RESALE_RATE)) }), icon: f.icon, price: f.price, buy: () => go({ type: "BUY_FURNITURE", id: f.id }) })),
+  ];
+  return (
+    <>
+      <div className="v3-subrow">
+        <button type="button" className="v3-link" onClick={onBack}>
+          ← {t("Shops")}
+        </button>
+        <span className="v3-cash">{t("Cash")}{lang === "en" ? ": " : " : "}<b>{cmoney(lang, p.cash)}</b></span>
+      </div>
+      <Pager
+        items={items}
+        minW={200}
+        itemH={62}
+        t={t}
+        label="Immo Dada"
+        render={(it) => (
+          <div className={`v3-card ${it.out ? "locked" : ""}`}>
+            <span className="v3-ic" aria-hidden="true"><Ico name={it.icon} /></span>
+            <span className="v3-tx">
+              <strong>{it.name}</strong>
+              <small>{it.note}</small>
+            </span>
+            {it.owned ? (
+              <span className="v3-tag own">{t("Owned")}</span>
+            ) : it.out ? (
+              <span className="v3-tag">{t("Out of stock")}</span>
+            ) : (
+              <button type="button" className="v3-tag act" disabled={!idle || p.cash < it.price} onClick={it.buy} aria-label={t("Buy {item} for {amount}", { item: it.name, amount: fmtMoney(lang, it.price) })}>
+                {cmoney(lang, it.price)}
+              </button>
+            )}
+          </div>
+        )}
+      />
+      {!idle && <p className="v3-muted">{t("Shops serve you between two rolls.")}</p>}
+    </>
   );
 }
 
@@ -469,12 +564,13 @@ export function ActivitiesPanel({ state, t, lang, go, onQuiz, onClose }: { state
   const p = cur(state);
   const [tab, setTab] = useState<"shops" | "games">("shops");
   const [shop, setShop] = useState<string | null>(null);
-  const open = shop ? shopById(shop) : undefined;
+  const open = shop && shop !== "immo" ? shopById(shop) : undefined;
+  const immo = shop === "immo";
   const pr = progressOf(p);
   return (
     <div className="v3-panel">
-      <PanelHead kicker={t("Activities")} title={open ? t(open.name) : t(tab === "shops" ? "Shops" : "Mini-games")} t={t} onClose={onClose} />
-      {!open && (
+      <PanelHead kicker={t("Activities")} title={immo ? "Immo Dada" : open ? t(open.name) : t(tab === "shops" ? "Shops" : "Mini-games")} t={t} onClose={onClose} />
+      {!open && !immo && (
         <Tabs<"shops" | "games">
           tabs={[
             ["shops", "Shops"],
@@ -487,16 +583,29 @@ export function ActivitiesPanel({ state, t, lang, go, onQuiz, onClose }: { state
         />
       )}
       <div className="v3-body">
-        {open ? (
+        {immo ? (
+          <ImmoView state={state} p={p} t={t} lang={lang} go={go} onBack={() => setShop(null)} />
+        ) : open ? (
           <ShopView shop={open} state={state} p={p} t={t} lang={lang} go={go} onBack={() => setShop(null)} />
         ) : tab === "shops" ? (
           <Pager
-            items={SHOP_DEFINITIONS}
+            items={[IMMO_CARD, ...SHOP_DEFINITIONS]}
             minW={200}
             itemH={62}
             t={t}
             label={t("Shops")}
             render={(s) => {
+              if (s === IMMO_CARD)
+                return (
+                  <button type="button" className="v3-card" onClick={() => setShop("immo")} style={{ "--c": "#3E7CB1" } as CSSProperties}>
+                    <span className="v3-ic tint" aria-hidden="true"><Ico name="house" /></span>
+                    <span className="v3-tx">
+                      <strong>Immo Dada</strong>
+                      <small>{t("Housing and home supplies")}</small>
+                    </span>
+                    <span className="v3-tag">→</span>
+                  </button>
+                );
               const u = unlockState(s.unlock, pr);
               const txt = unlockText(u);
               return (
@@ -518,6 +627,9 @@ export function ActivitiesPanel({ state, t, lang, go, onQuiz, onClose }: { state
     </div>
   );
 }
+
+/** Immo Dada's entry in the shops list (its own page, same design). */
+const IMMO_CARD = { id: "immo", name: "Immo Dada", icon: "house", color: "#3E7CB1", unlock: SHOP_DEFINITIONS[0]!.unlock, sells: SHOP_DEFINITIONS[0]!.sells } as ShopDefinition;
 
 function ShopView({ shop, state, p, t, lang, go, onBack }: { shop: ShopDefinition; state: GameState; p: Player; t: TFn; lang: Lang; go: Go; onBack: () => void }) {
   const idle = state.phase === "idle";
