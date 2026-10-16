@@ -1,5 +1,7 @@
 import { tl } from "./text";
-import { METRO_LIVES, metroOfferTurn, metroReward } from "./metro-run";
+import { creativeOpen, isPractice, minigameGig, quizOpen, quizWait } from "./minigame-rules";
+import { minigameById } from "@/minigames/registry";
+import type { AnyMinigame } from "@/minigames/registry";
 import {
   BIG_DEALS,
   BOOMS,
@@ -61,7 +63,7 @@ import {
   type Vitals,
 } from "./life";
 import { CLOTH_PRICE, HOME_LEVEL, homeItem } from "./shop";
-import { CLASS_QUIZ, CURVES, SKILL_RULES, SKILL_XP } from "./tuning";
+import { CURVES, SKILL_RULES, SKILL_XP } from "./tuning";
 import { levelState } from "./format-compact";
 import { goodById, shopOfGood, unlockState, type Progress } from "./shops";
 import {
@@ -84,8 +86,6 @@ import {
   pct,
   promoCopies,
   quietDealChance,
-  quizCash,
-  quizXpBonus,
   rewardPoints,
   antiFarm,
   affinityMult,
@@ -242,6 +242,11 @@ export interface Player {
   lastInterview?: number;
   /** v3 Class quiz: own turn of the last quiz played. */
   quizTurn?: number;
+  /**
+   * Batch 5: last answered marker per mini-game id (src/minigames/registry.ts), for the games added after batch 5.
+   * Optional (absent in every older save). The metro run and the class quiz keep theirs in metroTurn / quizTurn.
+   */
+  minigames?: Record<string, number>;
   /** v3 goods bought (tuning.ts GOODS ids) and how many times (books can be bought again). */
   goods?: string[];
   goodsCount?: Record<string, number>;
@@ -380,10 +385,8 @@ export interface TrainingState {
   skipped: boolean;
 }
 
-/** DEF-TUT-10/11/12: true for a tutorial (throw-away) game, during and after its scripted turns. */
-export function isPractice(s: { practice?: unknown }): boolean {
-  return s.practice === true;
-}
+// Moved to the leaf module minigame-rules.ts (batch 5, breaks the quiz → engine import cycle); same public names.
+export { creativeOpen, isPractice, quizOpen, quizWait };
 
 /** Training state when it applies to the current player, else null (the player guard is harmless in solo, kept for online play). */
 export function trainingFor(s: GameState): TrainingState | null {
@@ -2283,7 +2286,7 @@ export type Action =
   | { type: "BUY_HOME"; id: string }
   | { type: "TOGGLE_HOME"; id: string }
   /** v3 Activities › Class quiz: `correct` good answers out of CLASS_QUIZ questions. */
-  | { type: "QUIZ"; correct: number; creative?: number }
+  | { type: "QUIZ"; correct: number; creative?: number } // alias of MINIGAME { id: "quiz" }
   /** v3 Activities › shops: buy one of tuning.ts GOODS. */
   | { type: "BUY_GOOD"; id: string }
   | { type: "MENU" }
@@ -2292,7 +2295,10 @@ export type Action =
   | { type: "MUTE" }
   | { type: "NEW"; picks: Pick[]; training?: boolean }
   | { type: "SKIP_TRAINING" }
+  /** Alias of MINIGAME { id: "metro" } (old saves, Crypto's replay). */
   | { type: "METRO"; result: "decline" | "run"; lives?: number }
+  /** Batch 5: any registered mini-game (src/minigames/registry.ts). `result`: the UI result (untrusted) or "decline". */
+  | { type: "MINIGAME"; id: string; result: unknown }
   | { type: "CONTINUE"; saved: GameState };
 
 /**
@@ -2386,19 +2392,15 @@ function awardXp(prev: GameState, next: GameState, action: Action): GameState {
     add("discipline", X.repayDiscipline);
     add("reputation", X.repayReputation);
   }
-  if (action.type === "METRO" && action.result === "run" && b.metroTurn !== a.metroTurn) {
-    const lives = Math.max(0, Math.min(METRO_LIVES, Math.floor(action.lives ?? 0)));
-    addKey("runner.finish");
-    if (lives > 0) addKey("runner.win");
-    for (let k = 0; k < lives; k++) addKey("runner.perLife", 1, false);
-    if (lives === METRO_LIVES) addKey("runner.noHit");
-  }
-  if (action.type === "QUIZ" && b.quizTurn !== a.quizTurn) {
-    const n = Math.max(0, Math.min(CLASS_QUIZ.questions, Math.floor(Number(action.correct) || 0)));
-    // Geraldy: 0 / 5 gives nothing at all; otherwise the full quiz.complete line, + the Intelligence XP bonus.
-    if (n > 0) {
-      addKey("quiz.complete", 1 + quizXpBonus(a));
-      if (creativeOpen(a) && (action.creative ?? 0) > 0) add("creativity", CLASS_QUIZ.creativeXp);
+  // Mini-games (batch 5, generic): the definition's skill lines, only for a played (not declined) answer that was
+  // recorded (the marker moved). METRO and QUIZ go through here as aliases.
+  const call = minigameCall(action);
+  const mg = call && call.raw !== "decline" ? minigameById(call.id) : undefined;
+  if (call && mg && minigameMarker(b, mg.id) !== minigameMarker(a, mg.id)) {
+    for (const w of mg.skillKeys(mg.sanitize(call.raw, a), a, call.raw)) {
+      if ("skill" in w) add(w.skill, w.xp);
+      else if (w.farm === false) for (let k = 0; k < (w.times ?? 1); k++) addKey(w.key, 1 + (w.bonus ?? 0), false);
+      else for (let k = 0; k < (w.times ?? 1); k++) addKey(w.key, 1 + (w.bonus ?? 0));
     }
   }
   // Payday with a positive flow and no loan (collect / the payday square).
@@ -2415,41 +2417,49 @@ export function progressOf(p: Player): Progress {
   return { turns: p.turns, passive: statement(p).passive, level: p.level, xpLevel: experienceLevel(p), cut: unlockCut(p) };
 }
 
-function doQuiz(s: GameState, correct: number, creative = 0): GameState {
-  if (s.screen !== "play" || s.phase !== "idle" || s.training || isPractice(s)) return s;
+/**
+ * Generic mini-game answer (batch 5): METRO and QUIZ are aliases of `{ type: "MINIGAME", id, result }`.
+ * `result` is the untrusted UI result, or "decline" for an offer game. The definition (src/minigames/<id>/index.ts)
+ * gives the rules; the engine checks it is due, clamps the result, credits the cash and feeds the gig, marks the game
+ * as answered and writes the journal line. Bit-identical to the old doMetro / doQuiz (engine-fingerprint.test.ts).
+ */
+function doMinigame(s: GameState, id: string, raw: unknown): GameState {
+  const def = minigameById(id);
+  if (!def || s.screen !== "play") return s;
   const p = cur(s);
-  if (!quizOpen(p)) return s;
-  const total = CLASS_QUIZ.questions;
-  const n = Math.max(0, Math.min(total, Math.floor(Number(correct) || 0)));
-  const c = n > 0 && creativeOpen(p) ? Math.max(0, Math.min(2, Math.floor(Number(creative) || 0))) : 0;
-  const reward = quizCash(n, total) + (c === 2 ? CLASS_QUIZ.creativeBest : c === 1 ? CLASS_QUIZ.creativeOk : 0);
-  const next = withP(s, (pl) => ({ ...(n > 0 ? minigameGig(pl) : pl), cash: pl.cash + reward, quizTurn: pl.turns }));
-  return blip(log(next, tl("Class quiz: {n}/{m}, +{amount}", { n: String(n), m: String(total), amount: money(reward) })), reward > 0 ? "cash" : null);
+  if (!p || !def.isDue(s, p)) return s;
+  const decline = raw === "decline";
+  if (decline && !def.canDecline) return s;
+  const marker = def.markerValue(s, p);
+  const result = decline ? null : def.sanitize(raw, p);
+  const cash = result === null ? 0 : Math.max(0, def.cash(result, p));
+  const gig = result !== null && (typeof def.feedsGig === "function" ? def.feedsGig(result) : !!def.feedsGig);
+  const next = withP(s, (pl) => ({ ...(gig ? minigameGig(pl) : pl), cash: pl.cash + cash, ...markerPatch(def, pl, marker) }));
+  const logged = log(next, def.logLine(result === null ? "decline" : result, cash));
+  return cash > 0 ? blip(logged, "cash") : def.blipAlways ? blip(logged, null) : logged;
 }
 
-/** SKILLS.md §11.2: the creative bonus question shows from Creativity CLASS_QUIZ.creativeAt. */
-export function creativeOpen(p: Player): boolean {
-  return SKILL_RULES.effects && skillLevel(p, "creativity") >= CLASS_QUIZ.creativeAt;
+/** Player patch that records the answer: the legacy field (metroTurn, quizTurn) or Player.minigames[id]. */
+function markerPatch(def: AnyMinigame, p: Player, marker: number): Partial<Player> {
+  if (def.legacyMarker) return { [def.legacyMarker]: marker };
+  return { minigames: { ...(p.minigames ?? {}), [def.id]: marker } };
 }
 
-/** SKILLS.md §11.6: a finished mini-game with high Creativity feeds the "online content" side income (counts for the Gate). */
-function minigameGig(p: Player): Player {
-  const r = SKILL_RULES.creativity;
-  if (!SKILL_RULES.effects || skillLevel(p, "creativity") < r.minigameAt) return p;
-  return { ...p, gigBonus: Math.min(r.minigameMax, (p.gigBonus ?? 0) + r.minigameStep) };
+/** Last answered marker of a mini-game for `p` (undefined: never answered). */
+function minigameMarker(p: Player, id: string): number | undefined {
+  const def = minigameById(id);
+  const v = def?.legacyMarker ? p[def.legacyMarker] : p.minigames?.[id];
+  return typeof v === "number" ? v : undefined;
 }
 
-/** The quiz can be played once every CLASS_QUIZ.everyTurns own turns. */
-export function quizOpen(p: Player): boolean {
-  if (CLASS_QUIZ.everyTurns <= 0 || typeof p.quizTurn !== "number") return true;
-  return p.turns - p.quizTurn >= CLASS_QUIZ.everyTurns;
+/** The alias actions as a generic mini-game call, or null. */
+function minigameCall(action: Action): { id: string; raw: unknown } | null {
+  if (action.type === "MINIGAME") return { id: action.id, raw: action.result };
+  if (action.type === "METRO") return { id: "metro", raw: action.result === "decline" ? "decline" : { lives: action.lives ?? 0 } };
+  if (action.type === "QUIZ") return { id: "quiz", raw: { correct: action.correct, creative: action.creative } };
+  return null;
 }
 
-/** Own turns left before the quiz opens again (0 = open). */
-export function quizWait(p: Player): number {
-  if (quizOpen(p)) return 0;
-  return CLASS_QUIZ.everyTurns - (p.turns - (p.quizTurn ?? 0));
-}
 
 /** Goods owned (v3). Repeatable goods (books) are counted in goodsCount. */
 export function ownsGood(p: Player, id: string): boolean {
@@ -2494,7 +2504,11 @@ function reduceCore(state: GameState, action: Action): GameState {
       // stands in front of (DEF-TUT-10/11), so the two never share a seed.
       return createMatch(action.picks, (Date.now() ^ (state.seed + 17) ^ (action.training ? 0x5bd1e995 : 0)) >>> 0, state.muted, { training: !!action.training });
     case "METRO":
-      return doMetro(state, action.result, action.lives ?? 0);
+    case "QUIZ":
+    case "MINIGAME": {
+      const call = minigameCall(action)!;
+      return doMinigame(state, call.id, call.raw);
+    }
     case "SKIP_TRAINING":
       if (!state.training || state.training.skipped) return state;
       return log({ ...state, training: { ...state.training, skipped: true } }, "Training skipped: normal rules from the next turn.");
@@ -2537,8 +2551,6 @@ function reduceCore(state: GameState, action: Action): GameState {
       return doBuyHome(state, action.id);
     case "TOGGLE_HOME":
       return doToggleHome(state, action.id);
-    case "QUIZ":
-      return doQuiz(state, action.correct, action.creative);
     case "BUY_GOOD":
       return doBuyGood(state, action.id);
     default:
@@ -3538,21 +3550,6 @@ function doBreathe(s: GameState): GameState {
   return finish(withP(s, (p) => ({ ...p, brokeTurns: 0 })), "You catch your breath. No roll this turn.", "idle");
 }
 
-/**
- * Metro run answer. Only while an offer is due (metroOfferTurn), so it opens once per multiple of 10 and can't be
- * replayed. Declining or failing changes nothing but the journal; a finished run credits the active player's cash
- * only (no calm, loans, assets or position). Always ends with the offer marked as answered.
- */
-function doMetro(s: GameState, result: "decline" | "run", lives: number): GameState {
-  const due = metroOfferTurn(s);
-  if (due === null) return s;
-  const n = withP(s, (p) => ({ ...(result === "run" ? minigameGig(p) : p), metroTurn: due }));
-  if (result === "decline") return log(n, "Metro run: not this time");
-  const reward = metroReward(lives);
-  if (reward <= 0) return log(n, "Metro run: missed");
-  return blip(log(withP(n, (p) => ({ ...p, cash: p.cash + reward })), tl("Metro run: +{amount}", { amount: money(reward) })), "cash");
-}
-
 function doBorrow(s: GameState): GameState {
   if (trainingFor(s)) return s;
   if (s.phase === "card") return doChoice(s, "borrow");
@@ -3666,6 +3663,35 @@ function withPlayerDefaults(raw0: Player): Player {
   return p;
 }
 
+function finiteTurn(v: unknown): number | undefined {
+  return typeof v === "number" && Number.isFinite(v) ? v : undefined;
+}
+
+/**
+ * Batch 5 save migration. A marker written under Player.minigames for a game whose marker lives in a legacy field
+ * (metro → metroTurn, quiz → quizTurn) is folded back into that field when the field is missing; the legacy fields
+ * stay the source of truth (Crypto's tools read them, and the fingerprint stays bit-identical).
+ */
+function legacyFromMinigames(raw: Player, id: "metro" | "quiz"): unknown {
+  const m = raw.minigames as unknown;
+  return m && typeof m === "object" ? (m as Record<string, unknown>)[id] : undefined;
+}
+
+/**
+ * Player.minigames from a save: finite numbers under well-formed ids only, without the legacy ids (folded above).
+ * Unknown ids are kept (a save from a newer build keeps its markers). Undefined when empty, so older saves hydrate to
+ * the exact same state as before batch 5. Idempotent.
+ */
+function hydrateMinigames(v: unknown): Record<string, number> | undefined {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return undefined;
+  const out: Record<string, number> = {};
+  for (const [id, n] of Object.entries(v as Record<string, unknown>)) {
+    if (id === "metro" || id === "quiz" || !/^[a-z][a-z0-9-]*$/.test(id)) continue;
+    if (typeof n === "number" && Number.isFinite(n)) out[id] = n;
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
 function validMetroTurn(v: unknown): number | undefined {
   return typeof v === "number" && Number.isFinite(v) && v > 0 ? Math.floor(v) : undefined;
 }
@@ -3699,7 +3725,7 @@ function hydratePlayer(raw0: Player): Player {
       dislikes: f.dislikes ?? 0,
     })),
     circleTurn: raw.circleTurn ?? 0,
-    metroTurn: validMetroTurn(raw.metroTurn),
+    metroTurn: validMetroTurn(raw.metroTurn ?? legacyFromMinigames(raw, "metro")),
     lifeTurn: typeof raw.lifeTurn === "number" ? raw.lifeTurn : 0,
     outfit: isOutfit(raw.outfit) ? raw.outfit : "jeans",
     ownedOutfits: ownedOutfitsOf(raw),
@@ -3714,7 +3740,8 @@ function hydratePlayer(raw0: Player): Player {
     rerollUsed: !!raw.rerollUsed,
     rollFrom: typeof raw.rollFrom === "number" && Number.isInteger(raw.rollFrom) ? raw.rollFrom : undefined,
     lastInterview: typeof raw.lastInterview === "number" && Number.isFinite(raw.lastInterview) ? raw.lastInterview : undefined,
-    quizTurn: typeof raw.quizTurn === "number" && Number.isFinite(raw.quizTurn) ? raw.quizTurn : undefined,
+    quizTurn: finiteTurn(raw.quizTurn ?? legacyFromMinigames(raw, "quiz")),
+    minigames: hydrateMinigames(raw.minigames),
     goods: Array.isArray(raw.goods) ? raw.goods.filter((id) => typeof id === "string" && !!goodById(id)) : [],
     goodsCount: raw.goodsCount && typeof raw.goodsCount === "object" ? Object.fromEntries(Object.entries(raw.goodsCount).filter(([k, v]) => !!goodById(k) && typeof v === "number" && v > 0)) : {},
   };

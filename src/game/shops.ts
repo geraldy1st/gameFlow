@@ -2,6 +2,7 @@
  * GameFlow v3 — shops that open with progression (Activities) and the data-driven goods (Day › Goods).
  * Pure: the caller passes the player's progress, so this file never imports the engine.
  */
+import { shopOfArticle } from "./articles";
 import { GOODS, SHOPS, type GoodDef, type ShopDef, type Unlock } from "./tuning";
 
 export interface Progress {
@@ -46,7 +47,8 @@ export function goodById(id: string): GoodDef | undefined {
   return GOODS.find((g) => g.id === id);
 }
 
-/** The shop that sells a good. */
+/** The shop that sells a good (through the article model, batch 6; same shop object as tuning.ts SHOPS). */
 export function shopOfGood(id: string): ShopDef | undefined {
-  return SHOPS.find((s) => Array.isArray(s.sells) && s.sells.includes(id));
+  const def = shopOfArticle("good", id);
+  return def ? SHOPS.find((s) => s.id === def.id) : undefined;
 }

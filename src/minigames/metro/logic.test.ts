@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createMatch, cur, hydrate, reduce, type GameState, type Pick, type Player } from "./engine";
+import { createMatch, cur, hydrate, reduce, type GameState, type Pick, type Player } from "@/game/engine";
 import {
   RUN,
   act,
@@ -19,10 +19,10 @@ import {
   type Obstacle,
   type ObstacleKind,
   type RunState,
-} from "./metro-run";
-import { parseText } from "./text";
-import { tr } from "./i18n";
-import { firstChoice } from "./__tests__/drive";
+} from "./logic";
+import { parseText } from "@/game/text";
+import { tr } from "@/game/i18n";
+import { firstChoice } from "@/game/__tests__/drive";
 
 const AOI: Pick = { characterId: "aoi", dreamId: "cafe" };
 const REN: Pick = { characterId: "ren", dreamId: "studio" };

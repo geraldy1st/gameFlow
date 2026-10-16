@@ -1,0 +1,8 @@
+{
+  "note": "Save carrying Player.minigames (newer build): metro/quiz markers there are folded into metroTurn/quizTurn when missing; other well-formed ids are kept; bad ids and non-numbers are dropped.",
+  "save": {
+    "version": 1, "screen": "play", "phase": "idle", "turn": 21, "current": 0, "seq": 3, "sfxId": 4, "log": [], "history": [],
+    "players": [{ "id": "p1", "characterId": "sora", "dreamId": "scholar", "careerId": "tester", "cash": 700, "position": 1, "turns": 21,
+      "minigames": { "metro": 20, "quiz": 19, "delivery-run": 12, "Bad Id": 3, "typing": "7", "nan": null } }]
+  }
+}

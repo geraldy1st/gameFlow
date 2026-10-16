@@ -1,0 +1,7 @@
+{
+  "note": "First metro-run build: one table-wide GameState.metroTurn (solo). hydrate moves it to the player.",
+  "save": {
+    "version": 1, "screen": "play", "phase": "idle", "turn": 21, "current": 0, "seq": 3, "sfxId": 4, "log": [], "history": [], "metroTurn": 20,
+    "players": [{ "id": "p1", "characterId": "ren", "dreamId": "retreat", "careerId": "tester", "cash": 1500, "position": 7, "turns": 21 }]
+  }
+}

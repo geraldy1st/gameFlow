@@ -1,0 +1,1043 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`article inventory (batch 5bis) > clothes: price, buy, wear 1`] = `
+{
+  "jeans": {
+    "buy": "refused",
+    "note": "Ordinary clothes. The offer stays as written.",
+    "price": null,
+    "wear": "refused",
+  },
+  "jog": {
+    "buy": {
+      "cash": -240,
+      "expenseMods": 0,
+      "goods": undefined,
+      "homeOn": [],
+      "homeOwned": [],
+      "journal": "⁣tl:{"k":"Bought clothes for {amount}. They are in the wardrobe.","v":{"amount":"$240"}}",
+      "newAssets": [],
+      "outfit": "jeans",
+      "ownedOutfits": [
+        "jeans",
+        "jog",
+      ],
+      "passive": 0,
+      "skills": {
+        "nego": 20,
+      },
+      "vitals": {},
+    },
+    "note": "Comfortable. A landlord still notices.",
+    "price": 240,
+    "wear": {
+      "cash": 0,
+      "expenseMods": 0,
+      "goods": undefined,
+      "homeOn": [],
+      "homeOwned": [],
+      "journal": "⁣tl:{"k":"Bought clothes for {amount}. They are in the wardrobe.","v":{"amount":"$240"}}",
+      "newAssets": [],
+      "outfit": "jog",
+      "ownedOutfits": [
+        "jeans",
+        "jog",
+      ],
+      "passive": 0,
+      "skills": {},
+      "vitals": {},
+    },
+  },
+  "night": {
+    "buy": {
+      "cash": -380,
+      "expenseMods": 0,
+      "goods": undefined,
+      "homeOn": [],
+      "homeOwned": [],
+      "journal": "⁣tl:{"k":"Bought clothes for {amount}. They are in the wardrobe.","v":{"amount":"$380"}}",
+      "newAssets": [],
+      "outfit": "jeans",
+      "ownedOutfits": [
+        "jeans",
+        "night",
+      ],
+      "passive": 0,
+      "skills": {
+        "charisma": 60,
+        "nego": 20,
+      },
+      "vitals": {},
+    },
+    "note": "Right for a night out. Wrong for a signing.",
+    "price": 380,
+    "wear": {
+      "cash": 0,
+      "expenseMods": 0,
+      "goods": undefined,
+      "homeOn": [],
+      "homeOwned": [],
+      "journal": "⁣tl:{"k":"Bought clothes for {amount}. They are in the wardrobe.","v":{"amount":"$380"}}",
+      "newAssets": [],
+      "outfit": "night",
+      "ownedOutfits": [
+        "jeans",
+        "night",
+      ],
+      "passive": 0,
+      "skills": {},
+      "vitals": {},
+    },
+  },
+  "shirt": {
+    "buy": {
+      "cash": -520,
+      "expenseMods": 0,
+      "goods": undefined,
+      "homeOn": [],
+      "homeOwned": [],
+      "journal": "⁣tl:{"k":"Bought clothes for {amount}. They are in the wardrobe.","v":{"amount":"$520"}}",
+      "newAssets": [],
+      "outfit": "jeans",
+      "ownedOutfits": [
+        "jeans",
+        "shirt",
+      ],
+      "passive": 0,
+      "skills": {
+        "charisma": 60,
+        "nego": 20,
+      },
+      "vitals": {},
+    },
+    "note": "The room takes the offer more seriously.",
+    "price": 520,
+    "wear": {
+      "cash": 0,
+      "expenseMods": 0,
+      "goods": undefined,
+      "homeOn": [],
+      "homeOwned": [],
+      "journal": "⁣tl:{"k":"Bought clothes for {amount}. They are in the wardrobe.","v":{"amount":"$520"}}",
+      "newAssets": [],
+      "outfit": "shirt",
+      "ownedOutfits": [
+        "jeans",
+        "shirt",
+      ],
+      "passive": 0,
+      "skills": {},
+      "vitals": {},
+    },
+  },
+  "shorts": {
+    "buy": {
+      "cash": -180,
+      "expenseMods": 0,
+      "goods": undefined,
+      "homeOn": [],
+      "homeOwned": [],
+      "journal": "⁣tl:{"k":"Bought clothes for {amount}. They are in the wardrobe.","v":{"amount":"$180"}}",
+      "newAssets": [],
+      "outfit": "jeans",
+      "ownedOutfits": [
+        "jeans",
+        "shorts",
+      ],
+      "passive": 0,
+      "skills": {
+        "nego": 20,
+      },
+      "vitals": {},
+    },
+    "note": "Too casual for a contract or a first day.",
+    "price": 180,
+    "wear": {
+      "cash": 0,
+      "expenseMods": 0,
+      "goods": undefined,
+      "homeOn": [],
+      "homeOwned": [],
+      "journal": "⁣tl:{"k":"Bought clothes for {amount}. They are in the wardrobe.","v":{"amount":"$180"}}",
+      "newAssets": [],
+      "outfit": "shorts",
+      "ownedOutfits": [
+        "jeans",
+        "shorts",
+      ],
+      "passive": 0,
+      "skills": {},
+      "vitals": {},
+    },
+  },
+  "tee": {
+    "buy": {
+      "cash": -120,
+      "expenseMods": 0,
+      "goods": undefined,
+      "homeOn": [],
+      "homeOwned": [],
+      "journal": "⁣tl:{"k":"Bought clothes for {amount}. They are in the wardrobe.","v":{"amount":"$120"}}",
+      "newAssets": [],
+      "outfit": "jeans",
+      "ownedOutfits": [
+        "jeans",
+        "tee",
+      ],
+      "passive": 0,
+      "skills": {
+        "nego": 20,
+      },
+      "vitals": {},
+    },
+    "note": "Fine on a day off. Weak in an interview.",
+    "price": 120,
+    "wear": {
+      "cash": 0,
+      "expenseMods": 0,
+      "goods": undefined,
+      "homeOn": [],
+      "homeOwned": [],
+      "journal": "⁣tl:{"k":"Bought clothes for {amount}. They are in the wardrobe.","v":{"amount":"$120"}}",
+      "newAssets": [],
+      "outfit": "tee",
+      "ownedOutfits": [
+        "jeans",
+        "tee",
+      ],
+      "passive": 0,
+      "skills": {},
+      "vitals": {},
+    },
+  },
+}
+`;
+
+exports[`article inventory (batch 5bis) > goods: data and engine effect of one purchase (and a second one) 1`] = `
+{
+  "atelier": {
+    "again": "refused",
+    "buy": {
+      "cash": -1500,
+      "expenseMods": 0,
+      "goods": [
+        "atelier",
+      ],
+      "homeOn": [],
+      "homeOwned": [],
+      "journal": "⁣tl:{"k":"Bought {item} for {amount}.","v":{"item":"Studio corner","amount":"$1,500"}}",
+      "newAssets": [],
+      "outfit": "jeans",
+      "ownedOutfits": [
+        "jeans",
+      ],
+      "passive": 0,
+      "skills": {
+        "creativity": 150,
+        "nego": 20,
+      },
+      "vitals": {},
+    },
+    "data": {
+      "cat": "other",
+      "icon": "brush",
+      "id": "atelier",
+      "name": "Studio corner",
+      "note": "Creativity +150 XP",
+      "price": 1500,
+      "xp": {
+        "creativity": 150,
+      },
+    },
+  },
+  "bike": {
+    "again": "refused",
+    "buy": {
+      "cash": -300,
+      "expenseMods": -40,
+      "goods": [
+        "bike",
+      ],
+      "homeOn": [],
+      "homeOwned": [],
+      "journal": "⁣tl:{"k":"Bought {item} for {amount}.","v":{"item":"City bike","amount":"$300"}}",
+      "newAssets": [],
+      "outfit": "jeans",
+      "ownedOutfits": [
+        "jeans",
+      ],
+      "passive": 0,
+      "skills": {
+        "health": 60,
+        "nego": 20,
+      },
+      "vitals": {},
+    },
+    "data": {
+      "cat": "garage",
+      "icon": "bike",
+      "id": "bike",
+      "monthly": -40,
+      "name": "City bike",
+      "note": "Transport −$40/mo",
+      "price": 300,
+      "xp": {
+        "health": 60,
+      },
+    },
+  },
+  "book": {
+    "again": {
+      "cash": -80,
+      "expenseMods": 0,
+      "goods": [
+        "book",
+      ],
+      "homeOn": [],
+      "homeOwned": [],
+      "journal": "⁣tl:{"k":"Bought {item} for {amount}.","v":{"item":"A finance book","amount":"$80"}}",
+      "newAssets": [],
+      "outfit": "jeans",
+      "ownedOutfits": [
+        "jeans",
+      ],
+      "passive": 0,
+      "skills": {
+        "mind": 120,
+        "nego": 20,
+      },
+      "vitals": {},
+    },
+    "buy": {
+      "cash": -80,
+      "expenseMods": 0,
+      "goods": [
+        "book",
+      ],
+      "homeOn": [],
+      "homeOwned": [],
+      "journal": "⁣tl:{"k":"Bought {item} for {amount}.","v":{"item":"A finance book","amount":"$80"}}",
+      "newAssets": [],
+      "outfit": "jeans",
+      "ownedOutfits": [
+        "jeans",
+      ],
+      "passive": 0,
+      "skills": {
+        "mind": 120,
+        "nego": 20,
+      },
+      "vitals": {},
+    },
+    "data": {
+      "cat": "other",
+      "icon": "book",
+      "id": "book",
+      "name": "A finance book",
+      "note": "Intelligence +120 XP",
+      "price": 80,
+      "repeat": true,
+      "xp": {
+        "mind": 120,
+      },
+    },
+  },
+  "canvas": {
+    "again": "refused",
+    "buy": {
+      "cash": -2500,
+      "expenseMods": 0,
+      "goods": [
+        "canvas",
+      ],
+      "homeOn": [],
+      "homeOwned": [],
+      "journal": "⁣tl:{"k":"Bought {item} for {amount}.","v":{"item":"Signed canvas","amount":"$2,500"}}",
+      "newAssets": [],
+      "outfit": "jeans",
+      "ownedOutfits": [
+        "jeans",
+      ],
+      "passive": 0,
+      "skills": {
+        "creativity": 200,
+        "nego": 20,
+        "reputation": 60,
+      },
+      "vitals": {},
+    },
+    "data": {
+      "cat": "other",
+      "icon": "frame",
+      "id": "canvas",
+      "name": "Signed canvas",
+      "note": "Creativity +200 XP · Reputation",
+      "price": 2500,
+      "xp": {
+        "creativity": 200,
+        "reputation": 60,
+      },
+    },
+  },
+  "duplex": {
+    "again": "refused",
+    "buy": {
+      "cash": -24000,
+      "expenseMods": 0,
+      "goods": [
+        "duplex",
+      ],
+      "homeOn": [],
+      "homeOwned": [],
+      "journal": "⁣tl:{"k":"Bought {item} for {amount}.","v":{"item":"Duplex in Nakano","amount":"$24,000"}}",
+      "newAssets": [
+        {
+          "cashFlow": 900,
+          "cost": 24000,
+          "down": 24000,
+          "name": "Duplex in Nakano",
+        },
+      ],
+      "outfit": "jeans",
+      "ownedOutfits": [
+        "jeans",
+      ],
+      "passive": 900,
+      "skills": {
+        "nego": 20,
+      },
+      "vitals": {},
+    },
+    "data": {
+      "cat": "homes",
+      "icon": "house",
+      "id": "duplex",
+      "name": "Duplex in Nakano",
+      "note": "Rent received +$900/mo",
+      "passive": 900,
+      "price": 24000,
+    },
+  },
+  "gym": {
+    "again": "refused",
+    "buy": {
+      "cash": -200,
+      "expenseMods": 40,
+      "goods": [
+        "gym",
+      ],
+      "homeOn": [],
+      "homeOwned": [],
+      "journal": "⁣tl:{"k":"Bought {item} for {amount}.","v":{"item":"Gym membership","amount":"$200"}}",
+      "newAssets": [],
+      "outfit": "jeans",
+      "ownedOutfits": [
+        "jeans",
+      ],
+      "passive": 0,
+      "skills": {
+        "health": 300,
+        "nego": 20,
+      },
+      "vitals": {
+        "health": 15,
+      },
+    },
+    "data": {
+      "cat": "other",
+      "gauge": {
+        "health": 15,
+      },
+      "icon": "gym",
+      "id": "gym",
+      "monthly": 40,
+      "name": "Gym membership",
+      "note": "Health +15 · $40/mo",
+      "price": 200,
+      "xp": {
+        "health": 150,
+      },
+    },
+  },
+  "kei": {
+    "again": "refused",
+    "buy": {
+      "cash": -6000,
+      "expenseMods": -120,
+      "goods": [
+        "kei",
+      ],
+      "homeOn": [],
+      "homeOwned": [],
+      "journal": "⁣tl:{"k":"Bought {item} for {amount}.","v":{"item":"Kei car","amount":"$6,000"}}",
+      "newAssets": [],
+      "outfit": "jeans",
+      "ownedOutfits": [
+        "jeans",
+      ],
+      "passive": 0,
+      "skills": {
+        "nego": 20,
+        "reputation": 150,
+      },
+      "vitals": {},
+    },
+    "data": {
+      "cat": "garage",
+      "icon": "car",
+      "id": "kei",
+      "monthly": -120,
+      "name": "Kei car",
+      "note": "Transport −$120/mo · Reputation",
+      "price": 6000,
+      "xp": {
+        "reputation": 150,
+      },
+    },
+  },
+  "scooter": {
+    "again": "refused",
+    "buy": {
+      "cash": -1200,
+      "expenseMods": -80,
+      "goods": [
+        "scooter",
+      ],
+      "homeOn": [],
+      "homeOwned": [],
+      "journal": "⁣tl:{"k":"Bought {item} for {amount}.","v":{"item":"50 cc scooter","amount":"$1,200"}}",
+      "newAssets": [],
+      "outfit": "jeans",
+      "ownedOutfits": [
+        "jeans",
+      ],
+      "passive": 0,
+      "skills": {
+        "nego": 20,
+      },
+      "vitals": {},
+    },
+    "data": {
+      "cat": "garage",
+      "icon": "scooter",
+      "id": "scooter",
+      "monthly": -80,
+      "name": "50 cc scooter",
+      "note": "Transport −$80/mo",
+      "price": 1200,
+    },
+  },
+}
+`;
+
+exports[`article inventory (batch 5bis) > home shop: price, gauges, buy, toggle off and on 1`] = `
+{
+  "charm": {
+    "buy": {
+      "cash": -640,
+      "expenseMods": 0,
+      "goods": undefined,
+      "homeOn": [
+        "charm",
+      ],
+      "homeOwned": [
+        "charm",
+      ],
+      "journal": "⁣tl:{"k":"Bought {item} for {amount}. It is in the house.","v":{"item":"Door charm","amount":"$640"}}",
+      "newAssets": [],
+      "outfit": "jeans",
+      "ownedOutfits": [
+        "jeans",
+      ],
+      "passive": 0,
+      "skills": {
+        "luck": 80,
+        "nego": 20,
+      },
+      "vitals": {
+        "luck": 8,
+      },
+    },
+    "data": {
+      "bump": {
+        "luck": 8,
+      },
+      "cost": 640,
+      "id": "charm",
+      "name": "Door charm",
+    },
+    "off": {
+      "cash": 0,
+      "expenseMods": 0,
+      "goods": undefined,
+      "homeOn": [],
+      "homeOwned": [
+        "charm",
+      ],
+      "journal": "⁣tl:{"k":"Bought {item} for {amount}. It is in the house.","v":{"item":"Door charm","amount":"$640"}}",
+      "newAssets": [],
+      "outfit": "jeans",
+      "ownedOutfits": [
+        "jeans",
+      ],
+      "passive": 0,
+      "skills": {},
+      "vitals": {
+        "luck": -8,
+      },
+    },
+    "on": {
+      "cash": 0,
+      "expenseMods": 0,
+      "goods": undefined,
+      "homeOn": [
+        "charm",
+      ],
+      "homeOwned": [
+        "charm",
+      ],
+      "journal": "⁣tl:{"k":"Bought {item} for {amount}. It is in the house.","v":{"item":"Door charm","amount":"$640"}}",
+      "newAssets": [],
+      "outfit": "jeans",
+      "ownedOutfits": [
+        "jeans",
+      ],
+      "passive": 0,
+      "skills": {
+        "luck": 80,
+      },
+      "vitals": {
+        "luck": 8,
+      },
+    },
+  },
+  "desk": {
+    "buy": {
+      "cash": -1100,
+      "expenseMods": 0,
+      "goods": undefined,
+      "homeOn": [
+        "desk",
+      ],
+      "homeOwned": [
+        "desk",
+      ],
+      "journal": "⁣tl:{"k":"Bought {item} for {amount}. It is in the house.","v":{"item":"Work desk","amount":"$1,100"}}",
+      "newAssets": [],
+      "outfit": "jeans",
+      "ownedOutfits": [
+        "jeans",
+      ],
+      "passive": 0,
+      "skills": {
+        "mind": 80,
+        "nego": 20,
+      },
+      "vitals": {
+        "mind": 8,
+      },
+    },
+    "data": {
+      "bump": {
+        "mind": 8,
+      },
+      "cost": 1100,
+      "id": "desk",
+      "name": "Work desk",
+    },
+    "off": {
+      "cash": 0,
+      "expenseMods": 0,
+      "goods": undefined,
+      "homeOn": [],
+      "homeOwned": [
+        "desk",
+      ],
+      "journal": "⁣tl:{"k":"Bought {item} for {amount}. It is in the house.","v":{"item":"Work desk","amount":"$1,100"}}",
+      "newAssets": [],
+      "outfit": "jeans",
+      "ownedOutfits": [
+        "jeans",
+      ],
+      "passive": 0,
+      "skills": {},
+      "vitals": {
+        "mind": -8,
+      },
+    },
+    "on": {
+      "cash": 0,
+      "expenseMods": 0,
+      "goods": undefined,
+      "homeOn": [
+        "desk",
+      ],
+      "homeOwned": [
+        "desk",
+      ],
+      "journal": "⁣tl:{"k":"Bought {item} for {amount}. It is in the house.","v":{"item":"Work desk","amount":"$1,100"}}",
+      "newAssets": [],
+      "outfit": "jeans",
+      "ownedOutfits": [
+        "jeans",
+      ],
+      "passive": 0,
+      "skills": {
+        "mind": 80,
+      },
+      "vitals": {
+        "mind": 8,
+      },
+    },
+  },
+  "lamp": {
+    "buy": {
+      "cash": -350,
+      "expenseMods": 0,
+      "goods": undefined,
+      "homeOn": [
+        "lamp",
+      ],
+      "homeOwned": [
+        "lamp",
+      ],
+      "journal": "⁣tl:{"k":"Bought {item} for {amount}. It is in the house.","v":{"item":"Reading lamp","amount":"$350"}}",
+      "newAssets": [],
+      "outfit": "jeans",
+      "ownedOutfits": [
+        "jeans",
+      ],
+      "passive": 0,
+      "skills": {
+        "content": 60,
+        "nego": 20,
+      },
+      "vitals": {
+        "content": 6,
+      },
+    },
+    "data": {
+      "bump": {
+        "content": 6,
+      },
+      "cost": 350,
+      "id": "lamp",
+      "name": "Reading lamp",
+    },
+    "off": {
+      "cash": 0,
+      "expenseMods": 0,
+      "goods": undefined,
+      "homeOn": [],
+      "homeOwned": [
+        "lamp",
+      ],
+      "journal": "⁣tl:{"k":"Bought {item} for {amount}. It is in the house.","v":{"item":"Reading lamp","amount":"$350"}}",
+      "newAssets": [],
+      "outfit": "jeans",
+      "ownedOutfits": [
+        "jeans",
+      ],
+      "passive": 0,
+      "skills": {},
+      "vitals": {
+        "content": -6,
+      },
+    },
+    "on": {
+      "cash": 0,
+      "expenseMods": 0,
+      "goods": undefined,
+      "homeOn": [
+        "lamp",
+      ],
+      "homeOwned": [
+        "lamp",
+      ],
+      "journal": "⁣tl:{"k":"Bought {item} for {amount}. It is in the house.","v":{"item":"Reading lamp","amount":"$350"}}",
+      "newAssets": [],
+      "outfit": "jeans",
+      "ownedOutfits": [
+        "jeans",
+      ],
+      "passive": 0,
+      "skills": {
+        "content": 60,
+      },
+      "vitals": {
+        "content": 6,
+      },
+    },
+  },
+  "plant": {
+    "buy": {
+      "cash": -180,
+      "expenseMods": 0,
+      "goods": undefined,
+      "homeOn": [
+        "plant",
+      ],
+      "homeOwned": [
+        "plant",
+      ],
+      "journal": "⁣tl:{"k":"Bought {item} for {amount}. It is in the house.","v":{"item":"Window plant","amount":"$180"}}",
+      "newAssets": [],
+      "outfit": "jeans",
+      "ownedOutfits": [
+        "jeans",
+      ],
+      "passive": 0,
+      "skills": {
+        "content": 40,
+        "nego": 20,
+      },
+      "vitals": {
+        "content": 4,
+      },
+    },
+    "data": {
+      "bump": {
+        "content": 4,
+      },
+      "cost": 180,
+      "id": "plant",
+      "name": "Window plant",
+    },
+    "off": {
+      "cash": 0,
+      "expenseMods": 0,
+      "goods": undefined,
+      "homeOn": [],
+      "homeOwned": [
+        "plant",
+      ],
+      "journal": "⁣tl:{"k":"Bought {item} for {amount}. It is in the house.","v":{"item":"Window plant","amount":"$180"}}",
+      "newAssets": [],
+      "outfit": "jeans",
+      "ownedOutfits": [
+        "jeans",
+      ],
+      "passive": 0,
+      "skills": {},
+      "vitals": {
+        "content": -4,
+      },
+    },
+    "on": {
+      "cash": 0,
+      "expenseMods": 0,
+      "goods": undefined,
+      "homeOn": [
+        "plant",
+      ],
+      "homeOwned": [
+        "plant",
+      ],
+      "journal": "⁣tl:{"k":"Bought {item} for {amount}. It is in the house.","v":{"item":"Window plant","amount":"$180"}}",
+      "newAssets": [],
+      "outfit": "jeans",
+      "ownedOutfits": [
+        "jeans",
+      ],
+      "passive": 0,
+      "skills": {
+        "content": 40,
+      },
+      "vitals": {
+        "content": 4,
+      },
+    },
+  },
+  "sofa": {
+    "buy": {
+      "cash": -900,
+      "expenseMods": 0,
+      "goods": undefined,
+      "homeOn": [
+        "sofa",
+      ],
+      "homeOwned": [
+        "sofa",
+      ],
+      "journal": "⁣tl:{"k":"Bought {item} for {amount}. It is in the house.","v":{"item":"Low sofa","amount":"$900"}}",
+      "newAssets": [],
+      "outfit": "jeans",
+      "ownedOutfits": [
+        "jeans",
+      ],
+      "passive": 0,
+      "skills": {
+        "nego": 20,
+        "social": 80,
+      },
+      "vitals": {
+        "social": 8,
+      },
+    },
+    "data": {
+      "bump": {
+        "social": 8,
+      },
+      "cost": 900,
+      "id": "sofa",
+      "name": "Low sofa",
+    },
+    "off": {
+      "cash": 0,
+      "expenseMods": 0,
+      "goods": undefined,
+      "homeOn": [],
+      "homeOwned": [
+        "sofa",
+      ],
+      "journal": "⁣tl:{"k":"Bought {item} for {amount}. It is in the house.","v":{"item":"Low sofa","amount":"$900"}}",
+      "newAssets": [],
+      "outfit": "jeans",
+      "ownedOutfits": [
+        "jeans",
+      ],
+      "passive": 0,
+      "skills": {},
+      "vitals": {
+        "social": -8,
+      },
+    },
+    "on": {
+      "cash": 0,
+      "expenseMods": 0,
+      "goods": undefined,
+      "homeOn": [
+        "sofa",
+      ],
+      "homeOwned": [
+        "sofa",
+      ],
+      "journal": "⁣tl:{"k":"Bought {item} for {amount}. It is in the house.","v":{"item":"Low sofa","amount":"$900"}}",
+      "newAssets": [],
+      "outfit": "jeans",
+      "ownedOutfits": [
+        "jeans",
+      ],
+      "passive": 0,
+      "skills": {
+        "social": 80,
+      },
+      "vitals": {
+        "social": 8,
+      },
+    },
+  },
+}
+`;
+
+exports[`article inventory (batch 5bis) > shops: unlock rule, what they sell, open at the start of a game 1`] = `
+[
+  {
+    "id": "clothes",
+    "openAtStart": true,
+    "openRich": true,
+    "sells": "clothes",
+    "unlock": {
+      "kind": "start",
+    },
+  },
+  {
+    "id": "kiosk",
+    "openAtStart": true,
+    "openRich": true,
+    "sells": [
+      "book",
+      "gym",
+    ],
+    "unlock": {
+      "kind": "start",
+    },
+  },
+  {
+    "id": "bikes",
+    "openAtStart": false,
+    "openRich": true,
+    "sells": [
+      "bike",
+      "scooter",
+    ],
+    "unlock": {
+      "kind": "turn",
+      "n": 10,
+    },
+  },
+  {
+    "id": "home",
+    "openAtStart": false,
+    "openRich": true,
+    "sells": "home",
+    "unlock": {
+      "kind": "level",
+      "n": 2,
+    },
+  },
+  {
+    "id": "cars",
+    "openAtStart": false,
+    "openRich": true,
+    "sells": [
+      "kei",
+    ],
+    "unlock": {
+      "kind": "passive",
+      "n": 2000,
+    },
+  },
+  {
+    "id": "estate",
+    "openAtStart": false,
+    "openRich": true,
+    "sells": [
+      "duplex",
+    ],
+    "unlock": {
+      "kind": "turn",
+      "n": 20,
+    },
+  },
+  {
+    "id": "gallery",
+    "openAtStart": false,
+    "openRich": true,
+    "sells": [
+      "canvas",
+      "atelier",
+    ],
+    "unlock": {
+      "kind": "xp",
+      "n": 10,
+    },
+  },
+]
+`;
+
+exports[`article inventory (batch 5bis) > shops: unlock rule, what they sell, open at the start of a game 2`] = `
+{
+  "HOME_LEVEL": 2,
+  "SOON_GOODS": [
+    {
+      "cat": "wardrobe",
+      "icon": "dress",
+      "id": "yukata",
+      "when": "Coming in an update",
+    },
+    {
+      "cat": "garage",
+      "icon": "car",
+      "id": "foodtruck",
+      "when": "Coming in an update",
+    },
+    {
+      "cat": "other",
+      "icon": "question",
+      "id": "mystery",
+      "when": "Coming in an update",
+    },
+  ],
+}
+`;
