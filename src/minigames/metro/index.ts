@@ -16,6 +16,11 @@ export interface MetroResult {
 
 const ui = () => import("./ui");
 
+/** What a finished run sends to the engine: the offer's answer, or nothing for free play (practice, no gains). */
+export function metroDoneAction(practice: boolean, lives: number, coins: number): { type: "MINIGAME"; id: "metro"; result: { lives: number; coins: number } } | null {
+  return practice ? null : { type: "MINIGAME", id: "metro", result: { lives, coins } };
+}
+
 export const METRO_MINIGAME: MinigameDefinition<MetroResult> = {
   id: "metro",
   name: "Metro run",

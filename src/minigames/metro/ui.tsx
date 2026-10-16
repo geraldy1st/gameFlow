@@ -196,13 +196,22 @@ export interface MetroRunProps {
   onDone: (lives: number, coins: number) => void;
   /** Dev-only bot (hidden ?metro-demo=win|hurt|crash hook); never passed in production builds. */
   demo?: "win" | "hurt" | "crash";
+  /** Free play from the mini-games page: practice, the result card says nothing is credited. */
+  practice?: boolean;
 }
 
 type Pause = null | "user" | "hidden";
 
-export function MetroRun({ t: gameT, money, name, faces, skirt, cash, seed = RUN.seed, length = RUN.length, reduced, gameMuted, audio, onDone, demo }: MetroRunProps) {
+export function MetroRun({ t: gameT, money, name, faces, skirt, cash, seed = RUN.seed, length = RUN.length, reduced, gameMuted, audio: given, onDone, demo, practice = false }: MetroRunProps) {
   const t = useMemo(() => withV61(gameT), [gameT]);
   const driver = useMemo(() => demoDriver(demo), [demo]);
+  // Free play opens from the Play click (a user gesture): the runner makes its own audio then.
+  const [audio] = useState<RunnerAudio | null>(() => {
+    if (given) return given;
+    const a = new RunnerAudio(METRO_SKIN.music, readRunnerMute(gameMuted));
+    a.unlock();
+    return a;
+  });
   const run = useRef<RunState>(newRun(seed, length));
   const cam = useRef<Camera>({ x: 0, z: -4.2 });
   const fx = useRef<Fx[]>([]);
@@ -293,6 +302,12 @@ export function MetroRun({ t: gameT, money, name, faces, skirt, cash, seed = RUN
       setResult({ won, lives: won ? s.lives : 0, coins });
       audio?.sfx(won ? "win" : "fail");
       const reward = (won ? metroReward(s.lives) : 0) + coins * METRO_COIN_VALUE;
+      if (practice) {
+        setSay(t("Practice run: nothing is credited ({c} coins).", { c: coins }));
+        fw.current = { t: 0, i: 0 };
+        sparks.current = won && reduced ? staticSparkles() : [];
+        return;
+      }
       setSay(
         won
           ? t("You made the metro with {n} lives and {c} coins. {amount} won.", { n: s.lives, c: coins, amount: money(reward) })
@@ -303,7 +318,7 @@ export function MetroRun({ t: gameT, money, name, faces, skirt, cash, seed = RUN
       fw.current = { t: 0, i: 0 };
       sparks.current = won && reduced ? staticSparkles() : [];
     },
-    [audio, money, reduced, t],
+    [audio, money, practice, reduced, t],
   );
 
   // Game loop: fixed-step rules, skin drawing, effects. Keeps drawing the fireworks behind the result card.
@@ -507,7 +522,7 @@ export function MetroRun({ t: gameT, money, name, faces, skirt, cash, seed = RUN
   useEffect(() => {
     if (!result) return;
     window.setTimeout(() => backBtn.current?.focus({ preventScroll: true }), 30);
-    const reward = (result.won ? metroReward(result.lives) : 0) + result.coins * METRO_COIN_VALUE;
+    const reward = practice ? 0 : (result.won ? metroReward(result.lives) : 0) + result.coins * METRO_COIN_VALUE;
     if (!reward) {
       const id = window.setTimeout(() => setJournalShown(true), reduced ? 0 : 450);
       return () => window.clearTimeout(id);
@@ -562,7 +577,7 @@ export function MetroRun({ t: gameT, money, name, faces, skirt, cash, seed = RUN
       cancelAnimationFrame(raf);
       if (host) host.innerHTML = "";
     };
-  }, [result, audio, cash, reduced]);
+  }, [result, audio, cash, practice, reduced]);
 
   const toggleMute = () => {
     const m = !muted;
@@ -580,7 +595,7 @@ export function MetroRun({ t: gameT, money, name, faces, skirt, cash, seed = RUN
 
   const prime = result?.won ? metroReward(result.lives) : 0;
   const coinCash = (result?.coins ?? 0) * METRO_COIN_VALUE;
-  const reward = prime + coinCash;
+  const reward = practice ? 0 : prime + coinCash;
   const journal = result ? (reward > 0 ? t("Metro run: +{amount}", { amount: money(reward) }) : t("Metro run: missed")) : "";
   const controls: { a: MetroAction; label: string; hint: string; kbd: string; path: string }[] = [
     { a: "left", label: t("left"), hint: t("Change lane to the left"), kbd: "← A", path: "M15 5l-7 7 7 7" },
@@ -687,7 +702,7 @@ export function MetroRun({ t: gameT, money, name, faces, skirt, cash, seed = RUN
                 ? result.lives === METRO_LIVES
                   ? t("{name} jumps into the train with all 3 lives. The trip pays the full bonus.", { name })
                   : t("{name} catches the train. Lives left: {n}/3. Reduced bonus.", { name, n: result.lives })
-                : t("The metro left without you. No bonus, and no second try for this offer (the coins you picked up are kept).")}
+                : practice ? t("The metro left without you.") : t("The metro left without you. No bonus, and no second try for this offer (the coins you picked up are kept).")}
             </p>
             {reward > 0 && (
               <div className="mr-rewardrow">
@@ -698,14 +713,15 @@ export function MetroRun({ t: gameT, money, name, faces, skirt, cash, seed = RUN
                 </span>
               </div>
             )}
-            {result.coins > 0 && (
+            {practice && <p className="mr-coinline">{t("Practice run: nothing is credited ({c} coins).", { c: result.coins })}</p>}
+            {!practice && result.coins > 0 && (
               <p className="mr-coinline">
                 {result.won
                   ? t("Bonus {prime} + {c} coins × {v} ({sum})", { prime: money(prime), c: result.coins, v: money(METRO_COIN_VALUE), sum: money(coinCash) })
                   : t("{c} coins × {v}: {sum} kept", { c: result.coins, v: money(METRO_COIN_VALUE), sum: money(coinCash) })}
               </p>
             )}
-            <p className="mr-jline">{journalShown ? `${t("Journal")} · ${journal}` : "\u00a0"}</p>
+            <p className="mr-jline">{practice ? "\u00a0" : journalShown ? `${t("Journal")} · ${journal}` : "\u00a0"}</p>
             <button type="button" className="mr-btn gold" ref={backBtn} data-autofocus onClick={back}>{t("Back to the game")}</button>
           </div>
         </div>

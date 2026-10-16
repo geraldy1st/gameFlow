@@ -29,6 +29,7 @@ import {
   type Reaction,
 } from "@/game/engine";
 import { metroOfferTurn } from "@/game/metro-run";
+import { metroDoneAction } from "@/minigames/metro";
 import { arrivalLine, arrivalMood, bodyPortrait, dressedPortrait, expressionOf, outcomeLine, phraseSalt, speakerIsNpc } from "@/game/speech";
 import { DealSheet } from "./boite/DealSheet";
 import { fmtMoney, localizeMoney } from "./boite/format";
@@ -616,7 +617,7 @@ export function GameFlow() {
   // Metro run: the accepted offer being played (the game state only changes when it is over).
   // Offer closed because its chunk failed to load: hidden for this session only, no engine action (offer kept).
   const [metroDeferred, setMetroDeferred] = useState<number | null>(null);
-  const [metroPlay, setMetroPlay] = useState<{ turn: number; audio: RunnerAudio; demo?: "win" | "hurt" | "crash" } | null>(null);
+  const [metroPlay, setMetroPlay] = useState<{ turn: number; audio: RunnerAudio | null; demo?: "win" | "hurt" | "crash"; practice?: boolean } | null>(null);
   const metroBusyRef = useRef(false);
   const reducedMotion = useReducedMotion();
   const phaseRef = useRef(state.phase);
@@ -1314,7 +1315,7 @@ export function GameFlow() {
         {state.screen === "play" && player && hub && !coach && !classQuiz && (
           <HubLayer anchor={asideRef} nav={navRef} label={t(hub === "day" ? "Day" : hub === "acts" ? "Activities" : "Menu")} onClose={() => setHub(null)}>
             {hub === "day" && <DayPanel state={state} tab={dayTab} setTab={setDayTab} t={t} lang={lang} go={go} onFriend={(id) => setFriendId(id)} onHome={(id) => { go({ type: "HOME_ENTER", homeId: id }); setHub(null); setHomeOpen(id); }} onClose={() => setHub(null)} />}
-            {hub === "acts" && <ActivitiesPanel state={state} t={t} lang={lang} go={go} onQuiz={() => setClassQuiz(true)} onClose={() => setHub(null)} />}
+            {hub === "acts" && <ActivitiesPanel state={state} t={t} lang={lang} go={go} onQuiz={() => setClassQuiz(true)} onMetroPractice={() => { setHub(null); setMetroPlay({ turn: -1, audio: null, practice: true, demo: metroDemoDriver() }); }} onClose={() => setHub(null)} />}
             {hub === "menu" &&
               (legendView ? (
                 <LegendPanel map={<LegendBody t={t} />} player={player} t={t} lang={lang} onClose={() => setHub(null)} onBack={() => setLegendView(false)} />
@@ -1555,10 +1556,13 @@ export function GameFlow() {
             gameMuted: state.muted,
             audio: metroPlay.audio,
             demo: metroPlay.demo,
+            practice: !!metroPlay.practice,
             ...metroDemoRun(),
             onDone: (lives: number, coins: number) => {
               setMetroPlay(null);
-              go({ type: "MINIGAME", id: "metro", result: { lives, coins } });
+              // Free play from Activités › Mini-games: practice only, nothing reaches the engine.
+              const action = metroDoneAction(!!metroPlay.practice, lives, coins);
+              if (action) go(action);
             },
           }}
         />

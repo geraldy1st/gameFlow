@@ -6,6 +6,8 @@
 type TFn = (text: string, vars?: Record<string, string | number>) => string;
 
 const FR: Record<string, string> = {
+  "Practice run: nothing is credited ({c} coins).": "Course d’entraînement : rien n’est crédité ({c} pièces).",
+  "The metro left without you.": "Le métro est parti sans toi.",
   "Let’s go!": "C’est parti !",
   "{go} 3 lives. The metro is {m} metres away.": "{go} 3 vies. Le métro est à {m} mètres.",
   "Movers and their wardrobe": "Déménageurs et leur armoire",
@@ -20,6 +22,8 @@ const FR: Record<string, string> = {
     "Le métro est parti sans toi. Pas de prime, et pas de second essai pour cette offre (les pièces ramassées sont gardées).",
 };
 const ES: Record<string, string> = {
+  "Practice run: nothing is credited ({c} coins).": "Carrera de práctica: no se acredita nada ({c} monedas).",
+  "The metro left without you.": "El metro se fue sin ti.",
   "Let’s go!": "¡Vamos!",
   "{go} 3 lives. The metro is {m} metres away.": "{go} 3 vidas. El metro está a {m} metros.",
   "Movers and their wardrobe": "Mudanceros y su armario",
