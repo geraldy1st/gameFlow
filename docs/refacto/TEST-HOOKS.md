@@ -1,6 +1,6 @@
 # Hooks de test : course vers le métro
 
-Actifs **uniquement** en dev (`npm run dev`) ou dans un build fait avec `VITE_METRO_HOOK=1`. Dans le build public (`npm run build:pages` sans cette variable), `METRO_HOOK` vaut `false` à la compilation : le code est éliminé et les paramètres d'URL n'ont aucun effet (vérifié : ni `metro-demo`, ni `metro-seed`, ni `metro-length` dans `dist-pages/assets/*.js`). Le moteur n'est pas touché : la course envoie toujours la même action `METRO` avec le nombre de vies restantes.
+Actifs **uniquement** en dev (`npm run dev`) ou dans un build fait avec `VITE_METRO_HOOK=1`. Dans le build public (`npm run build:pages` sans cette variable), `METRO_HOOK` vaut `false` à la compilation : le code est éliminé et les paramètres d'URL n'ont aucun effet (vérifié : ni `metro-demo`, ni `metro-seed`, ni `metro-length` dans `dist-pages/assets/*.js`). Le moteur n'est pas touché : la course envoie toujours le même résultat (le nombre de vies restantes), depuis le lot 5 par l'action générique `{ type: "MINIGAME", id: "metro", result: { lives } }` (`METRO` reste un alias accepté).
 
 | Paramètre d'URL | Effet |
 |---|---|

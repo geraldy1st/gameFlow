@@ -1489,7 +1489,7 @@ export function GameFlow() {
             lang,
             t,
             onFinish: (correct: number, creative?: number) => {
-              go({ type: "QUIZ", correct, creative });
+              go({ type: "MINIGAME", id: "quiz", result: { correct, creative } });
               setClassQuiz(false);
               setHub("acts");
             },
@@ -1509,7 +1509,7 @@ export function GameFlow() {
             portrait: portraitOf(player),
             reduced: reducedMotion,
             gameMuted: state.muted,
-            onDecline: () => go({ type: "METRO", result: "decline" }),
+            onDecline: () => go({ type: "MINIGAME", id: "metro", result: "decline" }),
             onRun: (audio: RunnerAudio) => setMetroPlay({ turn: metroDue, audio, driver: metroDemoDriver() }),
           }}
         />
@@ -1538,7 +1538,7 @@ export function GameFlow() {
             ...metroDemoRun(),
             onDone: (lives: number) => {
               setMetroPlay(null);
-              go({ type: "METRO", result: "run", lives });
+              go({ type: "MINIGAME", id: "metro", result: { lives } });
             },
           }}
         />

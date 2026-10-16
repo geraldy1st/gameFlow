@@ -1,0 +1,7 @@
+{
+  "note": "Pre-batch-5 save (main 4515dea shape): markers in Player.metroTurn / Player.quizTurn, no Player.minigames. Turn 21 starting (turn 20 over): metro 20 is due; quiz answered on own turn 19.",
+  "save": {
+    "version": 1, "screen": "play", "phase": "idle", "turn": 21, "current": 0, "seq": 3, "sfxId": 4, "log": [], "history": [],
+    "players": [{ "id": "p1", "characterId": "aoi", "dreamId": "cafe", "careerId": "tester", "cash": 2400, "position": 5, "turns": 21, "metroTurn": 10, "quizTurn": 19 }]
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "note": "Pre-batch-5 save: the metro offer of turn 20 was already answered (metroTurn 20). Must not be offered again after load.",
+  "save": {
+    "version": 1, "screen": "play", "phase": "idle", "turn": 21, "current": 0, "seq": 3, "sfxId": 4, "log": [], "history": [],
+    "players": [{ "id": "p1", "characterId": "mio", "dreamId": "studio", "careerId": "tester", "cash": 900, "position": 2, "turns": 21, "metroTurn": 20, "quizTurn": 20 }]
+  }
+}

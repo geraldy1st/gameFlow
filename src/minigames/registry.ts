@@ -1,7 +1,8 @@
 /**
  * Mini-game registry (PLAN.md §2). Batch 3: the metro run is registered and GameFlow renders its UI through
  * MinigameHost (lazy chunk). Batch 4: the class quiz too, and Activités lists
- * MINIGAME_REGISTRY + MINIGAME_SOON. The engine does not read the registry yet (batch 5). Display order = array order.
+ * MINIGAME_REGISTRY + MINIGAME_SOON. Batch 5: the engine reads it (MINIGAME action). Display order = array order.
+ * Runtime imports must stay engine-free (engine.ts imports this module).
  */
 import { METRO_MINIGAME } from "./metro";
 import { QUIZ_MINIGAME } from "./quiz";

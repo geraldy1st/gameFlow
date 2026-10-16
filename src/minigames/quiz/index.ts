@@ -1,15 +1,15 @@
 /**
- * Class quiz definition (refacto batch 4). The engine still handles the QUIZ action itself (doQuiz, awardXp):
- * these functions mirror it so batch 5 can switch the engine to the registry with an identical fingerprint.
+ * Class quiz definition (refacto batch 4; batch 5: the engine plays it through the generic MINIGAME action, QUIZ is
+ * an alias). Must stay bit-identical to the old doQuiz / awardXp branch (engine-fingerprint.test.ts).
  * The UI and the questions (with their fr/es texts) are code-split: they load when the quiz opens.
- * Note for batch 5: this module imports engine.ts at runtime (quizOpen, quizWait, creativeOpen, isPractice); when the
- * engine reads the registry, those helpers move here (or to a leaf module) to avoid an import cycle.
+ * No runtime import of engine.ts (the helpers live in the leaf module minigame-rules.ts), so the engine can import
+ * the registry without a cycle.
  */
-import { creativeOpen, isPractice, quizOpen, quizWait } from "@/game/engine";
+import { creativeOpen, isPractice, moneyText, quizOpen, quizWait } from "@/game/minigame-rules";
 import { quizCash, quizXpBonus } from "@/game/skills";
 import { tl } from "@/game/text";
 import { CLASS_QUIZ } from "@/game/tuning";
-import type { MinigameDefinition } from "../types";
+import type { MinigameDefinition, SkillAward } from "../types";
 
 export interface QuizResult {
   correct: number;
@@ -34,12 +34,22 @@ export const QUIZ_MINIGAME: MinigameDefinition<QuizResult> = {
     return { correct, creative };
   },
   cash: (r) => quizCash(r.correct, CLASS_QUIZ.questions) + (r.creative === 2 ? CLASS_QUIZ.creativeBest : r.creative === 1 ? CLASS_QUIZ.creativeOk : 0),
-  skillKeys: (r, p) => (r.correct > 0 ? [{ key: "quiz.complete", bonus: quizXpBonus(p) }] : []),
+  skillKeys: (r, p, raw) => {
+    if (r.correct <= 0) return []; // Geraldy: 0 / 5 gives nothing at all.
+    const out: SkillAward[] = [{ key: "quiz.complete", bonus: quizXpBonus(p) }];
+    // As the QUIZ action always did: the raw `creative` answer (not the clamped one) opens the Creativity XP.
+    const c = typeof raw === "object" && raw !== null ? (raw as { creative?: number }).creative : undefined;
+    if (creativeOpen(p) && (c ?? 0) > 0) out.push({ skill: "creativity", xp: CLASS_QUIZ.creativeXp });
+    return out;
+  },
   logLine: (r, cash) =>
     r === "decline"
       ? ""
-      : tl("Class quiz: {n}/{m}, +{amount}", { n: String(r.correct), m: String(CLASS_QUIZ.questions), amount: `$${Math.round(cash).toLocaleString("en-US")}` }),
-  feedsGig: true,
+      : tl("Class quiz: {n}/{m}, +{amount}", { n: String(r.correct), m: String(CLASS_QUIZ.questions), amount: moneyText(cash) }),
+  feedsGig: (r) => r.correct > 0,
+  markerValue: (_s, p) => p.turns,
+  legacyMarker: "quizTurn",
+  blipAlways: true,
   parts: {
     play: () => ui().then((m) => m.ClassQuiz),
   },

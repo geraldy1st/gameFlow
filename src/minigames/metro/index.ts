@@ -1,8 +1,9 @@
 /**
- * Metro run definition (refacto batch 3). The engine still handles the METRO action itself (doMetro, awardXp):
- * these functions mirror it so batch 5 can switch the engine to the registry with an identical fingerprint.
+ * Metro run definition (refacto batch 3; batch 5: the engine plays it through the generic MINIGAME action, METRO
+ * is an alias). Must stay bit-identical to the old doMetro / awardXp branch (engine-fingerprint.test.ts).
  * The UI ("offer" and "run") is code-split: nothing from ui.tsx, the skins or the audio is in the main bundle.
  */
+import { moneyText } from "@/game/minigame-rules";
 import { tl } from "@/game/text";
 import type { MinigameDefinition, SkillAward } from "../types";
 import { METRO_LIVES, metroOfferTurn, metroReward } from "./logic";
@@ -28,13 +29,16 @@ export const METRO_MINIGAME: MinigameDefinition<MetroResult> = {
   skillKeys: (r) => {
     const out: SkillAward[] = [{ key: "runner.finish" }];
     if (r.lives > 0) out.push({ key: "runner.win" });
-    if (r.lives > 0) out.push({ key: "runner.perLife", times: r.lives });
+    if (r.lives > 0) out.push({ key: "runner.perLife", times: r.lives, farm: false });
     if (r.lives === METRO_LIVES) out.push({ key: "runner.noHit" });
     return out;
   },
   logLine: (r, cash) =>
-    r === "decline" ? "Metro run: not this time" : cash > 0 ? tl("Metro run: +{amount}", { amount: `$${Math.round(cash).toLocaleString("en-US")}` /* = engine money() */ }) : "Metro run: missed",
+    r === "decline" ? "Metro run: not this time" : cash > 0 ? tl("Metro run: +{amount}", { amount: moneyText(cash) }) : "Metro run: missed",
   feedsGig: true,
+  canDecline: true,
+  markerValue: (s) => metroOfferTurn(s) ?? 0,
+  legacyMarker: "metroTurn",
   parts: {
     offer: () => ui().then((m) => m.MetroOffer),
     run: () => ui().then((m) => m.MetroRun),

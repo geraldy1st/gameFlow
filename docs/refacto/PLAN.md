@@ -94,6 +94,7 @@ export interface MinigameDefinition<R = unknown> {
 - **Marqueur** : `Player.minigames?: Record<id, number>` (dernier tour joué ou refusé).
 - **Les actions `METRO` et `QUIZ` restent acceptées** comme alias, pour les anciennes sauvegardes et pour le replay de Crypto.
 - **hydrate** recopie `metroTurn` et `quizTurn` dans `minigames.metro` et `minigames.quiz`, tout en gardant les deux champs (lecture seule) tant que des outils les lisent.
+  - **Fait au lot 5 (16/10), dans l'autre sens** pour garder l'empreinte identique bit à bit : `metroTurn` et `quizTurn` restent la source de vérité du métro et du quiz (le moteur continue à les écrire, `def.legacyMarker`). `Player.minigames` ne sert qu'aux jeux ajoutés après le lot 5. hydrate replie `minigames.metro` et `minigames.quiz` dans `metroTurn` et `quizTurn` quand ces champs manquent, garde les autres ids bien formés et n'écrit jamais `minigames` vide (les anciennes sauvegardes hydratent exactement comme avant). Le passage complet à `minigames` demandera une nouvelle EXPECTED, après le lot 5bis.
 - **UI** :
   - `GameFlow` ne connaît plus aucun mini-jeu : un `<MinigameHost>` lit le registre, affiche l'offre quand `entry === "offer"` et `isDue`, et charge `def.load()` avec `React.lazy` et `Suspense`.
   - Hub › Activités lit le registre au lieu de `MINIGAMES` (tuning.ts).

@@ -3,7 +3,7 @@ import { MINIGAME_REGISTRY, MINIGAME_SOON, minigameById, registryErrors, type An
 
 const fake = (id: string): AnyMinigame => ({
   id, name: "Fake", note: "", icon: "star", entry: "menu",
-  isDue: () => true, sanitize: (r) => r, cash: () => 0, skillKeys: () => [], logLine: () => "",
+  isDue: () => true, sanitize: (r) => r, cash: () => 0, skillKeys: () => [], logLine: () => "", markerValue: () => 0,
   load: async () => ({ default: () => null }),
 });
 
