@@ -69,7 +69,7 @@ function play(seed: number) {
 describe("MINIGAME action (batch 5)", () => {
   it("200 seeded games with MINIGAME give the METRO / QUIZ fingerprint bit for bit", () => {
     const games = Array.from({ length: 200 }, (_, k) => play(k + 1));
-    expect({ states: games.reduce((n, g) => n + g.states, 0), chainAll: h(games.map((g) => g.chain)) }).toEqual({ states: 102806, chainAll: "c5b22799e4ee85a3" });
+    expect({ states: games.reduce((n, g) => n + g.states, 0), chainAll: h(games.map((g) => g.chain)) }).toEqual({ states: 93335, chainAll: "844f62971aa0030a" }); // payday invite (RULES.md §14); was 102806 / c5b22799e4ee85a3
   }, 120_000);
 
   it("METRO / QUIZ and MINIGAME give the same state, XP and journal", () => {
