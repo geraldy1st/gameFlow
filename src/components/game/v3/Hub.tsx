@@ -2,6 +2,7 @@
  * GameFlow v3 — bottom bar (Day · Activities · Ledger · Menu) and its panels. Nothing scrolls: internal tabs and
  * the Pager split whatever does not fit. Data comes from the engine (statement, skills) and tuning.ts.
  */
+import { sceneOfMinigame } from "@/scenes/registry";
 import { useLayoutEffect, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { FRIENDS, PARTNERS } from "@/game/data";
 import { cur, ownsGood, progressOf, quizOpen, quizWait, shopPrice, statement, type Action, type GameState, type Player } from "@/game/engine";
@@ -578,7 +579,8 @@ function GamesTab({ state, p, t, onQuiz }: { state: GameState; p: Player; t: TFn
   const canQuiz = state.phase === "idle" && quizOpen(p) && !state.training && !state.practice;
   return (
     <div className="v3-games">
-      {[...MINIGAME_REGISTRY, ...MINIGAME_SOON].map((g) =>
+      {/* Batch 7: a "menu" mini-game is listed when an open scene hosts it (the school hosts the class quiz). */}
+      {[...MINIGAME_REGISTRY.filter((g) => g.entry !== "menu" || !!sceneOfMinigame(g.id)), ...MINIGAME_SOON].map((g) =>
         "soon" in g ? (
           <div key={g.id} className="v3-card v3-game soon">
             <span className="v3-ic" aria-hidden="true"><Ico name="unknown" /></span>
