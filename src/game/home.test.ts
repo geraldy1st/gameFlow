@@ -117,6 +117,10 @@ describe("Home v1: actions and the home counter", () => {
     expect(actionTodayText(t, 1, 1)).toBe("");
     expect(actionTodayText(t, 2, 3)).toBe("2 times left today");
     expect(actionTodayText(t, 1, 3)).toBe("1 time left today");
+    // DEF-HOME-05: the label follows the blocking reason
+    expect(actionTodayText(t, 1, 3, true)).toBe("No time slot left today");
+    expect(actionTodayText(t, 1, 1, true)).toBe("No time slot left today");
+    expect(actionTodayText(t, 0, 3, true)).toBe("Already done today");
   });
 
   it("refused in the tutorial (script and practice game)", () => {

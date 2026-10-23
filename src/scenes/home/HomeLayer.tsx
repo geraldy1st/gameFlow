@@ -8,6 +8,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Lock } from "lucide-react";
 import { cur, homeActionLeft, homeActionState, homeDayOf, type Action, type GameState } from "@/game/engine";
+import { focusAfterAction } from "./focus";
 import { HOME_SLOTS_PER_TURN, ROOMS, actionTodayText, actionsIn, dailyLimitOf, furnitureById, homeActionById, roomById, slotsLeftText, type RoomId } from "@/game/home-data";
 import { HomePlayer } from "./player";
 import "./home.css";
@@ -80,7 +81,7 @@ export default function HomeLayer({ state, homeId, t, go, onClose, onShop }: { s
     setSit(false);
     setBusy(null);
     setSay(t("Done: {action}.", { action: t(act.name) }));
-    setTimeout(() => rootRef.current?.querySelector<HTMLElement>(`[data-act="${id}"]`)?.focus(), 0);
+    setTimeout(() => { if (rootRef.current) focusAfterAction(rootRef.current, id)?.focus(); }, 0);
   };
   const left = HOME_SLOTS_PER_TURN - d.used;
 
@@ -117,7 +118,7 @@ export default function HomeLayer({ state, homeId, t, go, onClose, onShop }: { s
                 </button>
               );
             }
-            const today = actionTodayText(t, homeActionLeft(p, a.id), dailyLimitOf(a));
+            const today = actionTodayText(t, homeActionLeft(p, a.id), dailyLimitOf(a), st === "full");
             return (
               <button key={a.id} type="button" className="gold" data-act={a.id} data-done={st === "done" || undefined} disabled={!!busy || !idle || st !== "open"} onClick={() => void run(a.id)}
                 aria-label={today ? `${t(a.name)} — ${today}` : undefined} title={today || undefined}>

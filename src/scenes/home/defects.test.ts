@@ -36,3 +36,26 @@ describe("DEF-HOME-02 page of focused item", () => {
     expect(pageOf(5, 0)).toBe(5);
   });
 });
+
+describe("DEF-HOME-04 focus after an action", () => {
+  const btn = (attrs: Record<string, string>, disabled = false) => ({ disabled, dataset: { act: attrs.act }, attrs });
+  const root = (acts: ReturnType<typeof btn>[], rooms: ReturnType<typeof btn>[]) => ({
+    querySelectorAll: () => acts,
+    querySelector: (sel: string) => rooms.find((r) => !r.disabled && (!sel.includes("aria-pressed") || r.attrs.pressed === "true")) ?? null,
+  }) as unknown as ParentNode;
+  const rooms = [btn({ room: "salon" }), btn({ room: "chambre", pressed: "true" })];
+  it("keeps the action when still enabled", async () => {
+    const { focusAfterAction } = await import("./focus");
+    const a = btn({ act: "lire" });
+    expect(focusAfterAction(root([a, btn({ act: "dormir" })], rooms), "lire")).toBe(a);
+  });
+  it("moves to the next enabled action (wrapping) when the action is now disabled", async () => {
+    const { focusAfterAction } = await import("./focus");
+    const d = btn({ act: "dormir" });
+    expect(focusAfterAction(root([d, btn({ act: "lire" }, true)], rooms), "lire")).toBe(d);
+  });
+  it("falls back to the current room selector, never null", async () => {
+    const { focusAfterAction } = await import("./focus");
+    expect(focusAfterAction(root([btn({ act: "canape" }, true), btn({ act: "tele" }, true)], rooms), "canape")).toBe(rooms[1]);
+  });
+});

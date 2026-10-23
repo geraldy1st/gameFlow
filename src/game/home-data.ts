@@ -136,9 +136,13 @@ export function slotsLeftText(t: (k: string, v?: Record<string, string | number>
   return t(n === 1 ? "{n} of {max} time slot left today" : "{n} of {max} time slots left today", { n, max });
 }
 
-/** Accessible label of an action for today: "done today" when exhausted, remaining count when the limit is > 1. */
-export function actionTodayText(t: (k: string, v?: Record<string, string | number>) => string, left: number, max: number): string {
+/**
+ * Accessible label of an action for today, matching its actual blocking reason (DEF-HOME-05):
+ * "done today" when exhausted, "no time slot left" when the slots are used up, else the remaining count when the limit is > 1.
+ */
+export function actionTodayText(t: (k: string, v?: Record<string, string | number>) => string, left: number, max: number, noSlot = false): string {
   if (left <= 0) return t("Already done today");
+  if (noSlot) return t("No time slot left today");
   if (max <= 1) return "";
   return t(left === 1 ? "{n} time left today" : "{n} times left today", { n: left });
 }
