@@ -25,7 +25,9 @@ export const FP_HOME = ["lamp", "plant", "sofa", "desk", "charm", "nope"];
 /** Chez Aoi (home-data.ts): housings, supplies and slots, plus one unknown id each. */
 /** "home" policy (home-aoi): same weight as goods, Chez Aoi actions only (Crypto: a strong-weight home policy). */
 export const FP_HOUSING = ["kichijoji", "nakameguro", "nope"];
-export const FP_FURN = ["sofa", "futon", "plant", "desk", "nope"];
+export const FP_FURN = ["canape", "lit", "lavabo", "douche", "nope"];
+/** Home v1 actions (plus the old "nap" alias and an unknown id). */
+export const FP_ACTS = ["canape", "lire", "douche", "nap", "nope"];
 export const FP_SLOTS = ["salon-fl", "salon-br", "chambre-bl", "sdb-c", "nope"];
 
 interface Engine {
@@ -68,7 +70,7 @@ export function extraAction(rnd: () => number, p: any, homeOnly = false): unknow
         case 3: return { type: "HOME_STORE", homeId: "kichijoji", slot: pick(FP_SLOTS) };
         case 4: return { type: "SELL_FURNITURE", id: pick(FP_FURN) };
         case 5: return { type: "HOME_ENTER", homeId: pick(FP_HOUSING) };
-        default: return { type: "HOME_ACT", id: "nap" };
+        default: return { type: "HOME_ACT", id: pick(FP_ACTS) };
       }
   }
 }

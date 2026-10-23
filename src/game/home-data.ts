@@ -1,9 +1,10 @@
 /**
- * "Chez Aoi" home (DOSSIER.md §9, Geraldy 16/10/2026): data only, engine-free. Housing sold by Immo Dada, home
- * supplies (furniture), the apartment type with its 4 rooms and predefined furniture slots (keyboard friendly: one
- * button per slot, no free drag), and the resident character per chosen character (only Aoi has assets for now).
- * Art: Mirage's mockup (gameflow-bc/v3), converted once by tools/home-assets.py into public/game/scenes/home/.
+ * Home v1 "appartement d'Aoi" (Mirage's home3 prototype, validated by Geraldy 23/10/2026): data only, engine-free.
+ * Housing sold by Immo Dada, 8 pieces of furniture in a fixed layout (no free placement), 4 rooms and 8 data-driven
+ * actions, each played as a video sequence go → loop → return (scenes/home/HomeLayer.tsx).
+ * Clips: the 24 animation clips the prototype serves, re-encoded (H.264 CRF 26, no audio), public/game/scenes/home3/.
  */
+import type { SkillId } from "./skills";
 
 export type RoomId = "salon" | "cuisine" | "chambre" | "sdb";
 
@@ -26,128 +27,107 @@ export const HOUSING: HousingDef[] = [
 export interface FurnitureDef {
   id: string;
   name: string;
-  /** Immo Dada price (Ash, carte blanche: below the mockup prices, in line with the $1,000 apartment). */
+  /** Immo Dada price (Ash, validated by Geraldy 23/10/2026: $880 for the 8). One of each at most. */
   price: number;
-  /** Real width in metres and sprite height / width. */
-  wM: number;
-  ar: number;
+  room: RoomId;
   icon: string;
 }
 
 export const FURNITURE: FurnitureDef[] = [
-  { id: "sofa", name: "Three-seat sofa", price: 420, wM: 2.1, ar: 0.3496, icon: "house" },
-  { id: "futon", name: "Futon", price: 180, wM: 1.9, ar: 0.4395, icon: "moon" },
-  { id: "bookshelf", name: "Bookshelf", price: 220, wM: 1.4, ar: 0.916, icon: "book" },
-  { id: "tv-stand", name: "TV stand and screen", price: 320, wM: 1.5, ar: 0.4961, icon: "game" },
-  { id: "desk", name: "Work desk", price: 380, wM: 1.6, ar: 0.6758, icon: "brush" },
-  { id: "plant", name: "Green plant", price: 60, wM: 0.62, ar: 1.3223, icon: "clover" },
-  { id: "coffee-table", name: "Coffee table", price: 120, wM: 1.2, ar: 0.3672, icon: "star" },
-  { id: "dining-table", name: "Dining table", price: 300, wM: 1.6, ar: 0.5938, icon: "people" },
+  { id: "canape", name: "Sofa", price: 120, room: "salon", icon: "house" },
+  { id: "tele", name: "TV", price: 150, room: "salon", icon: "game" },
+  { id: "cuisiniere", name: "Stove", price: 140, room: "cuisine", icon: "brush" },
+  { id: "table", name: "Table", price: 80, room: "cuisine", icon: "people" },
+  { id: "lit", name: "Bed", price: 130, room: "chambre", icon: "moon" },
+  { id: "bibliotheque", name: "Bookshelf", price: 90, room: "chambre", icon: "book" },
+  { id: "douche", name: "Shower", price: 110, room: "sdb", icon: "star" },
+  { id: "lavabo", name: "Washbasin", price: 60, room: "sdb", icon: "clover" },
 ];
+
+/**
+ * Furniture of the previous Chez Aoi shop (home-aoi, free placement) → new furniture, or null = removed and
+ * refunded at its full purchase price on load (Geraldy 23/10/2026).
+ */
+export const LEGACY_FURNITURE: Record<string, { price: number; to: string | null }> = {
+  sofa: { price: 420, to: "canape" },
+  futon: { price: 180, to: "lit" },
+  bookshelf: { price: 220, to: "bibliotheque" },
+  "tv-stand": { price: 320, to: "tele" },
+  "dining-table": { price: 300, to: "table" },
+  desk: { price: 380, to: null },
+  plant: { price: 60, to: null },
+  "coffee-table": { price: 120, to: null },
+};
 
 /** Resale from the inventory: 50 % of the purchase price, rounded down to the dollar (Geraldy). */
 export const RESALE_RATE = 0.5;
 
-export interface SlotDef {
-  id: string;
-  /** Feet of the item in the 1280×720 background. */
-  x: number;
-  y: number;
-  /** Spoken position ("back left"...). */
-  label: string;
-  /** Allowed items; absent = any furniture. */
-  only?: string[];
-}
-
 export interface RoomDef {
   id: RoomId;
   name: string;
-  bg: string;
-  horizon: number;
-  slots: SlotDef[];
-  /** Where the resident stands / naps (feet). */
-  stand: [number, number];
+  /** Clip folder (root-absolute, rebased by the Pages build). */
+  dir: string;
+  /** Still shown when standing in the room. */
+  start: string;
 }
 
-export const HOME_TYPE = {
-  id: "appart-2ldk",
-  w: 1280,
-  h: 720,
-  camH: 1.4,
-  rooms: [
-    { id: "salon", name: "Living room", bg: "/game/scenes/home/salon.webp", horizon: 233, stand: [640, 640], slots: [
-      { id: "salon-bl", x: 440, y: 548, label: "back left" },
-      { id: "salon-br", x: 1010, y: 575, label: "back right" },
-      { id: "salon-fl", x: 360, y: 668, label: "front left" },
-      { id: "salon-fr", x: 860, y: 640, label: "front right" },
-    ] },
-    { id: "cuisine", name: "Kitchen", bg: "/game/scenes/home/cuisine.webp", horizon: 330, stand: [760, 660], slots: [
-      { id: "cuisine-c", x: 900, y: 650, label: "centre" },
-      { id: "cuisine-r", x: 1180, y: 700, label: "front right" },
-    ] },
-    { id: "chambre", name: "Bedroom", bg: "/game/scenes/home/chambre.webp", horizon: 319, stand: [700, 670], slots: [
-      { id: "chambre-bl", x: 520, y: 580, label: "back left" },
-      { id: "chambre-br", x: 940, y: 610, label: "back right" },
-      { id: "chambre-fl", x: 330, y: 708, label: "front left" },
-    ] },
-    { id: "sdb", name: "Bathroom", bg: "/game/scenes/home/sdb.webp", horizon: 232, stand: [560, 700], slots: [
-      { id: "sdb-c", x: 700, y: 690, label: "by the bath", only: ["plant"] },
-    ] },
-  ] as RoomDef[],
-};
+export const ROOMS: RoomDef[] = [
+  { id: "salon", name: "Living room", dir: "/game/scenes/home3/salon/", start: "/game/scenes/home3/salon/canape-depart.jpg" },
+  { id: "cuisine", name: "Kitchen", dir: "/game/scenes/home3/cuisine/", start: "/game/scenes/home3/cuisine/cuisine-depart.jpg" },
+  { id: "chambre", name: "Bedroom", dir: "/game/scenes/home3/chambre/", start: "/game/scenes/home3/chambre/chambre-depart.jpg" },
+  { id: "sdb", name: "Bathroom", dir: "/game/scenes/home3/salle-de-bain/", start: "/game/scenes/home3/salle-de-bain/sdb-depart.jpg" },
+];
 
-export interface ClipDef {
-  /** Horizontal strips of ≤ 4096 px (one decoded at a time), frames per strip. */
-  strips: string[];
-  perStrip: number;
-  frames: number;
-  fw: number;
-  fh: number;
-  fps: number;
-  /** Still frame: reduced motion and the fallback when a strip cannot be decoded (old Safari). */
-  still: string;
-  /** Outfit the clip was drawn for; any other outfit shows the still body instead. */
-  outfit: string;
+export interface HomeActionDef {
+  id: string;
+  /** English source label (i18n key). */
+  name: string;
+  room: RoomId;
+  /** Furniture that unlocks the action. */
+  furniture: string;
+  /** Points per skill (gauge skills move the gauge, the others add XP). */
+  effects: Partial<Record<SkillId, number>>;
+  /** Loop clip: "pingpong" (symmetric, mirror jump on "Se lever") or "fade" (forward, `period` s per cycle). */
+  loop: "pingpong" | "fade";
+  period?: number;
+  /** Playback rate used to reach the cut frame after "Se lever" (shower: 1). */
+  upRate: number;
 }
 
-export interface ResidentDef {
-  /** Standing body per outfit ("{outfit}" placeholder), height in metres. */
-  body: string;
-  outfits: string[];
-  hM: number;
-  nap?: ClipDef;
-}
+export const HOME_ACTIONS: HomeActionDef[] = [
+  { id: "canape", name: "Sit on the sofa", room: "salon", furniture: "canape", effects: { content: 2, health: 1 }, loop: "pingpong", upRate: 2 },
+  { id: "tele", name: "Watch TV", room: "salon", furniture: "tele", effects: { content: 3 }, loop: "pingpong", upRate: 2 },
+  { id: "cuisiner", name: "Cook", room: "cuisine", furniture: "cuisiniere", effects: { creativity: 2, health: 1 }, loop: "pingpong", upRate: 2 },
+  { id: "manger", name: "Eat", room: "cuisine", furniture: "table", effects: { health: 3 }, loop: "pingpong", upRate: 2 },
+  { id: "dormir", name: "Sleep", room: "chambre", furniture: "lit", effects: { health: 2, discipline: 2 }, loop: "pingpong", upRate: 2 },
+  { id: "lire", name: "Read", room: "chambre", furniture: "bibliotheque", effects: { mind: 3 }, loop: "pingpong", upRate: 2 },
+  { id: "douche", name: "Shower", room: "sdb", furniture: "douche", effects: { health: 2, charisma: 1 }, loop: "fade", period: 2, upRate: 1 },
+  { id: "dents", name: "Brush teeth", room: "sdb", furniture: "lavabo", effects: { health: 1, charisma: 2 }, loop: "pingpong", upRate: 2 },
+];
+
+/** Old "Sieste" action id, mapped to the sofa action. */
+export const LEGACY_ACTION: Record<string, string> = { nap: "canape" };
+
+/** 3 time slots a turn; one per action, used as soon as the action starts. */
+export const HOME_SLOTS_PER_TURN = 3;
+/** "Se lever": the return clip starts at most this many seconds later (DEF-HOME3-01). */
+export const UP_MAX_DELAY = 1.7;
+
+export const housingById = (id: string) => HOUSING.find((h) => h.id === id);
+export const furnitureById = (id: string) => FURNITURE.find((f) => f.id === id);
+export const homeActionById = (id: string) => HOME_ACTIONS.find((a) => a.id === (LEGACY_ACTION[id] ?? id));
+export const roomById = (id: RoomId) => ROOMS.find((r) => r.id === id)!;
+export const actionsIn = (room: RoomId) => HOME_ACTIONS.filter((a) => a.room === room);
 
 /** Resident per chosen character. Only Aoi has art for now; every other character falls back to her (Geraldy). */
-export const RESIDENTS: Record<string, ResidentDef> = {
-  aoi: {
-    body: "/game/scenes/home/aoi-{outfit}.webp",
-    outfits: ["jeans", "jog", "night", "shirt", "shorts", "tee"],
-    hM: 1.58,
-    nap: {
-      strips: ["/game/scenes/home/aoi-nap-0.webp", "/game/scenes/home/aoi-nap-1.webp", "/game/scenes/home/aoi-nap-2.webp"],
-      perStrip: 6,
-      frames: 15,
-      fw: 660,
-      fh: 200,
-      fps: 8,
-      still: "/game/scenes/home/aoi-nap-still.png",
-      outfit: "jeans",
-    },
-  },
-};
-
-export function residentFor(characterId: string | undefined): { id: string; def: ResidentDef } {
+export const RESIDENTS: Record<string, { name: string }> = { aoi: { name: "Aoi" } };
+export function residentFor(characterId: string | undefined): { id: string; def: { name: string } } {
   const id = characterId && RESIDENTS[characterId] ? characterId : "aoi";
   return { id, def: RESIDENTS[id]! };
 }
 
-/** Sieste (nap): no turn spent, +5 on every gauge, 3 time slots a turn, home counter 100 / 50 / 25 / 0 %. */
-export const HOME_SLOTS_PER_TURN = 3;
-export const NAP_POINTS = 5;
-export const HOME_DIM = [1, 0.5, 0.25, 0];
-
-export const housingById = (id: string) => HOUSING.find((h) => h.id === id);
-export const furnitureById = (id: string) => FURNITURE.find((f) => f.id === id);
-export const allSlots = () => HOME_TYPE.rooms.flatMap((r) => r.slots.map((s) => ({ room: r.id, ...s })));
-export const slotById = (id: string) => allSlots().find((s) => s.id === id);
+/** "n of max time slots left" with real plurals (DEF-HOME-03): 0 / 1 / many are separate keys (fr: 0 is singular). */
+export function slotsLeftText(t: (k: string, v?: Record<string, string | number>) => string, n: number, max: number): string {
+  if (n <= 0) return t("No time slot left today");
+  return t(n === 1 ? "{n} of {max} time slot left today" : "{n} of {max} time slots left today", { n, max });
+}

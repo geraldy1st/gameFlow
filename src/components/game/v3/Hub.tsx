@@ -5,13 +5,13 @@
 import { sceneOfMinigame } from "@/scenes/registry";
 import { useLayoutEffect, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { FRIENDS, PARTNERS } from "@/game/data";
-import { cur, furnitureFree, homeDayOf, napPoints, ownsGood, progressOf, quizOpen, quizWait, shopPrice, statement, type Action, type GameState, type Player } from "@/game/engine";
+import { cur, furnitureFree, homeDayOf, ownsGood, progressOf, quizOpen, quizWait, shopPrice, statement, type Action, type GameState, type Player } from "@/game/engine";
 import { formatCompact } from "@/game/format-compact";
 import { MINIGAME_REGISTRY, MINIGAME_SOON } from "@/minigames/registry";
 import { CLASS_QUIZ, CURVES, AFFINITY_SEED, GOODS_CATEGORIES, SKILL_RULES, SOON_GOODS, type GoodsCategory } from "@/game/tuning";
 import { ARTICLES, SHOP_DEFINITIONS, articlesOfShop, shopById, shopOfArticle, shopOfType, type ShopDefinition } from "@/game/articles";
 import { HOME_LEVEL, HOME_SHOP } from "@/game/shop";
-import { FURNITURE, HOME_SLOTS_PER_TURN, HOUSING, RESALE_RATE, housingById } from "@/game/home-data";
+import { FURNITURE, HOME_SLOTS_PER_TURN, HOUSING, RESALE_RATE, housingById, slotsLeftText } from "@/game/home-data";
 import { BIRTHDAY_COST, MUSEUM_COST, OUTFITS, clothDelta, type OutfitId } from "@/game/life";
 import { SKILL_IDS, SKILL_NAMES, experienceXp, maxFriends, skillLevel, skillXp, type SkillId } from "@/game/skills";
 import { SKILL_INFO, skillInfo } from "@/game/skills-info";
@@ -178,7 +178,7 @@ export function HomeTab({ state, p, t, lang, go, onHome }: { state: GameState; p
           <span className="v3-ic" aria-hidden="true"><Ico name="house" /></span>
           <span className="v3-tx">
             <strong>{t(housingById(id)!.name)}</strong>
-            <small>{t("{n} of {max} time slots left today", { n: HOME_SLOTS_PER_TURN - d.used, max: HOME_SLOTS_PER_TURN })}</small>
+            <small>{slotsLeftText(t, HOME_SLOTS_PER_TURN - d.used, HOME_SLOTS_PER_TURN)}</small>
           </span>
           <button type="button" className="v3-tag act" data-home-enter={id} disabled={!idle || !onHome} onClick={() => onHome?.(id)}>{t("Enter")}</button>
         </div>
@@ -190,8 +190,8 @@ export function HomeTab({ state, p, t, lang, go, onHome }: { state: GameState; p
         <div className="v3-card">
           <span className="v3-ic" aria-hidden="true"><Ico name={f.icon} /></span>
           <span className="v3-tx">
-            <strong>{t(f.name)} × {furnitureFree(p, f.id)}</strong>
-            <small>{t("In the inventory")}</small>
+            <strong>{t(f.name)}</strong>
+            <small>{t("In your home")}</small>
           </span>
           <button type="button" className="v3-tag act" disabled={!idle} onClick={() => go({ type: "SELL_FURNITURE", id: f.id })} aria-label={t("Sell {item} for {amount}", { item: t(f.name), amount: fmtMoney(lang, Math.floor(f.price * RESALE_RATE)) })}>
             {t("Sell")} {cmoney(lang, Math.floor(f.price * RESALE_RATE))}
@@ -203,26 +203,32 @@ export function HomeTab({ state, p, t, lang, go, onHome }: { state: GameState; p
   if (!rows.length) return <p className="v3-muted">{t("No home yet. Immo Dada (Activities › Shops) sells apartments and home supplies.")}</p>;
   return (
     <>
-      <p className="v3-muted">{t("Nap: +{n} on every gauge, no turn spent.", { n: napPoints(p) })} {t("{n} of {max} time slots left today", { n: HOME_SLOTS_PER_TURN - d.used, max: HOME_SLOTS_PER_TURN })}</p>
+      <p className="v3-muted">{t("Each home action uses one time slot, no turn spent.")} {slotsLeftText(t, HOME_SLOTS_PER_TURN - d.used, HOME_SLOTS_PER_TURN)}</p>
       <Pager items={rows} minW={200} itemH={62} t={t} label={t("Home")} render={(r) => r.node} />
     </>
   );
 }
 
 /** Immo Dada: housing (one in stock, the others "out of stock") and home supplies; same design as the shops. */
-function ImmoView({ state, p, t, lang, go, onBack }: { state: GameState; p: Player; t: TFn; lang: Lang; go: Go; onBack: () => void }) {
+function ImmoView({ state, p, t, lang, go, onBack, onBackHome }: { state: GameState; p: Player; t: TFn; lang: Lang; go: Go; onBack: () => void; onBackHome?: () => void }) {
   const idle = state.phase === "idle" && !state.practice;
   type Item = { id: string; name: string; note: string; icon: string; price: number; owned?: boolean; out?: boolean; buy: () => void };
   const items: Item[] = [
     ...HOUSING.map((h) => ({ id: h.id, name: t(h.name), note: h.inStock ? t("Empty on purchase") : fmtMoney(lang, h.price), icon: "house", price: h.price, owned: !!p.housing?.[h.id], out: !h.inStock, buy: () => go({ type: "BUY_HOUSING", id: h.id }) })),
-    ...FURNITURE.map((f) => ({ id: f.id, name: t(f.name), note: t("Home supply · resale {amount}", { amount: fmtMoney(lang, Math.floor(f.price * RESALE_RATE)) }), icon: f.icon, price: f.price, buy: () => go({ type: "BUY_FURNITURE", id: f.id }) })),
+    ...FURNITURE.map((f) => ({ id: f.id, name: t(f.name), note: t("Home supply · resale {amount}", { amount: fmtMoney(lang, Math.floor(f.price * RESALE_RATE)) }), icon: f.icon, price: f.price, owned: furnitureFree(p, f.id) > 0, buy: () => go({ type: "BUY_FURNITURE", id: f.id }) })),
   ];
   return (
     <>
       <div className="v3-subrow">
-        <button type="button" className="v3-link" onClick={onBack}>
-          ← {t("Shops")}
-        </button>
+        {onBackHome ? (
+          <button type="button" className="v3-link" data-back-home onClick={onBackHome}>
+            ← {t("Back to the apartment")}
+          </button>
+        ) : (
+          <button type="button" className="v3-link" onClick={onBack}>
+            ← {t("Shops")}
+          </button>
+        )}
         <span className="v3-cash">{t("Cash")}{lang === "en" ? ": " : " : "}<b>{cmoney(lang, p.cash)}</b></span>
       </div>
       <Pager
@@ -560,10 +566,10 @@ function StatsTab({ state, p, t, lang, go }: { state: GameState; p: Player; t: T
 
 /* ------------------------------------------------------------------ Activities */
 
-export function ActivitiesPanel({ state, t, lang, go, onQuiz, onMetroPractice, onClose }: { state: GameState; t: TFn; lang: Lang; go: Go; onQuiz: () => void; onMetroPractice?: () => void; onClose: () => void }) {
+export function ActivitiesPanel({ state, t, lang, go, onQuiz, onMetroPractice, onClose, initialShop, onBackHome }: { state: GameState; t: TFn; lang: Lang; go: Go; onQuiz: () => void; onMetroPractice?: () => void; onClose: () => void; initialShop?: string; onBackHome?: () => void }) {
   const p = cur(state);
   const [tab, setTab] = useState<"shops" | "games">("shops");
-  const [shop, setShop] = useState<string | null>(null);
+  const [shop, setShop] = useState<string | null>(initialShop ?? null);
   const open = shop && shop !== "immo" ? shopById(shop) : undefined;
   const immo = shop === "immo";
   const pr = progressOf(p);
@@ -584,7 +590,7 @@ export function ActivitiesPanel({ state, t, lang, go, onQuiz, onMetroPractice, o
       )}
       <div className="v3-body">
         {immo ? (
-          <ImmoView state={state} p={p} t={t} lang={lang} go={go} onBack={() => setShop(null)} />
+          <ImmoView state={state} p={p} t={t} lang={lang} go={go} onBack={() => setShop(null)} onBackHome={onBackHome} />
         ) : open ? (
           <ShopView shop={open} state={state} p={p} t={t} lang={lang} go={go} onBack={() => setShop(null)} />
         ) : tab === "shops" ? (

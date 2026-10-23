@@ -604,6 +604,8 @@ export function GameFlow() {
   const [legendView, setLegendView] = useState(false);
   const [classQuiz, setClassQuiz] = useState(false);
   const [homeOpen, setHomeOpen] = useState<string | null>(null);
+  /** Home v1: Immo Dada opened from a locked home action (its home id), with a way back to the apartment. */
+  const [immoFrom, setImmoFrom] = useState<string | null>(null);
   const navRef = useRef<HTMLElement | null>(null);
   const asideRef = useRef<HTMLElement | null>(null);
   const [chat, setChat] = useState<{ friendId: string; index: number; step: number } | null>(null);
@@ -1313,9 +1315,9 @@ export function GameFlow() {
           </main>
         )}
         {state.screen === "play" && player && hub && !coach && !classQuiz && (
-          <HubLayer anchor={asideRef} nav={navRef} label={t(hub === "day" ? "Day" : hub === "acts" ? "Activities" : "Menu")} onClose={() => setHub(null)}>
+          <HubLayer anchor={asideRef} nav={navRef} label={t(hub === "day" ? "Day" : hub === "acts" ? "Activities" : "Menu")} onClose={() => { setImmoFrom(null); setHub(null); }}>
             {hub === "day" && <DayPanel state={state} tab={dayTab} setTab={setDayTab} t={t} lang={lang} go={go} onFriend={(id) => setFriendId(id)} onHome={(id) => { go({ type: "HOME_ENTER", homeId: id }); setHub(null); setHomeOpen(id); }} onClose={() => setHub(null)} />}
-            {hub === "acts" && <ActivitiesPanel state={state} t={t} lang={lang} go={go} onQuiz={() => setClassQuiz(true)} onMetroPractice={() => { setHub(null); setMetroPlay({ turn: -1, audio: null, practice: true, demo: metroDemoDriver() }); }} onClose={() => setHub(null)} />}
+            {hub === "acts" && <ActivitiesPanel key={immoFrom ?? "acts"} initialShop={immoFrom ? "immo" : undefined} onBackHome={immoFrom ? () => { const id = immoFrom; setImmoFrom(null); setHub(null); setHomeOpen(id); } : undefined} state={state} t={t} lang={lang} go={go} onQuiz={() => setClassQuiz(true)} onMetroPractice={() => { setHub(null); setMetroPlay({ turn: -1, audio: null, practice: true, demo: metroDemoDriver() }); }} onClose={() => { setImmoFrom(null); setHub(null); }} />}
             {hub === "menu" &&
               (legendView ? (
                 <LegendPanel map={<LegendBody t={t} />} player={player} t={t} lang={lang} onClose={() => setHub(null)} onBack={() => setLegendView(false)} />
@@ -1331,6 +1333,12 @@ export function GameFlow() {
               homeId={homeOpen}
               t={t}
               go={go}
+              onShop={() => {
+                const id = homeOpen;
+                setHomeOpen(null);
+                setImmoFrom(id);
+                setHub("acts");
+              }}
               onClose={() => {
                 // R2: back to Day › Home with the focus on this home's "Enter" (the trigger), else on the panel.
                 const id = homeOpen;

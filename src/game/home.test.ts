@@ -3,7 +3,8 @@ import { describe, expect, it } from "vitest";
 import * as E from "./engine";
 import type { GameState, Player } from "./engine";
 import { HOME_SHOP } from "./shop";
-import { FURNITURE, HOME_SLOTS_PER_TURN, residentFor } from "./home-data";
+import { FURNITURE, HOME_ACTIONS, HOME_SLOTS_PER_TURN, residentFor } from "./home-data";
+import { GAUGE_SKILLS, SKILL_IDS } from "./skills";
 
 function idle(seed = 3, cash = 5000): GameState {
   let s = E.createMatch([{ characterId: "aoi", dreamId: "cafe" }], seed, true);
@@ -12,63 +13,70 @@ function idle(seed = 3, cash = 5000): GameState {
 }
 const P = (s: GameState) => E.cur(s);
 const go = (s: GameState, ...as: E.Action[]) => as.reduce((x, a) => E.reduce(x, a), s);
-const sofa = FURNITURE.find((f) => f.id === "sofa")!;
 
-describe("Chez Aoi: Immo Dada, inventory, slots", () => {
+describe("Home v1: Immo Dada furniture, fixed layout", () => {
   it("apartment: $1,000, empty on purchase, bought once; out-of-stock housing refused", () => {
     expect(P(go(idle(3, 999), { type: "BUY_HOUSING", id: "kichijoji" })).housing).toBeUndefined();
     const s = go(idle(3, 1000), { type: "BUY_HOUSING", id: "kichijoji" });
     expect(P(s).cash).toBe(0);
     expect(P(s).housing).toEqual({ kichijoji: { slots: {} } });
     expect(P(s).homeCurrent).toBe("kichijoji");
-    const again = go({ ...s, players: s.players.map((p) => ({ ...p, cash: 5000 })) }, { type: "BUY_HOUSING", id: "kichijoji" });
-    expect(P(again).cash).toBe(5000);
     const oos = idle();
     expect(go(oos, { type: "BUY_HOUSING", id: "nakameguro" })).toBe(oos);
   });
 
-  it("supplies go to the inventory; place, swap, store; slot limits; resale 50 % of free items only", () => {
-    let s = go(idle(), { type: "BUY_HOUSING", id: "kichijoji" }, { type: "BUY_FURNITURE", id: "sofa" }, { type: "BUY_FURNITURE", id: "plant" });
-    expect(P(s).cash).toBe(5000 - 1000 - sofa.price - 60);
-    expect(E.furnitureFree(P(s), "sofa")).toBe(1);
-    s = go(s, { type: "HOME_PLACE", homeId: "kichijoji", slot: "salon-fl", itemId: "sofa" });
-    expect(E.furnitureFree(P(s), "sofa")).toBe(0);
-    expect(go(s, { type: "HOME_PLACE", homeId: "kichijoji", slot: "salon-fr", itemId: "sofa" })).toBe(s); // none left
-    expect(go(s, { type: "HOME_PLACE", homeId: "kichijoji", slot: "sdb-c", itemId: "sofa" })).toBe(s); // bathroom: plant only
-    expect(go(s, { type: "SELL_FURNITURE", id: "sofa" })).toBe(s); // placed: not sellable
-    s = go(s, { type: "HOME_PLACE", homeId: "kichijoji", slot: "salon-fl", itemId: "plant" }); // swap: sofa back to inventory
-    expect(P(s).housing!.kichijoji!.slots).toEqual({ "salon-fl": "plant" });
-    expect(E.furnitureFree(P(s), "sofa")).toBe(1);
-    const cash = P(s).cash;
-    s = go(s, { type: "SELL_FURNITURE", id: "sofa" });
-    expect(P(s).cash).toBe(cash + Math.floor(sofa.price / 2));
-    expect(P(s).furniture).toEqual({ plant: 1 });
-    s = go(s, { type: "HOME_STORE", homeId: "kichijoji", slot: "salon-fl" });
-    expect(P(s).housing!.kichijoji!.slots).toEqual({});
-    expect(E.furnitureFree(P(s), "plant")).toBe(1);
+  it("8 pieces at the agreed prices ($880), one of each; resale 50 %; placement refused", () => {
+    const prices = Object.fromEntries(FURNITURE.map((f) => [f.id, f.price]));
+    expect(prices).toEqual({ canape: 120, tele: 150, cuisiniere: 140, table: 80, lit: 130, bibliotheque: 90, douche: 110, lavabo: 60 });
+    let s = go(idle(), { type: "BUY_HOUSING", id: "kichijoji" }, { type: "BUY_FURNITURE", id: "canape" });
+    expect(P(s).cash).toBe(5000 - 1000 - 120);
+    expect(go(s, { type: "BUY_FURNITURE", id: "canape" })).toBe(s); // already owned
+    expect(go(s, { type: "HOME_PLACE", homeId: "kichijoji", slot: "salon-fl", itemId: "canape" })).toBe(s);
+    expect(go(s, { type: "HOME_STORE", homeId: "kichijoji", slot: "salon-fl" })).toBe(s);
+    expect(E.homeActionState(P(s), "canape")).toBe("open");
+    s = go(s, { type: "SELL_FURNITURE", id: "canape" });
+    expect(P(s).cash).toBe(5000 - 1000 - 120 + 60);
+    expect(E.homeActionState(P(s), "canape")).toBe("locked"); // relocked
   });
 });
 
-describe("Chez Aoi: Sieste and the home counter", () => {
-  it("+5 on every gauge, no turn spent; 100 / 50 / 25 % then no slot left; fresh counter next turn", () => {
-    const base = go(idle(), { type: "BUY_HOUSING", id: "kichijoji" });
-    expect(go(idle(), { type: "HOME_ACT", id: "nap" }).players[0]!.homeDay).toBeUndefined(); // no home: refused
-    const v0 = P(base).vitals;
-    let s = go(base, { type: "HOME_ACT", id: "nap" });
-    expect(s.turn).toBe(base.turn);
-    expect(s.phase).toBe("idle");
-    for (const k of ["content", "social", "mind", "luck", "health"] as const) expect(P(s).vitals[k]).toBe(Math.min(100, v0[k] + 5));
-    s = go(s, { type: "HOME_ACT", id: "nap" }, { type: "HOME_ACT", id: "nap" });
-    expect(P(s).homeDay).toMatchObject({ used: HOME_SLOTS_PER_TURN, done: { nap: 3 } });
-    expect(E.napPoints(P(s))).toBe(0);
-    expect(go(s, { type: "HOME_ACT", id: "nap" })).toBe(s);
+describe("Home v1: actions and the home counter", () => {
+  const all = (s: GameState) => go(s, { type: "BUY_HOUSING", id: "kichijoji" }, ...FURNITURE.map((f) => ({ type: "BUY_FURNITURE", id: f.id }) as E.Action));
+  it("each action applies exactly its effects and uses 1 slot; no turn spent", () => {
+    for (const a of HOME_ACTIONS) {
+      const base = all(idle());
+      const s = go(base, { type: "HOME_ACT", id: a.id });
+      expect(s.turn).toBe(base.turn);
+      expect(P(s).homeDay).toMatchObject({ used: 1, done: { [a.id]: 1 } });
+      for (const id of SKILL_IDS) {
+        const n = a.effects[id] ?? 0;
+        if ((GAUGE_SKILLS as readonly string[]).includes(id)) expect(P(s).vitals[id as "health"], `${a.id} ${id}`).toBe(Math.min(100, P(base).vitals[id as "health"] + n));
+        else expect(P(s).skills?.[id] ?? 0, `${a.id} ${id}`).toBe((P(base).skills?.[id] ?? 0) + n);
+      }
+    }
+    expect(HOME_ACTIONS.map((a) => [a.id, a.effects])).toEqual([
+      ["canape", { content: 2, health: 1 }], ["tele", { content: 3 }], ["cuisiner", { creativity: 2, health: 1 }], ["manger", { health: 3 }],
+      ["dormir", { health: 2, discipline: 2 }], ["lire", { mind: 3 }], ["douche", { health: 2, charisma: 1 }], ["dents", { health: 1, charisma: 2 }],
+    ]);
+  });
+
+  it("locked without its furniture; 3 slots then full; fresh counter next turn; old 'nap' id = canape", () => {
+    const home = go(idle(), { type: "BUY_HOUSING", id: "kichijoji" });
+    expect(go(home, { type: "HOME_ACT", id: "lire" })).toBe(home);
+    expect(E.homeActionState(P(home), "lire")).toBe("locked");
+    expect(go(idle(), { type: "HOME_ACT", id: "canape" }).players[0]!.homeDay).toBeUndefined(); // no home
+    let s = all(idle());
+    s = go(s, { type: "HOME_ACT", id: "nap" }, { type: "HOME_ACT", id: "lire" }, { type: "HOME_ACT", id: "douche" });
+    expect(P(s).homeDay).toMatchObject({ used: HOME_SLOTS_PER_TURN, done: { canape: 1, lire: 1, douche: 1 } });
+    expect(E.homeActionState(P(s), "tele")).toBe("full");
+    expect(go(s, { type: "HOME_ACT", id: "tele" })).toBe(s);
     const next = { ...s, players: s.players.map((p) => ({ ...p, turns: p.turns + 1 })) };
-    expect(E.napPoints(P(next))).toBe(5);
+    expect(E.homeActionState(P(next), "tele")).toBe("open");
   });
 
   it("refused in the tutorial (script and practice game)", () => {
     const t = E.createMatch([{ characterId: "aoi", dreamId: "cafe" }], 3, true, { training: true });
-    for (const a of [{ type: "BUY_HOUSING", id: "kichijoji" }, { type: "BUY_FURNITURE", id: "plant" }, { type: "HOME_ACT", id: "nap" }] as E.Action[]) {
+    for (const a of [{ type: "BUY_HOUSING", id: "kichijoji" }, { type: "BUY_FURNITURE", id: "lavabo" }, { type: "HOME_ACT", id: "canape" }] as E.Action[]) {
       expect(E.reduce(t, a)).toBe(t);
       const pr = { ...idle(), practice: true };
       expect(E.reduce(pr, a)).toBe(pr);
@@ -76,28 +84,30 @@ describe("Chez Aoi: Sieste and the home counter", () => {
   });
 });
 
-describe("Chez Aoi: saves", () => {
-  it("old saves: no home field appears; sanitising is idempotent", () => {
-    const old = JSON.parse(JSON.stringify(idle()));
-    const h = E.hydrate(old);
+describe("Home v1: saves and migration", () => {
+  it("old saves without a home: no home field appears", () => {
+    const h = E.hydrate(JSON.parse(JSON.stringify(idle())));
     for (const k of ["housing", "homeCurrent", "furniture", "homeDay"]) expect(k in h.players[0]!).toBe(false);
-    const bad = JSON.parse(JSON.stringify(idle()));
-    Object.assign(bad.players[0] as Player, {
-      furniture: { sofa: 1, plant: -2, desk: 1.7, ghost: 3 },
-      housing: { kichijoji: { slots: { "salon-fl": "sofa", "salon-fr": "sofa", "sdb-c": "desk", "nowhere": "desk", "chambre-bl": "desk" } }, castle: { slots: {} } },
+  });
+
+  it("old Chez Aoi save (free placement, Sieste) loads: converted, the rest refunded at full price, idempotent", () => {
+    const old = JSON.parse(JSON.stringify(idle(3, 100)));
+    Object.assign(old.players[0] as Player, {
+      furniture: { sofa: 2, futon: 1, plant: 1, desk: 1, "coffee-table": 1, "dining-table": 1, ghost: 3, bookshelf: -1 },
+      housing: { kichijoji: { slots: { "salon-fl": "sofa", "chambre-bl": "desk", "sdb-c": "plant" } }, castle: { slots: {} } },
       homeCurrent: "castle",
-      homeDay: { turn: 2, used: 4, done: { nap: -1 } },
+      homeDay: { turn: 2, used: 4, done: { nap: 2 } },
     });
-    const h1 = E.hydrate(bad);
-    const p = h1.players[0]!;
-    expect(p.furniture).toEqual({ sofa: 1, desk: 1 });
-    expect(p.housing).toEqual({ kichijoji: { slots: { "salon-fl": "sofa", "chambre-bl": "desk" } } });
+    const h = E.hydrate(old);
+    const p = h.players[0]!;
+    expect(p.furniture).toEqual({ canape: 1, lit: 1, table: 1 });
+    expect(p.cash).toBe(100 + 420 + 60 + 380 + 120); // 2nd sofa, plant, desk, coffee table
+    expect(p.housing).toEqual({ kichijoji: { slots: {} } });
     expect(p.homeCurrent).toBe("kichijoji");
-    expect(p.homeDay).toEqual({ turn: 2, used: 3, done: { nap: 0 } });
-    expect(E.hydrate(JSON.parse(JSON.stringify(h1))).players[0]).toEqual(p);
-    const neg = JSON.parse(JSON.stringify(idle()));
-    neg.players[0].homeDay = { turn: 1, used: -1, done: {} };
-    expect(E.hydrate(neg).players[0]!.homeDay!.used).toBe(0);
+    expect(p.homeDay).toEqual({ turn: 2, used: 3, done: { canape: 2 } });
+    expect(E.homeActionState(p, "canape")).not.toBe("locked");
+    const again = E.hydrate(JSON.parse(JSON.stringify(h)));
+    expect(again.players[0]).toEqual(p);
   });
 
   it("resident: keyed by character, Aoi as the fallback", () => {

@@ -64,7 +64,7 @@ import {
   type Vitals,
 } from "./life";
 import { CLOTH_PRICE, HOME_LEVEL, homeItem } from "./shop";
-import { HOME_DIM, HOME_SLOTS_PER_TURN, NAP_POINTS, RESALE_RATE, furnitureById, housingById, slotById } from "./home-data";
+import { HOME_SLOTS_PER_TURN, LEGACY_FURNITURE, RESALE_RATE, furnitureById, homeActionById, housingById } from "./home-data";
 import { CURVES, SKILL_RULES, SKILL_XP } from "./tuning";
 import { levelState } from "./format-compact";
 import { goodById, shopOfGood, unlockState, type Progress } from "./shops";
@@ -227,11 +227,11 @@ export interface Player {
   ownedOutfits: OutfitId[];
   homeOwned: string[];
   homeOn: string[];
-  /** Chez Aoi (home-data.ts): housings bought at Immo Dada, each with its furniture slots (slotId → itemId). Optional. */
+  /** Chez Aoi (home-data.ts): housings bought at Immo Dada. `slots` is kept for old saves and always empty (Home v1: fixed layout). Optional. */
   housing?: Record<string, { slots: Record<string, string> }>;
   /** Housing shown when entering the home. Optional (first housing owned). */
   homeCurrent?: string;
-  /** Furniture owned (count by id), placed or not. Inventory = owned − placed in every housing. Optional. */
+  /** Home v1 furniture owned (id → 1), shown in the fixed layout; unlocks its action. Optional. */
   furniture?: Record<string, number>;
   /** Home counter for the turn `turn`: time slots used (of 3) and how many times each home action was done. */
   homeDay?: { turn: number; used: number; done: Record<string, number> };
@@ -2346,7 +2346,8 @@ export type Action =
   | { type: "HOME_PLACE"; homeId: string; slot: string; itemId: string }
   | { type: "HOME_STORE"; homeId: string; slot: string }
   | { type: "HOME_ENTER"; homeId: string }
-  | { type: "HOME_ACT"; id: "nap" }
+  /** Home v1 action (home-data.ts HOME_ACTIONS id; "nap" = old Sieste → canape). HOME_PLACE / HOME_STORE: refused since Home v1. */
+  | { type: "HOME_ACT"; id: string }
   /** v3 Activities › Class quiz: `correct` good answers out of CLASS_QUIZ questions. */
   | { type: "QUIZ"; correct: number; creative?: number } // alias of MINIGAME { id: "quiz" }
   /** v3 Activities › shops: buy one of tuning.ts GOODS. */
@@ -3065,16 +3066,9 @@ function doBuyHome(s: GameState, id: string): GameState {
   );
 }
 
-/** Placed count of a furniture id over every housing. */
-export function furniturePlaced(p: Player, id: string): number {
-  let n = 0;
-  for (const h of Object.values(p.housing ?? {})) for (const it of Object.values(h.slots)) if (it === id) n++;
-  return n;
-}
-
-/** Inventory: owned − placed. */
+/** Furniture owned (Home v1: 0 or 1; no placement, the layout is fixed). */
 export function furnitureFree(p: Player, id: string): number {
-  return Math.max(0, (p.furniture?.[id] ?? 0) - furniturePlaced(p, id));
+  return Math.max(0, p.furniture?.[id] ?? 0);
 }
 
 /** Home counter of the current turn (a fresh one when the turn changed). */
@@ -3082,11 +3076,12 @@ export function homeDayOf(p: Player): { turn: number; used: number; done: Record
   return p.homeDay && p.homeDay.turn === p.turns ? p.homeDay : { turn: p.turns, used: 0, done: {} };
 }
 
-/** Points a nap gives now (home counter 100 / 50 / 25 / 0 %), 0 when no slot is left. */
-export function napPoints(p: Player): number {
-  const d = homeDayOf(p);
-  if (d.used >= HOME_SLOTS_PER_TURN) return 0;
-  return Math.round(NAP_POINTS * HOME_DIM[Math.min(d.done.nap ?? 0, HOME_DIM.length - 1)]!);
+/** Home v1: "open" | "locked" (furniture missing) | "full" (no time slot left) | "none" (no home / unknown action). */
+export function homeActionState(p: Player, id: string): "open" | "locked" | "full" | "none" {
+  const a = homeActionById(id);
+  if (!a || !Object.keys(p.housing ?? {}).length) return "none";
+  if (furnitureFree(p, a.furniture) < 1) return "locked";
+  return homeDayOf(p).used >= HOME_SLOTS_PER_TURN ? "full" : "open";
 }
 
 type HomeAction = Extract<Action, { type: "BUY_HOUSING" | "BUY_FURNITURE" | "SELL_FURNITURE" | "HOME_PLACE" | "HOME_STORE" | "HOME_ENTER" | "HOME_ACT" }>;
@@ -3106,10 +3101,10 @@ function doHome(s: GameState, a: HomeAction): GameState {
   }
   if (a.type === "BUY_FURNITURE") {
     const f = furnitureById(a.id);
-    if (!f || p.cash < f.price) return s;
+    if (!f || furnitureFree(p, a.id) > 0 || p.cash < f.price) return s;
     return log(
-      withP(s, (pl) => ({ ...pl, cash: pl.cash - f.price, furniture: { ...(pl.furniture ?? {}), [a.id]: (pl.furniture?.[a.id] ?? 0) + 1 } })),
-      tl("Bought {item} for {amount}. It is in your inventory.", { item: f.name, amount: money(f.price) }),
+      withP(s, (pl) => ({ ...pl, cash: pl.cash - f.price, furniture: { ...(pl.furniture ?? {}), [a.id]: 1 } })),
+      tl("Bought {item} for {amount}. It is in your home.", { item: f.name, amount: money(f.price) }),
     );
   }
   if (a.type === "SELL_FURNITURE") {
@@ -3118,8 +3113,8 @@ function doHome(s: GameState, a: HomeAction): GameState {
     const back = Math.floor(f.price * RESALE_RATE);
     return log(
       withP(s, (pl) => {
-        const furniture = { ...(pl.furniture ?? {}), [a.id]: (pl.furniture?.[a.id] ?? 0) - 1 };
-        if (furniture[a.id]! <= 0) delete furniture[a.id];
+        const furniture = { ...(pl.furniture ?? {}) };
+        delete furniture[a.id];
         return { ...pl, cash: pl.cash + back, furniture };
       }),
       tl("Sold {item} for {amount}.", { item: f.name, amount: money(back) }),
@@ -3129,37 +3124,25 @@ function doHome(s: GameState, a: HomeAction): GameState {
     if (!housing[a.homeId] || p.homeCurrent === a.homeId) return s;
     return withP(s, (pl) => ({ ...pl, homeCurrent: a.homeId }));
   }
-  if (a.type === "HOME_PLACE" || a.type === "HOME_STORE") {
-    const h = housing[a.homeId];
-    const slot = slotById(a.slot);
-    if (!h || !slot) return s;
-    const slots = { ...h.slots };
-    if (a.type === "HOME_STORE") {
-      if (!slots[a.slot]) return s;
-      delete slots[a.slot];
-    } else {
-      const f = furnitureById(a.itemId);
-      if (!f || (slot.only && !slot.only.includes(a.itemId))) return s;
-      const prev = slots[a.slot];
-      if (prev === a.itemId) return s;
-      // the item currently in the slot goes back to the inventory, so only the new one must be free
-      if (furnitureFree(p, a.itemId) < 1) return s;
-      slots[a.slot] = a.itemId;
-    }
-    return withP(s, (pl) => ({ ...pl, housing: { ...housing, [a.homeId]: { slots } } }));
-  }
-  // HOME_ACT nap (Sieste): no turn spent, +5 on every gauge, one of the 3 slots, home counter.
-  if (a.id !== "nap" || !Object.keys(housing).length) return s;
+  // Home v1: fixed layout, no placement.
+  if (a.type === "HOME_PLACE" || a.type === "HOME_STORE") return s;
+  // HOME_ACT: one of the 3 slots, used at the start (an action cut short by "Se lever" still counts); no turn spent.
+  const act = homeActionById(a.id);
+  if (!act || homeActionState(p, act.id) !== "open") return s;
   const d = homeDayOf(p);
-  if (d.used >= HOME_SLOTS_PER_TURN) return s;
-  const pts = napPoints(p);
+  const gauge: Partial<Vitals> = {};
+  const xp: Skills = {};
+  for (const [k, n] of Object.entries(act.effects)) {
+    if ((GAUGE_SKILLS as readonly string[]).includes(k)) (gauge as Record<string, number>)[k] = n ?? 0;
+    else xp[k as SkillId] = n ?? 0;
+  }
   return log(
     withP(s, (pl) => ({
-      ...pl,
-      vitals: bumpVitals(pl.vitals, { content: pts, social: pts, mind: pts, luck: pts, health: pts }),
-      homeDay: { turn: d.turn, used: d.used + 1, done: { ...d.done, nap: (d.done.nap ?? 0) + 1 } },
+      ...gainSkills(pl, xp),
+      vitals: bumpVitals(pl.vitals, gauge),
+      homeDay: { turn: d.turn, used: d.used + 1, done: { ...d.done, [act.id]: (d.done[act.id] ?? 0) + 1 } },
     })),
-    tl("Nap at home: +{n} on every gauge.", { n: pts }),
+    tl("At home: {action}.", { action: act.name }),
   );
 }
 
@@ -3914,35 +3897,41 @@ function hydratePlayer(raw0: Player): Player {
     minigames: hydrateMinigames(raw.minigames),
     goods: Array.isArray(raw.goods) ? raw.goods.filter((id) => typeof id === "string" && !!goodById(id)) : [],
     goodsCount: raw.goodsCount && typeof raw.goodsCount === "object" ? Object.fromEntries(Object.entries(raw.goodsCount).filter(([k, v]) => !!goodById(k) && typeof v === "number" && v > 0)) : {},
-    ...hydrateHome(raw),
+    ...hydrateHome(raw, Number.isFinite(Number(raw.cash)) ? Number(raw.cash) : 0),
   };
 }
 
 /**
- * Chez Aoi fields (all optional; absent in old saves and left absent): unknown housings / furniture / slots dropped,
- * counts made non-negative integers, placements capped by what is owned, home counter clamped to 0..3.
+ * Chez Aoi fields (all optional; absent in old saves and left absent). Home v1 migration: old placed / stored
+ * furniture (LEGACY_FURNITURE) becomes the matching new piece (one of each), the rest — and duplicates — is removed
+ * and refunded at its full purchase price; slots emptied (fixed layout); the "nap" counter becomes "canape".
+ * Unknown ids dropped, home counter clamped to 0..3. Idempotent (a migrated save holds only new ids).
  */
-function hydrateHome(raw: Player): Partial<Player> {
+function hydrateHome(raw: Player, cash: number): Partial<Player> {
   const out: Partial<Player> = {};
   const r = raw as Partial<Player>;
   if (r.furniture && typeof r.furniture === "object") {
-    out.furniture = Object.fromEntries(Object.entries(r.furniture).filter(([k]) => !!furnitureById(k)).map(([k, v]) => [k, Math.max(0, Math.floor(Number(v) || 0))] as [string, number]).filter(([, v]) => v > 0));
+    const furniture: Record<string, number> = {};
+    let refund = 0;
+    for (const [k, v] of Object.entries(r.furniture)) {
+      const n = Math.max(0, Math.floor(Number(v) || 0));
+      if (!n) continue;
+      const old = LEGACY_FURNITURE[k];
+      const to = furnitureById(k) ? k : old?.to ?? null;
+      const price = old?.price ?? furnitureById(k)?.price ?? 0;
+      let left = n;
+      if (to && !furniture[to]) {
+        furniture[to] = 1;
+        left--;
+      }
+      if (old || furnitureById(k)) refund += left * price;
+    }
+    out.furniture = furniture;
+    if (refund > 0) out.cash = cash + refund;
   }
   if (r.housing && typeof r.housing === "object") {
-    const used: Record<string, number> = {};
     const housing: Record<string, { slots: Record<string, string> }> = {};
-    for (const [hid, h] of Object.entries(r.housing)) {
-      if (!housingById(hid)) continue;
-      const slots: Record<string, string> = {};
-      for (const [sid, it] of Object.entries((h && typeof h === "object" && h.slots) || {})) {
-        const slot = slotById(sid);
-        if (!slot || typeof it !== "string" || !furnitureById(it) || (slot.only && !slot.only.includes(it))) continue;
-        if ((used[it] ?? 0) >= (out.furniture?.[it] ?? 0)) continue;
-        used[it] = (used[it] ?? 0) + 1;
-        slots[sid] = it;
-      }
-      housing[hid] = { slots };
-    }
+    for (const hid of Object.keys(r.housing)) if (housingById(hid)) housing[hid] = { slots: {} };
     out.housing = housing;
   }
   if (typeof r.homeCurrent === "string") {
@@ -3951,10 +3940,15 @@ function hydrateHome(raw: Player): Partial<Player> {
   }
   if (r.homeDay && typeof r.homeDay === "object") {
     const d = r.homeDay;
+    const done: Record<string, number> = {};
+    for (const [k, v] of Object.entries(d.done && typeof d.done === "object" ? d.done : {})) {
+      const id = homeActionById(k)?.id;
+      if (id) done[id] = (done[id] ?? 0) + Math.max(0, Math.floor(Number(v) || 0));
+    }
     out.homeDay = {
       turn: Number.isFinite(Number(d.turn)) ? Math.floor(Number(d.turn)) : 0,
       used: Math.min(HOME_SLOTS_PER_TURN, Math.max(0, Math.floor(Number(d.used) || 0))),
-      done: Object.fromEntries(Object.entries(d.done && typeof d.done === "object" ? d.done : {}).map(([k, v]) => [k, Math.max(0, Math.floor(Number(v) || 0))] as [string, number])),
+      done,
     };
   }
   return out;
