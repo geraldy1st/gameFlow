@@ -19,6 +19,8 @@ export class HomePlayer {
   private wantUp = false;
   private alive = true;
   private room: RoomDef | null = null;
+  /** Clip phase of the running action ("loop" = waiting loop). */
+  phase: "idle" | "go" | "loop" | "return" = "idle";
 
   constructor(a: HTMLVideoElement, b: HTMLVideoElement, private reduce: boolean) {
     this.v = [a, b];
@@ -111,6 +113,16 @@ export class HomePlayer {
     });
   }
 
+  /** DEF-HOME-01: hidden → pause both videos; visible again → resume the waiting loop (not with reduced motion). */
+  setVisible(visible: boolean) {
+    if (!visible) {
+      for (const v of this.v) v.pause();
+      return;
+    }
+    const el = this.v[this.cur]!;
+    if (this.alive && this.phase === "loop" && !this.reduce && el.paused) void el.play()?.catch?.(() => {});
+  }
+
   up() {
     this.wantUp = true;
   }
@@ -119,10 +131,12 @@ export class HomePlayer {
   async run(act: HomeActionDef, onSit: () => void): Promise<void> {
     const dir = this.room?.dir ?? "";
     this.wantUp = false;
+    this.phase = "go";
     let el = await this.show(`${dir}${act.id}-aller.mp4`);
     await this.until(el, (t, d) => t >= d - (this.reduce ? 0.05 : EARLY));
     if (!this.alive) return;
     el = await this.show(`${dir}${act.id}-attente.mp4`, !this.reduce);
+    this.phase = "loop";
     onSit();
     if (this.reduce) {
       await this.until(el, () => this.wantUp);
@@ -148,9 +162,11 @@ export class HomePlayer {
       });
     }
     if (!this.alive) return;
+    this.phase = "return";
     el = await this.show(`${dir}${act.id}-retour.mp4`);
     await this.until(el, (t, d) => t >= d - 0.02);
     el.pause();
+    this.phase = "idle";
   }
 
   destroy() {

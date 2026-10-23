@@ -1,3 +1,4 @@
+import { pageOf } from "./page-of";
 /**
  * GameFlow v3 — pagination instead of scrolling (port of the mockup's pager): the visible area decides how many
  * columns and rows fit; arrows and dots move between pages. Never overflow: auto.
@@ -16,6 +17,7 @@ export function Pager<T>({
   t,
   label,
   className = "",
+  focusIndex,
 }: {
   items: T[];
   render: (item: T, i: number) => ReactNode;
@@ -26,6 +28,8 @@ export function Pager<T>({
   t: TFn;
   label: string;
   className?: string;
+  /** Opens on the page holding this item (DEF-HOME-02), once, until the player turns pages. */
+  focusIndex?: number;
 }) {
   const area = useRef<HTMLDivElement>(null);
   const [fit, setFit] = useState({ cols: 1, rows: 3 });
@@ -48,7 +52,8 @@ export function Pager<T>({
   }, [minW, itemH, gap, maxCols]);
   const per = fit.cols * fit.rows;
   const pages = Math.max(1, Math.ceil(items.length / per));
-  const at = Math.min(page, pages - 1);
+  const [moved, setMoved] = useState(false);
+  const at = Math.min(!moved && focusIndex != null && focusIndex >= 0 ? pageOf(focusIndex, per) : page, pages - 1);
   const shown = items.slice(at * per, at * per + per);
   return (
     <div className={`v3-pg ${className}`}>
@@ -67,7 +72,7 @@ export function Pager<T>({
       </div>
       {pages > 1 && (
         <div className="v3-pg-foot">
-          <button type="button" disabled={at === 0} onClick={() => setPage(at - 1)} aria-label={t("Previous page")}>
+          <button type="button" disabled={at === 0} onClick={() => { setMoved(true); setPage(at - 1); }} aria-label={t("Previous page")}>
             ←
           </button>
           <span className="v3-dots" aria-label={t("Page {n} of {m}", { n: at + 1, m: pages })}>
@@ -75,7 +80,7 @@ export function Pager<T>({
               <i key={i} className={i === at ? "on" : ""} />
             ))}
           </span>
-          <button type="button" disabled={at >= pages - 1} onClick={() => setPage(at + 1)} aria-label={t("Next page")}>
+          <button type="button" disabled={at >= pages - 1} onClick={() => { setMoved(true); setPage(at + 1); }} aria-label={t("Next page")}>
             →
           </button>
         </div>

@@ -19,7 +19,7 @@ function useReducedMotion(): boolean {
   return r;
 }
 
-export default function HomeLayer({ state, homeId, t, go, onClose, onShop }: { state: GameState; homeId: string; t: TFn; go: (a: Action) => void; onClose: () => void; onShop?: () => void }) {
+export default function HomeLayer({ state, homeId, t, go, onClose, onShop }: { state: GameState; homeId: string; t: TFn; go: (a: Action) => void; onClose: () => void; onShop?: (furnitureId: string) => void }) {
   const p = cur(state);
   const home = p.housing?.[homeId];
   const reduce = useReducedMotion();
@@ -47,6 +47,12 @@ export default function HomeLayer({ state, homeId, t, go, onClose, onShop }: { s
   useEffect(() => {
     player.current?.setRoom(room);
   }, [room, reduce]);
+  // DEF-HOME-01: pause when hidden, resume the waiting loop when visible again.
+  useEffect(() => {
+    const vis = () => player.current?.setVisible(document.visibilityState !== "hidden");
+    document.addEventListener("visibilitychange", vis);
+    return () => document.removeEventListener("visibilitychange", vis);
+  }, []);
   useEffect(() => {
     rootRef.current?.querySelector<HTMLElement>(".ho-rooms button")?.focus();
   }, []);
@@ -105,7 +111,7 @@ export default function HomeLayer({ state, homeId, t, go, onClose, onShop }: { s
             if (st === "locked") {
               const f = furnitureById(a.furniture)!;
               return (
-                <button key={a.id} type="button" className="locked" data-act={a.id} data-locked disabled={!!busy || !onShop} onClick={onShop}
+                <button key={a.id} type="button" className="locked" data-act={a.id} data-locked disabled={!!busy || !onShop} onClick={() => onShop?.(f.id)}
                   aria-label={t("{action} locked — buy {item} at Immo Dada", { action: t(a.name), item: t(f.name) })}>
                   <Lock size={16} aria-hidden="true" /> {t(a.name)}
                 </button>

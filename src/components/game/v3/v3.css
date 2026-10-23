@@ -122,6 +122,7 @@ button.v3-tag.act:disabled{background:#E9E1D3;color:var(--navy-soft);box-shadow:
 /* DEF-UI-01: menu tile labels wrap on two lines instead of being cut ("Menu principal" at 360 px). */
 .v3-tile .v3-tx strong{white-space:normal;overflow-wrap:normal;font-size:clamp(13px,3.7vw,15px);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .v3-tile.hl{background:var(--gold)}
+.v3-card.hl{outline:3px solid var(--gold);outline-offset:2px;box-shadow:0 0 0 6px var(--navy)}
 .v3-legend-map{flex:1;min-height:0;overflow:hidden}
 .v3-skill{align-items:flex-start;padding:7px 9px}
 .v3-skill .v3-tx small{-webkit-line-clamp:2;font-size:11.5px;color:var(--navy)}

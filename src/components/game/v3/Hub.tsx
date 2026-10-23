@@ -3,7 +3,7 @@
  * the Pager split whatever does not fit. Data comes from the engine (statement, skills) and tuning.ts.
  */
 import { sceneOfMinigame } from "@/scenes/registry";
-import { useLayoutEffect, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
+import { useEffect, useLayoutEffect, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { FRIENDS, PARTNERS } from "@/game/data";
 import { cur, furnitureFree, homeDayOf, ownsGood, progressOf, quizOpen, quizWait, shopPrice, statement, type Action, type GameState, type Player } from "@/game/engine";
 import { formatCompact } from "@/game/format-compact";
@@ -210,13 +210,24 @@ export function HomeTab({ state, p, t, lang, go, onHome }: { state: GameState; p
 }
 
 /** Immo Dada: housing (one in stock, the others "out of stock") and home supplies; same design as the shops. */
-function ImmoView({ state, p, t, lang, go, onBack, onBackHome }: { state: GameState; p: Player; t: TFn; lang: Lang; go: Go; onBack: () => void; onBackHome?: () => void }) {
+function ImmoView({ state, p, t, lang, go, onBack, onBackHome, focusItem }: { state: GameState; p: Player; t: TFn; lang: Lang; go: Go; onBack: () => void; onBackHome?: () => void; focusItem?: string }) {
   const idle = state.phase === "idle" && !state.practice;
   type Item = { id: string; name: string; note: string; icon: string; price: number; owned?: boolean; out?: boolean; buy: () => void };
   const items: Item[] = [
     ...HOUSING.map((h) => ({ id: h.id, name: t(h.name), note: h.inStock ? t("Empty on purchase") : fmtMoney(lang, h.price), icon: "house", price: h.price, owned: !!p.housing?.[h.id], out: !h.inStock, buy: () => go({ type: "BUY_HOUSING", id: h.id }) })),
     ...FURNITURE.map((f) => ({ id: f.id, name: t(f.name), note: t("Home supply · resale {amount}", { amount: fmtMoney(lang, Math.floor(f.price * RESALE_RATE)) }), icon: f.icon, price: f.price, owned: furnitureFree(p, f.id) > 0, buy: () => go({ type: "BUY_FURNITURE", id: f.id }) })),
   ];
+  const focusIndex = focusItem ? items.findIndex((it) => it.id === focusItem) : -1;
+  // DEF-HOME-02: the furniture asked for by a padlock is shown, highlighted and focused.
+  useEffect(() => {
+    if (focusIndex < 0) return;
+    const id = setTimeout(() => {
+      const el = document.querySelector<HTMLElement>(`[data-immo-item="${focusItem}"]`);
+      el?.scrollIntoView?.({ block: "nearest" });
+      (el?.querySelector<HTMLElement>("button") ?? el)?.focus();
+    }, 50);
+    return () => clearTimeout(id);
+  }, [focusIndex, focusItem]);
   return (
     <>
       <div className="v3-subrow">
@@ -237,8 +248,9 @@ function ImmoView({ state, p, t, lang, go, onBack, onBackHome }: { state: GameSt
         itemH={62}
         t={t}
         label="Immo Dada"
+        focusIndex={focusIndex >= 0 ? focusIndex : undefined}
         render={(it) => (
-          <div className={`v3-card ${it.out ? "locked" : ""}`}>
+          <div className={`v3-card ${it.out ? "locked" : ""} ${it.id === focusItem ? "hl" : ""}`} data-immo-item={it.id} tabIndex={it.id === focusItem ? -1 : undefined}>
             <span className="v3-ic" aria-hidden="true"><Ico name={it.icon} /></span>
             <span className="v3-tx">
               <strong>{it.name}</strong>
@@ -566,7 +578,7 @@ function StatsTab({ state, p, t, lang, go }: { state: GameState; p: Player; t: T
 
 /* ------------------------------------------------------------------ Activities */
 
-export function ActivitiesPanel({ state, t, lang, go, onQuiz, onMetroPractice, onClose, initialShop, onBackHome }: { state: GameState; t: TFn; lang: Lang; go: Go; onQuiz: () => void; onMetroPractice?: () => void; onClose: () => void; initialShop?: string; onBackHome?: () => void }) {
+export function ActivitiesPanel({ state, t, lang, go, onQuiz, onMetroPractice, onClose, initialShop, onBackHome, focusItem }: { state: GameState; t: TFn; lang: Lang; go: Go; onQuiz: () => void; onMetroPractice?: () => void; onClose: () => void; initialShop?: string; onBackHome?: () => void; focusItem?: string }) {
   const p = cur(state);
   const [tab, setTab] = useState<"shops" | "games">("shops");
   const [shop, setShop] = useState<string | null>(initialShop ?? null);
@@ -590,7 +602,7 @@ export function ActivitiesPanel({ state, t, lang, go, onQuiz, onMetroPractice, o
       )}
       <div className="v3-body">
         {immo ? (
-          <ImmoView state={state} p={p} t={t} lang={lang} go={go} onBack={() => setShop(null)} onBackHome={onBackHome} />
+          <ImmoView state={state} p={p} t={t} lang={lang} go={go} onBack={() => setShop(null)} onBackHome={onBackHome} focusItem={focusItem} />
         ) : open ? (
           <ShopView shop={open} state={state} p={p} t={t} lang={lang} go={go} onBack={() => setShop(null)} />
         ) : tab === "shops" ? (
