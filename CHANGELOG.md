@@ -4,6 +4,7 @@
 
 | File | What | Why | What can be trimmed | Risk |
 |---|---|---|---|---|
+| `src/game/home-data.ts`, `engine.ts`, `HomeLayer.tsx`, `i18n.ts`, `home.test.ts` | CA3 daily limit: `dailyLimit` in action data (default 1, `lire` 3), `homeActionLeft`, new state `"done"`; counted in `homeDay.done`, reset with the 3 slots (both limits apply); button disabled with label « Déjà fait aujourd’hui » / « Encore n fois aujourd’hui » (fr/es); boundary tests lire 1-4, other 1-2, day rollover | Geraldy 23/10: each action once a day, reading 3 | — | Low: old saves already carry `homeDay.done` or none |
 | `src/scenes/home/player.ts`, `HomeLayer.tsx` | DEF-HOME-01: `phase` + `setVisible()`; `visibilitychange` pauses both videos when hidden and resumes the waiting loop when visible again (never with reduced motion; CA3 playback unchanged) | Crypto recette: loop stayed paused after tab return | — | Low: only acts in the loop phase |
 | `src/components/game/v3/Pager.tsx`, `page-of.ts`, `Hub.tsx`, `v3.css`, `GameFlow.tsx` | DEF-HOME-02: padlock passes the furniture id; Immo Dada opens on its page (`focusIndex`, until the player turns pages), scrolls it into view, focuses its Buy button and highlights the card (`.v3-card.hl`, `--gold` outline) | Crypto recette: padlock opened page 1 without the item | highlight style | Low: optional props |
 | `src/scenes/home/defects.test.ts` | Tests: hidden pauses / visible resumes loop only; no resume outside loop or with reduced motion; `pageOf` | Cover both defects | — | None |

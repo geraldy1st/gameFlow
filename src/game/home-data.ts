@@ -92,6 +92,8 @@ export interface HomeActionDef {
   period?: number;
   /** Playback rate used to reach the cut frame after "Se lever" (shower: 1). */
   upRate: number;
+  /** Times per in-game day (Geraldy 23/10/2026: 1, reading 3). Missing = 1. Both this and the 3 slots apply. */
+  dailyLimit?: number;
 }
 
 export const HOME_ACTIONS: HomeActionDef[] = [
@@ -100,10 +102,12 @@ export const HOME_ACTIONS: HomeActionDef[] = [
   { id: "cuisiner", name: "Cook", room: "cuisine", furniture: "cuisiniere", effects: { creativity: 2, health: 1 }, loop: "pingpong", upRate: 2 },
   { id: "manger", name: "Eat", room: "cuisine", furniture: "table", effects: { health: 3 }, loop: "pingpong", upRate: 2 },
   { id: "dormir", name: "Sleep", room: "chambre", furniture: "lit", effects: { health: 2, discipline: 2 }, loop: "pingpong", upRate: 2 },
-  { id: "lire", name: "Read", room: "chambre", furniture: "bibliotheque", effects: { mind: 3 }, loop: "pingpong", upRate: 2 },
+  { id: "lire", name: "Read", room: "chambre", furniture: "bibliotheque", effects: { mind: 3 }, loop: "pingpong", upRate: 2, dailyLimit: 3 },
   { id: "douche", name: "Shower", room: "sdb", furniture: "douche", effects: { health: 2, charisma: 1 }, loop: "fade", period: 2, upRate: 1 },
   { id: "dents", name: "Brush teeth", room: "sdb", furniture: "lavabo", effects: { health: 1, charisma: 2 }, loop: "pingpong", upRate: 2 },
 ];
+
+export const dailyLimitOf = (a: HomeActionDef) => Math.max(1, a.dailyLimit ?? 1);
 
 /** Old "Sieste" action id, mapped to the sofa action. */
 export const LEGACY_ACTION: Record<string, string> = { nap: "canape" };
@@ -130,4 +134,11 @@ export function residentFor(characterId: string | undefined): { id: string; def:
 export function slotsLeftText(t: (k: string, v?: Record<string, string | number>) => string, n: number, max: number): string {
   if (n <= 0) return t("No time slot left today");
   return t(n === 1 ? "{n} of {max} time slot left today" : "{n} of {max} time slots left today", { n, max });
+}
+
+/** Accessible label of an action for today: "done today" when exhausted, remaining count when the limit is > 1. */
+export function actionTodayText(t: (k: string, v?: Record<string, string | number>) => string, left: number, max: number): string {
+  if (left <= 0) return t("Already done today");
+  if (max <= 1) return "";
+  return t(left === 1 ? "{n} time left today" : "{n} times left today", { n: left });
 }

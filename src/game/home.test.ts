@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import * as E from "./engine";
 import type { GameState, Player } from "./engine";
 import { HOME_SHOP } from "./shop";
-import { FURNITURE, HOME_ACTIONS, HOME_SLOTS_PER_TURN, residentFor } from "./home-data";
+import { FURNITURE, HOME_ACTIONS, HOME_SLOTS_PER_TURN, actionTodayText, residentFor } from "./home-data";
 import { GAUGE_SKILLS, SKILL_IDS } from "./skills";
 
 function idle(seed = 3, cash = 5000): GameState {
@@ -72,6 +72,51 @@ describe("Home v1: actions and the home counter", () => {
     expect(go(s, { type: "HOME_ACT", id: "tele" })).toBe(s);
     const next = { ...s, players: s.players.map((p) => ({ ...p, turns: p.turns + 1 })) };
     expect(E.homeActionState(P(next), "tele")).toBe("open");
+  });
+
+  it("daily limit: lire 3 a day (1,2,3 ok, 4th refused), others once (2nd refused); both limits; reset next day", () => {
+    const nextDay = (x: E.GameState) => ({ ...x, players: x.players.map((p) => ({ ...p, turns: p.turns + 1 })) });
+    let s = all(idle());
+    expect(HOME_ACTIONS.find((a) => a.id === "lire")!.dailyLimit).toBe(3);
+    expect(HOME_ACTIONS.filter((a) => a.id !== "lire").every((a) => a.dailyLimit === undefined)).toBe(true);
+    for (const n of [1, 2, 3]) {
+      expect(E.homeActionLeft(P(s), "lire")).toBe(4 - n);
+      s = go(s, { type: "HOME_ACT", id: "lire" });
+      expect(P(s).homeDay!.done.lire).toBe(n);
+    }
+    expect(E.homeActionState(P(s), "lire")).toBe("done");
+    s = nextDay(s);
+    expect(E.homeActionLeft(P(s), "lire")).toBe(3);
+    s = go(s, { type: "HOME_ACT", id: "lire" }, { type: "HOME_ACT", id: "lire" });
+    expect(P(s).homeDay!.done.lire).toBe(2);
+    s = go(s, { type: "HOME_ACT", id: "canape" });
+    expect(E.homeActionState(P(s), "lire")).toBe("full"); // 3 slots used, 1 lire left
+    expect(go(s, { type: "HOME_ACT", id: "lire" })).toBe(s); // 4th of the day refused (slots)
+    // other action: 1 ok, 2 refused
+    let o = all(idle());
+    o = go(o, { type: "HOME_ACT", id: "tele" });
+    expect(P(o).homeDay).toMatchObject({ used: 1, done: { tele: 1 } });
+    expect(E.homeActionState(P(o), "tele")).toBe("done");
+    expect(go(o, { type: "HOME_ACT", id: "tele" })).toBe(o);
+    o = nextDay(o);
+    expect(E.homeActionState(P(o), "tele")).toBe("open");
+    expect(P(go(o, { type: "HOME_ACT", id: "tele" })).homeDay).toMatchObject({ used: 1, done: { tele: 1 } });
+  });
+
+  it("lire 4th refused by the daily limit itself", () => {
+    let s = all(idle());
+    s = go(s, { type: "HOME_ACT", id: "lire" }, { type: "HOME_ACT", id: "lire" }, { type: "HOME_ACT", id: "lire" });
+    expect(P(s).homeDay).toMatchObject({ used: 3, done: { lire: 3 } });
+    expect(E.homeActionState(P(s), "lire")).toBe("done");
+    expect(go(s, { type: "HOME_ACT", id: "lire" })).toBe(s);
+  });
+
+  it("labels: done today / remaining count (fr plurals)", () => {
+    const t = (k: string, v?: Record<string, string | number>) => k.replace("{n}", String(v?.n ?? ""));
+    expect(actionTodayText(t, 0, 1)).toBe("Already done today");
+    expect(actionTodayText(t, 1, 1)).toBe("");
+    expect(actionTodayText(t, 2, 3)).toBe("2 times left today");
+    expect(actionTodayText(t, 1, 3)).toBe("1 time left today");
   });
 
   it("refused in the tutorial (script and practice game)", () => {

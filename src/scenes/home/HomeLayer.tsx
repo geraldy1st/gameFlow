@@ -7,8 +7,8 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { Lock } from "lucide-react";
-import { cur, homeActionState, homeDayOf, type Action, type GameState } from "@/game/engine";
-import { HOME_SLOTS_PER_TURN, ROOMS, actionsIn, furnitureById, homeActionById, roomById, slotsLeftText, type RoomId } from "@/game/home-data";
+import { cur, homeActionLeft, homeActionState, homeDayOf, type Action, type GameState } from "@/game/engine";
+import { HOME_SLOTS_PER_TURN, ROOMS, actionTodayText, actionsIn, dailyLimitOf, furnitureById, homeActionById, roomById, slotsLeftText, type RoomId } from "@/game/home-data";
 import { HomePlayer } from "./player";
 import "./home.css";
 
@@ -117,9 +117,11 @@ export default function HomeLayer({ state, homeId, t, go, onClose, onShop }: { s
                 </button>
               );
             }
+            const today = actionTodayText(t, homeActionLeft(p, a.id), dailyLimitOf(a));
             return (
-              <button key={a.id} type="button" className="gold" data-act={a.id} disabled={!!busy || !idle || st !== "open"} onClick={() => void run(a.id)}>
-                {t(a.name)}
+              <button key={a.id} type="button" className="gold" data-act={a.id} data-done={st === "done" || undefined} disabled={!!busy || !idle || st !== "open"} onClick={() => void run(a.id)}
+                aria-label={today ? `${t(a.name)} — ${today}` : undefined} title={today || undefined}>
+                {t(a.name)}{today && <small className="ho-today"> · {today}</small>}
               </button>
             );
           })}

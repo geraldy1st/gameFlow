@@ -64,7 +64,7 @@ import {
   type Vitals,
 } from "./life";
 import { CLOTH_PRICE, HOME_LEVEL, homeItem } from "./shop";
-import { HOME_SLOTS_PER_TURN, LEGACY_FURNITURE, RESALE_RATE, furnitureById, homeActionById, housingById } from "./home-data";
+import { HOME_SLOTS_PER_TURN, LEGACY_FURNITURE, dailyLimitOf, RESALE_RATE, furnitureById, homeActionById, housingById } from "./home-data";
 import { CURVES, SKILL_RULES, SKILL_XP } from "./tuning";
 import { levelState } from "./format-compact";
 import { goodById, shopOfGood, unlockState, type Progress } from "./shops";
@@ -3076,11 +3076,19 @@ export function homeDayOf(p: Player): { turn: number; used: number; done: Record
   return p.homeDay && p.homeDay.turn === p.turns ? p.homeDay : { turn: p.turns, used: 0, done: {} };
 }
 
-/** Home v1: "open" | "locked" (furniture missing) | "full" (no time slot left) | "none" (no home / unknown action). */
-export function homeActionState(p: Player, id: string): "open" | "locked" | "full" | "none" {
+/** Uses of an action left today (its dailyLimit minus today's count, same reset as the slots). */
+export function homeActionLeft(p: Player, id: string): number {
+  const a = homeActionById(id);
+  if (!a) return 0;
+  return Math.max(0, dailyLimitOf(a) - (homeDayOf(p).done[a.id] ?? 0));
+}
+
+/** Home v1: "open" | "locked" (furniture missing) | "done" (daily limit reached) | "full" (no time slot left) | "none". */
+export function homeActionState(p: Player, id: string): "open" | "locked" | "done" | "full" | "none" {
   const a = homeActionById(id);
   if (!a || !Object.keys(p.housing ?? {}).length) return "none";
   if (furnitureFree(p, a.furniture) < 1) return "locked";
+  if (homeActionLeft(p, a.id) < 1) return "done";
   return homeDayOf(p).used >= HOME_SLOTS_PER_TURN ? "full" : "open";
 }
 
