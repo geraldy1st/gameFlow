@@ -18,7 +18,7 @@ const V1 = { games: 200, states: 93335, chainAll: "844f62971aa0030a" };
 // goods 125714 e82698fd19744dd9.
 const V2 = { games: 200, states: 97734, chainAll: "43fa7281563ccb83" };
 const GOODS = { games: 200, states: 122121, chainAll: "e64d226c6b39ff79" };
-const HOME = { games: 200, states: 132196, chainAll: "69697a232d57fd07" };
+const HOME = { games: 200, states: 132851, chainAll: "a9546137ed53ea81" };
 const EXTRA = ["BUY_GOOD", "BUY_CLOTH", "WEAR", "BUY_HOME", "TOGGLE_HOME", "HOUSE", "CIRCLE", "SKIP_TRAINING"];
 // home-v1: HOME_PLACE / HOME_STORE are refused (fixed layout), so they must never change the state.
 const HOME_EXTRA = ["BUY_HOUSING", "BUY_FURNITURE", "SELL_FURNITURE", "HOME_ACT"];
