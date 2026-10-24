@@ -1,5 +1,19 @@
 # Changelog
 
+## perf-ios — lot B « images » (24/10/2026)
+
+Base: lot A commit on the same `perf-ios` branch (QA RES-8: each lot has its own SHA; B is tested on its SHA, which contains A).
+
+| File | What | Why | What can be trimmed | Risk |
+|---|---|---|---|---|
+| `tools/webp-assets.py` (new) | Offline generator: every `public/game/**/*.jpg` > 500 KB → `<name>.webp` next to it, 800 px wide (never upscaled, same aspect), q78 method 6, re-encoded lower if > 300 KB (ceiling); writes the manifest; `--check` verifies manifest ↔ files ↔ ceiling | Audit cause 5; QA RES-1 / RES-5 | — | None (not bundled) |
+| `public/game/{art,trophies,portraits/**}/*.webp` (120 new, 10.9 MB) | The variants: median 89 KB, max 161 KB (JPEGs: ~91 MB, kept as fallback, Q6) | 1600 px JPEGs of ~1 MB shown at 40–400 px | Later lot: unreferenced 1600 px JPEGs | Low: sharpness at DPR 3 on large art to confirm (captures) |
+| `src/components/game/webp-manifest.json` (generated) | Sorted list of the 120 paths (relative to `public/game/`) that have a variant | RES-1: never derive a `.webp` that does not exist | — | Must be regenerated with the tool if assets change |
+| `src/components/game/webp.ts` (new), `webp.test.ts`, `vitest.config.ts` | `toWebp()` (manifest only; ignores data:/blob:/http(s), query/hash, `.JPG`, other formats; any base path), `fromWebp()`, `webpFallback()` onError → JPEG once; unit tests incl. every manifest file exists (0 404) | Display-time derivation: state, saves, `rebaseAssetPath` and fingerprints untouched | — | Low |
+| `GameFlow.tsx`, `boite/PlayerMat.tsx`, `MenuScreen.tsx`, `DealSheet.tsx`, `GateScene.tsx`, `TrainingCoach.tsx`, `FriendScene.tsx`, `MetroBoard.tsx` (SVG pawn `<image>`), `v3/Hub.tsx` | `src={toWebp(…)}` + `onError` chained (WebP → JPEG → existing fallback); `loading="lazy"` on images inside lists / scrolled sheets (trophy grid, dreams, friends, bios, chat faces), `decoding="async"` on modal images; first-screen avatar / menu portraits stay eager | Fewer bytes and decoded pixels (iPhone memory, modal open spikes) | — | Low. Deviation from the dossier: `src` swap instead of `<picture>` (no extra wrapper element, so CSS child selectors and fit-check are unaffected); WebP is supported by every target (iOS Safari ≥ 14); JPEG fallback through `onError` |
+| `tools/perf/check-webp.mjs` (new) | Static 0-404 check on `public/` and `dist-pages/` + no unlisted `.webp` literal in the bundle | RES-1 | — | None |
+| — | Not converted (unchanged): Metro runner faces and canvas images, intro media, quiz images (already WebP) | Out of the 120-file scope | — | — |
+
 ## perf-ios — lot A « iOS perf » (24/10/2026)
 
 Criteria: PERF-CA1… (renamed per QA RES-7). No rule change: `src/game/` untouched, fingerprints unchanged.

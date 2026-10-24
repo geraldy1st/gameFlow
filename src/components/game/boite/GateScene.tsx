@@ -9,6 +9,7 @@ import type { Lang } from "@/game/i18n";
 import { expressionOf } from "@/game/speech";
 import { fmtMoney } from "./format";
 import { Ico } from "./icons";
+import { toWebp, webpFallback } from "../webp";
 
 type TFn = (text: string, vars?: Record<string, string | number>) => string;
 
@@ -89,9 +90,10 @@ export function GateScene({ player, turn, t, lang, onBoard, onStay }: { player: 
         </svg>
         <div className="face">
           <img
-            src={expressionOf(player, "proud")}
+            src={toWebp(expressionOf(player, "proud"))}
             alt={t("{name}, proud", { name: nameOf(player) })}
             onError={(e) => {
+              if (webpFallback(e)) return;
               e.currentTarget.onerror = null;
               e.currentTarget.src = portraitOf(player);
             }}

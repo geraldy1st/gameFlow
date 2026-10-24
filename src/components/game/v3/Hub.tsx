@@ -23,6 +23,7 @@ import { fmtMoney } from "../boite/format";
 import { LevelBar } from "./LevelBar";
 import { Pager } from "./Pager";
 import "./v3.css";
+import { toWebp, webpFallback } from "../webp";
 
 type TFn = (text: string, vars?: Record<string, string | number>) => string;
 export type HubTab = "day" | "acts" | "ledger" | "menu";
@@ -507,7 +508,7 @@ function CircleTab({ state, p, t, onFriend }: { state: GameState; p: Player; t: 
           label={t("Circle")}
           render={(x) => (
             <button type="button" className="v3-card v3-friend" onClick={() => onFriend(x.id)}>
-              <img src={x.portrait} alt="" />
+              <img src={toWebp(x.portrait)} alt="" loading="lazy" decoding="async" onError={webpFallback} />
               <strong>{x.name}</strong>
               <small>{x.note}</small>
               {x.xp !== null && <LevelBar label={x.name} xp={x.xp} curve={CURVES.affinity} color="var(--coral)" t={t} compact />}

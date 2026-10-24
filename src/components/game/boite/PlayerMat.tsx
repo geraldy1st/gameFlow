@@ -13,6 +13,7 @@ import { Gauge, gaugeMax } from "./Gauge";
 import type { Point } from "./history";
 import { Ico, spaceMeta } from "./icons";
 import { trackSpaces } from "./MetroBoard";
+import { toWebp, webpFallback } from "../webp";
 
 type TFn = (text: string, vars?: Record<string, string | number>) => string;
 
@@ -69,9 +70,10 @@ function Avatar({ player, size = "md" }: { player: Player; size?: "md" | "sm" })
   return (
     <div className={`avatar avatar-${size}`}>
       <img
-        src={dressedPortrait(player, player.reaction)}
+        src={toWebp(dressedPortrait(player, player.reaction))}
         alt=""
         onError={(e) => {
+          if (webpFallback(e)) return;
           e.currentTarget.onerror = null;
           e.currentTarget.src = portraitOf(player);
         }}
@@ -337,7 +339,7 @@ export function StationStrip({ player, t }: { player: Player; t: TFn }) {
         {k > 0 && <span className="n">{k}</span>}
         {k === 0 && (
           <span className="mpawn" aria-hidden="true">
-            <img src={portraitOf(player)} alt="" />
+            <img src={toWebp(portraitOf(player))} alt="" onError={webpFallback} />
           </span>
         )}
         <div className={`tile ${space.kind === "big" ? "is-big" : ""}`} style={{ background: fill, color: fg }}>

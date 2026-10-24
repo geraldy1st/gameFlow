@@ -12,6 +12,7 @@ import { cur, nameOf, portraitOf, statement, unlocked, type GameState, type Play
 import type { Lang } from "@/game/i18n";
 import { fmtMoney } from "./format";
 import { FAMILIES, spaceMeta, type Family } from "./icons";
+import { toWebp } from "../webp";
 
 type TFn = (text: string, vars?: Record<string, string | number>) => string;
 type Pt = { x: number; y: number; nx: number; ny: number };
@@ -122,7 +123,7 @@ function Pawn({ player, idx, clip, x, y, hopKey, active = false }: { player: Pla
         <ellipse cx={0} cy={4} rx={24} ry={8} fill="rgba(27,42,65,.3)" />
         <path d="M-20 2 Q-20 -8 -12 -12 L-8 -30 Q-17 -36 -17 -48 L17 -48 Q17 -36 8 -30 L12 -12 Q20 -8 20 2 Z" fill={PAWN_COLORS[idx % 2]} stroke="var(--navy)" strokeWidth={4} strokeLinejoin="round" />
         <circle cx={0} cy={-58} r={20} fill="var(--paper)" stroke="var(--navy)" strokeWidth={4} />
-        <image href={portraitOf(player)} x={-20} y={-82} width={40} height={53} preserveAspectRatio="xMidYMin slice" clipPath={`url(#${clip})`} />
+        <image href={toWebp(portraitOf(player))} x={-20} y={-82} width={40} height={53} preserveAspectRatio="xMidYMin slice" clipPath={`url(#${clip})`} />
         <circle cx={0} cy={-58} r={18} fill="none" stroke="var(--navy)" strokeWidth={3} />
       </g>
     </g>

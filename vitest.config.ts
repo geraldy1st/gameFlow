@@ -8,7 +8,7 @@ export default defineConfig({
     alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) },
   },
   test: {
-    include: ["src/game/**/*.test.ts", "src/minigames/**/*.test.ts", "src/scenes/**/*.test.ts"],
+    include: ["src/game/**/*.test.ts", "src/minigames/**/*.test.ts", "src/scenes/**/*.test.ts", "src/components/game/webp.test.ts"],
     environment: "node",
   },
 });

@@ -11,6 +11,7 @@ import { trKey, type Lang } from "@/game/i18n";
 import { colon, fmtMoney } from "./format";
 import { Ico } from "./icons";
 import { MetroBoard } from "./MetroBoard";
+import { toWebp, webpFallback } from "../webp";
 
 type TFn = (text: string, vars?: Record<string, string | number>) => string;
 
@@ -139,7 +140,7 @@ export function MenuScreen({
                 }}
               >
                 <div className="pic">
-                  <img src={c.portrait} alt="" />
+                  <img src={toWebp(c.portrait)} alt="" decoding="async" onError={webpFallback} />
                 </div>
                 {!open && (
                   <span className="lock">
@@ -155,7 +156,7 @@ export function MenuScreen({
           {current.custom && (
             <button type="button" role="radio" aria-checked={current.characterId === "custom"} className={`char ${current.characterId === "custom" ? "on" : ""}`} onClick={() => setPick({ characterId: "custom" })}>
               <div className="pic">
-                <img src={customPortrait(current.custom)} alt="" />
+                <img src={toWebp(customPortrait(current.custom))} alt="" onError={webpFallback} />
               </div>
               <strong>{current.custom.name}</strong>
               <span>{current.custom.age}</span>
@@ -165,7 +166,7 @@ export function MenuScreen({
 
         {creating && canCreate && (
           <div className="box creator">
-            <img src={customPortrait(draft)} alt="" />
+            <img src={toWebp(customPortrait(draft))} alt="" onError={webpFallback} />
             <div>
               <p className="kicker">{t("Your character")}</p>
               <label className="field">
@@ -289,7 +290,7 @@ export function MenuScreen({
           <div className="dreams" role="radiogroup" aria-label={t("Dream")}>
             {DREAMS.map((d) => (
               <button key={d.id} type="button" role="radio" aria-checked={current.dreamId === d.id} className={`dream ${current.dreamId === d.id ? "on" : ""}`} onClick={() => setPick({ dreamId: d.id })}>
-                <img src={d.art} alt="" />
+                <img src={toWebp(d.art)} alt="" loading="lazy" decoding="async" onError={webpFallback} />
                 <div>
                   <strong>{t(d.name)}</strong>
                   <p>{t(d.blurb)}</p>

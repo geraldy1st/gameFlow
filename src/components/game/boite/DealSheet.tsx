@@ -13,6 +13,7 @@ import { colon, fmtDec, fmtMoney, fmtNum } from "./format";
 import { Gauge, gaugeMax } from "./Gauge";
 import { Ico } from "./icons";
 import { rich } from "./PlayerMat";
+import { toWebp, webpFallback } from "../webp";
 
 type TFn = (text: string, vars?: Record<string, string | number>) => string;
 
@@ -106,7 +107,7 @@ export function DealSheet({ card, player, t, lang, onChoose }: { card: CardView;
             <span className="pill">{deal.passive ? t("Asset") : t("Side income")}</span>
           </div>
           <div className="ill">
-            <img src={card.art} alt="" />
+            <img src={toWebp(card.art)} alt="" decoding="async" onError={webpFallback} />
           </div>
           <div className="bd">
             <h2 id="deal-title">{t(card.title)}</h2>

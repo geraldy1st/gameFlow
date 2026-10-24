@@ -13,6 +13,7 @@ import { dressedPortrait } from "@/game/speech";
 import { fmtMoney } from "./format";
 import { Ico } from "./icons";
 import { TRAINING_STRINGS, fill, type StepId } from "./training-strings";
+import { toWebp, webpFallback } from "../webp";
 
 /** UI-only progress that the engine does not need to know about. */
 export interface TutLocal {
@@ -513,7 +514,7 @@ export function TrainingCoach(props: TrainingCoachProps) {
           aria-describedby="tut-p"
           style={layout?.bubble ?? { visibility: "hidden", left: 0, top: 0 }}
         >
-          <div className="tut-face"><img src={face} alt={nameOf(p)} /></div>
+          <div className="tut-face"><img src={toWebp(face)} alt={nameOf(p)} onError={webpFallback} /></div>
           <span className={`tut-tail ${layout?.side ?? "t"}`} style={layout?.tail} aria-hidden="true" />
           <div className="tut-head">
             <span className="tut-pill"><i aria-hidden="true" /><span>{fill(T.pill, { n: turnNo })}</span></span>
@@ -631,7 +632,7 @@ function DoneCard(props: {
     <>
       {!props.reduced && <Confetti count={props.mobile ? 16 : 26} />}
       <div className="tdone" role="dialog" aria-modal="true" aria-labelledby="tdone-h">
-        <div className="face"><img src={src} alt={props.name} onError={() => setSrc(props.fallback)} /></div>
+        <div className="face"><img src={toWebp(src)} alt={props.name} onError={(e) => webpFallback(e) || setSrc(props.fallback)} /></div>
         <span className="k">{D.kicker}</span>
         <h2 id="tdone-h">{D.title}</h2>
         <ul>

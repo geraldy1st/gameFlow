@@ -64,6 +64,7 @@ import {
 } from "@/game/tutorial-save";
 import { TRAINING_STRINGS, fill } from "./boite/training-strings";
 import { BoxDie, Dock, FlowBox, GateBox, MobileHud, PassiveChart, StationStrip, WhoBox, hereLabel, lineName, rollLabel } from "./boite/PlayerMat";
+import { toWebp, webpFallback } from "./webp";
 
 type TFn = (text: string, vars?: Record<string, string | number>) => string;
 
@@ -109,7 +110,7 @@ function MoodFace({
   useEffect(() => setImg(src), [src]);
   return (
     <div className={`mood-face mood-${mood} ${className ?? ""}`}>
-      <img src={img} alt="" onError={() => setImg(fallback)} />
+      <img src={toWebp(img)} alt="" decoding="async" onError={(e) => webpFallback(e) || setImg(fallback)} />
       <i className="mark sweat" />
       <i className="mark blush left" />
       <i className="mark blush right" />
@@ -1367,7 +1368,7 @@ export function GameFlow() {
                       ? "A fortune, then rest"
                       : "Passive income, unbound")}
             </h2>
-            <img className="win-portrait" src={portraitOf(state.players[state.winner]!)} alt="" />
+            <img className="win-portrait" src={toWebp(portraitOf(state.players[state.winner]!))} alt="" decoding="async" onError={webpFallback} />
             <p>
               {state.winReason === "dream"
                 ? t("{name} bought {dream} and retired.", { name: nameOf(state.players[state.winner]!), dream: t(dreamOf(state.players[state.winner]!).name) })
@@ -1583,7 +1584,7 @@ export function GameFlow() {
           <div className="pass-gate">
             <p className="kicker">{t("Broke")}</p>
             <h2>{t("A turn on the bench")}</h2>
-            <img src={portraitOf(player)} alt="" />
+            <img src={toWebp(portraitOf(player))} alt="" decoding="async" onError={webpFallback} />
             <p>{t("You don’t roll. If the month is still short, you’ll be asked to pay what you can.")}</p>
             <button className="btn btn-gold" onClick={() => go({ type: "BREATHE" })}>{t("Catch your breath")}</button>
           </div>
@@ -1641,7 +1642,7 @@ export function GameFlow() {
           <article className="bio-sheet" role="dialog" aria-modal="true" aria-labelledby="bio-title" onClick={(e) => e.stopPropagation()}>
             {CHARACTERS.filter((c) => c.id === bioId).map((bio) => (
               <div className="bio-layout" key={bio.id}>
-                <img src={bio.portrait} alt="" />
+                <img src={toWebp(bio.portrait)} alt="" loading="lazy" decoding="async" onError={webpFallback} />
                 <div>
                   <p className="kicker">{t(bio.title)}</p>
                   <h2 id="bio-title">{bio.name}</h2>
@@ -1719,7 +1720,7 @@ export function GameFlow() {
                         className={open ? "trophy" : "trophy is-locked"}
                         onClick={() => setTrophyId(piece.id)}
                       >
-                        <img src={piece.art} alt="" />
+                        <img src={toWebp(piece.art)} alt="" loading="lazy" decoding="async" onError={webpFallback} />
                         <span>{t(piece.name)}</span>
                       </button>
                     );
@@ -1769,7 +1770,7 @@ export function GameFlow() {
               const open = trophies.ids.includes(piece.id);
               return (
                 <div key={piece.id}>
-                  <img className={open ? "trophy-large" : "trophy-large is-dim"} src={piece.art} alt="" />
+                  <img className={open ? "trophy-large" : "trophy-large is-dim"} src={toWebp(piece.art)} alt="" decoding="async" onError={webpFallback} />
                   <p className="kicker">{t("Paintings")}</p>
                   <h2>{t(piece.name)}</h2>
                   <p>{open ? t(piece.hint) : `${t("Not yet")}. ${t(piece.hint)}`}</p>
@@ -1806,9 +1807,11 @@ export function GameFlow() {
                   <div className="who-col">
                     <img
                       className="body-shot"
-                      src={bodyPortrait(who)}
+                      src={toWebp(bodyPortrait(who))}
                       alt=""
+                      decoding="async"
                       onError={(e) => {
+                        if (webpFallback(e)) return;
                         e.currentTarget.onerror = null;
                         e.currentTarget.src = dressedPortrait(who, who.reaction);
                       }}
@@ -1889,7 +1892,7 @@ export function GameFlow() {
               const can = !!f && state.screen === "play" && state.phase === "idle" && player.circleTurn !== state.turn;
               return (
                 <div className="bio-layout">
-                  <img src={def.portrait} alt="" />
+                  <img src={toWebp(def.portrait)} alt="" decoding="async" onError={webpFallback} />
                   <div>
                     <p className="kicker">{f?.role === "partner" ? t("Business partner") : player.partner?.id === friendId ? t("partner") : t(def.friendTrait ?? def.trait)}</p>
                     <h2>{def.name}</h2>
@@ -1952,8 +1955,9 @@ export function GameFlow() {
                       <div key={`${script.id}-${i}`} className={`bubble-row ${row.who === "you" ? "you" : "them"}`}>
                         <img
                           className="chat-face"
-                          src={row.who === "you" ? portraitOf(player) : def.portrait}
+                          src={toWebp(row.who === "you" ? portraitOf(player) : def.portrait)}
                           alt=""
+                          loading="lazy" decoding="async" onError={webpFallback}
                         />
                         <p className={row.who === "you" ? "bubble you" : "bubble them"}>
                           <strong>{row.who === "you" ? nameOf(player) : def.name.split(" ")[0]}</strong>
@@ -1978,7 +1982,7 @@ export function GameFlow() {
       {intro === "boot" && <div className="intro-frame intro-boot" />}
       {typeof intro === "number" && (
         <div className="intro-frame" role="dialog" aria-modal="true">
-          <img className={intro === 3 ? "intro-crest" : undefined} src={INTRO_SLIDES[intro].art} alt="" />
+          <img className={intro === 3 ? "intro-crest" : undefined} src={toWebp(INTRO_SLIDES[intro].art)} alt="" onError={webpFallback} />
           <div className="intro-copy">
             <p className="kicker">{t(INTRO_SLIDES[intro].place)} · {intro + 1}/4</p>
             <p className="intro-line">{t(INTRO_SLIDES[intro].line)}</p>
