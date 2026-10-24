@@ -582,7 +582,6 @@ export function GameFlow() {
   const [hasSave, setHasSave] = useState(false);
   const [rules, setRules] = useState(false);
   const [tutorial, setTutorial] = useState<number | null>(null);
-  const [flicker, setFlicker] = useState(1);
   const [bioId, setBioId] = useState<string | null>(null);
   const [lang, setLang] = useState<Lang>("en");
   const [optionsOpen, setOptionsOpen] = useState(false);
@@ -744,8 +743,8 @@ export function GameFlow() {
     if (state.phase !== "rolling") return;
     const started = performance.now();
     let raf = 0;
+    // The random faces are painted by <BoxDie> itself (DOM only); this loop only times the reveal.
     const loop = (now: number) => {
-      setFlicker(1 + Math.floor(Math.random() * 6));
       if (now - started > 680) {
         dispatch({ type: "REVEAL" });
         return;
@@ -1125,8 +1124,8 @@ export function GameFlow() {
     { label: t("Credits"), icon: "star", onClick: () => { setHub(null); go({ type: "CREDITS" }); } },
   ];
   const player = state.players.length ? cur(state) : null;
-  const shownDie = state.phase === "rolling" ? flicker : state.die;
-  const viewState = state.phase === "rolling" ? { ...state, die: shownDie } : state;
+  const shownDie = state.die;
+  const viewState = state;
   const passiveHistory = usePassiveHistory(state);
   const points: Point[] = player ? (passiveHistory[player.id] ?? []) : [];
   const isMobile = useIsMobile();

@@ -11,6 +11,7 @@
  */
 import { RUN, currentSpeed, jumpY, laneX, sliding, type Coin, type Obstacle, type RunState } from "../runner";
 import type { Camera, DrawInput, RunnerSkin, SkinLabels } from "./types";
+import { cachedText } from "../glyphCache";
 
 /** Seconds between two neon on/off decisions (≥ 333 ms: never more than 3 flashes a second). */
 export const NEON_STEP = 1 / 3;
@@ -297,13 +298,10 @@ function coin(c: Ctx, V: View, cn: Coin, t: number, reduced: boolean) {
     c.ellipse(p.x, p.y, r * sx * 0.66, r * 0.66, 0, 0, 7);
     c.stroke();
     c.fillStyle = "rgba(107,62,10,.8)";
-    c.font = `700 ${r * 0.95}px ${JP}`;
-    c.textAlign = "center";
-    c.textBaseline = "middle";
     c.save();
     c.translate(p.x, p.y);
     c.scale(sx, 1);
-    c.fillText("円", 0, r * 0.05);
+    cachedText(c, "円", "700", JP, r * 0.95, 0, r * 0.05);
     c.restore();
   }
   c.fillStyle = "rgba(255,255,255,.75)";
@@ -341,10 +339,7 @@ function signPole(c: Ctx, V: View, pl: Pole, SW: number) {
   const fs = Math.min(ww * 0.72, hh / (letters.length + 0.8));
   if (fs > 6) {
     c.fillStyle = C.navy;
-    c.font = `700 ${fs}px ${JP}`;
-    c.textAlign = "center";
-    c.textBaseline = "middle";
-    letters.forEach((ch, i) => c.fillText(ch, p1.x + ww / 2, p1.y + (hh * (i + 0.9)) / (letters.length + 0.7)));
+    letters.forEach((ch, i) => cachedText(c, ch, "700", JP, fs, p1.x + ww / 2, p1.y + (hh * (i + 0.9)) / (letters.length + 0.7)));
   }
 }
 
@@ -457,10 +452,7 @@ function obstacle(c: Ctx, V: View, o: Obstacle) {
     c.fill();
     c.stroke();
     c.fillStyle = C.navy;
-    c.font = `700 0.28px ${FONT}`;
-    c.textAlign = "center";
-    c.textBaseline = "middle";
-    c.fillText(glyph, 0, by + 0.02);
+    cachedText(c, glyph, "700", FONT, 0.28, 0, by + 0.02);
   }
   c.restore();
 }
@@ -474,10 +466,7 @@ function metro(c: Ctx, V: View, z0: number, z1: number, hx: number, L: SkinLabel
   const wl = P(V, 0, 2.3, z1 + 1.2);
   if (wl && wl.s > 6) {
     c.fillStyle = C.cream;
-    c.font = `700 ${wl.s * 0.42}px ${FONT}`;
-    c.textAlign = "center";
-    c.textBaseline = "middle";
-    c.fillText(L.line, wl.x, wl.y);
+    cachedText(c, L.line, "700", FONT, wl.s * 0.42, wl.x, wl.y);
   }
   const Lb = P(V, -hx - 0.15, 0, z0);
   const Lt = P(V, -hx - 0.15, 4.3, z0);
@@ -506,10 +495,8 @@ function metro(c: Ctx, V: View, z0: number, z1: number, hx: number, L: SkinLabel
     const hh = s2.y - s1.y;
     const cx = (s1.x + s2.x) / 2;
     const cy = (s1.y + s2.y) / 2;
-    c.font = `700 ${hh * 0.4}px ${FONT}`;
-    c.fillText(L.metro, cx - (s2.x - s1.x) * 0.17, cy);
-    c.font = `700 ${hh * 0.34}px ${JP}`;
-    c.fillText("地下鉄", cx + (s2.x - s1.x) * 0.24, cy);
+    cachedText(c, L.metro, "700", FONT, hh * 0.4, cx - (s2.x - s1.x) * 0.17, cy);
+    cachedText(c, "地下鉄", "700", JP, hh * 0.34, cx + (s2.x - s1.x) * 0.24, cy);
   }
   const m = P(V, 0, 4.7, z0);
   if (m) {
@@ -521,10 +508,7 @@ function metro(c: Ctx, V: View, z0: number, z1: number, hx: number, L: SkinLabel
     c.fill();
     c.stroke();
     c.fillStyle = C.navy;
-    c.font = `700 ${m.s * 0.5}px ${FONT}`;
-    c.textAlign = "center";
-    c.textBaseline = "middle";
-    c.fillText("M", m.x, m.y + 1);
+    cachedText(c, "M", "700", FONT, m.s * 0.5, m.x, m.y + 1);
     const k = P(V, hx - 0.2, 4.7, z0);
     if (k) {
       c.fillStyle = C.cream;
@@ -533,8 +517,7 @@ function metro(c: Ctx, V: View, z0: number, z1: number, hx: number, L: SkinLabel
       c.fill();
       c.stroke();
       c.fillStyle = C.navy;
-      c.font = `700 ${k.s * 0.42}px ${JP}`;
-      c.fillText("駅", k.x, k.y + 1);
+      cachedText(c, "駅", "700", JP, k.s * 0.42, k.x, k.y + 1);
     }
   }
 }
@@ -701,10 +684,7 @@ function burst(c: Ctx, x: number, y: number, r: number, text: string, fill: stri
   c.strokeStyle = C.navy;
   c.stroke();
   c.fillStyle = C.navy;
-  c.font = `700 ${r * 0.5}px ${FONT}`;
-  c.textAlign = "center";
-  c.textBaseline = "middle";
-  c.fillText(text, 0, 2);
+  cachedText(c, text, "700", FONT, r * 0.5, 0, 2);
   c.restore();
 }
 const spring = (t: number, reduced: boolean) => (reduced ? 1 : 1 - Math.exp(-7 * t) * Math.cos(14 * t));

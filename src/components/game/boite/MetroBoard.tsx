@@ -114,9 +114,10 @@ export function trackSpaces(p: Player): SpaceDef[] {
   return p.track === "grind" ? GRIND : p.track === "venture" ? VENTURE : FREEDOM;
 }
 
-function Pawn({ player, idx, clip, x, y, hopKey }: { player: Player; idx: number; clip: string; x: number; y: number; hopKey?: string | number }) {
+function Pawn({ player, idx, clip, x, y, hopKey, active = false }: { player: Player; idx: number; clip: string; x: number; y: number; hopKey?: string | number; active?: boolean }) {
+  // Only the active player's pawn keeps the idle bob (see styles.css: .pawn.active).
   return (
-    <g className="pawn" style={{ transform: `translate(${x - 2}px, ${y - 12}px)` }}>
+    <g className={active ? "pawn active" : "pawn"} style={{ transform: `translate(${x - 2}px, ${y - 12}px)` }}>
       <g className="bob" key={hopKey}>
         <ellipse cx={0} cy={4} rx={24} ry={8} fill="rgba(27,42,65,.3)" />
         <path d="M-20 2 Q-20 -8 -12 -12 L-8 -30 Q-17 -36 -17 -48 L17 -48 Q17 -36 8 -30 L12 -12 Q20 -8 20 2 Z" fill={PAWN_COLORS[idx % 2]} stroke="var(--navy)" strokeWidth={4} strokeLinejoin="round" />
@@ -338,7 +339,7 @@ export function MetroBoard({ state, t, lang, lid = false }: { state: GameState; 
       {state.players.map((p, idx) => {
         const pt = lid ? S1[0]! : pawnPoint(p);
         const twin = state.players.some((o, j) => j < idx && o.track === p.track && o.position === p.position);
-        return <Pawn key={p.id} player={p} idx={idx} clip={`${uid}-head-${idx}`} x={pt.x + (twin ? 18 : 0)} y={pt.y} hopKey={`${p.track}-${p.position}`} />;
+        return <Pawn key={p.id} player={p} idx={idx} clip={`${uid}-head-${idx}`} x={pt.x + (twin ? 18 : 0)} y={pt.y} hopKey={`${p.track}-${p.position}`} active={!lid && idx === state.current} />;
       })}
     </svg>
   );

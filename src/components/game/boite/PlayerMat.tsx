@@ -3,7 +3,7 @@
  * who box, monthly flow as coin rows (Salary + Passive − Expenses), the Gate
  * gauge, passive income per turn, and the dock (die + roll + secondary actions).
  */
-import type { ReactNode } from "react";
+import { useLayoutEffect, useRef, type ReactNode } from "react";
 import { GRIND, PASSIVE_WIN } from "@/game/data";
 import { dreamOf, nameOf, portraitOf, statement, type GameState, type Player } from "@/game/engine";
 import type { Lang } from "@/game/i18n";
@@ -28,8 +28,36 @@ const PIPS: Record<number, number[]> = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0,
 
 export function BoxDie({ value, rolling, t }: { value: number; rolling: boolean; t: TFn }) {
   const on = new Set(PIPS[value] ?? PIPS[1]);
+  const ref = useRef<HTMLDivElement>(null);
+  // While rolling, random faces are painted straight into the DOM (no React state per frame:
+  // the old per-frame setState re-rendered the whole game screen). Reduced motion: no flicker.
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!rolling || !el) return;
+    if (typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    const pips = Array.from(el.children) as HTMLElement[];
+    let raf = 0;
+    const paint = (face: number) => {
+      const lit = PIPS[face] ?? PIPS[1];
+      pips.forEach((pip, i) => pip.classList.toggle("o", lit.includes(i)));
+    };
+    const loop = () => {
+      paint(1 + Math.floor(Math.random() * 6));
+      raf = requestAnimationFrame(loop);
+    };
+    loop();
+    return () => cancelAnimationFrame(raf);
+  }, [rolling]);
+  // Re-sync the DOM with the React face after every commit outside a roll (the flicker
+  // above bypassed React, so its diff alone may leave a random face behind).
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (rolling || !el) return;
+    const lit = PIPS[value] ?? PIPS[1];
+    (Array.from(el.children) as HTMLElement[]).forEach((pip, i) => pip.classList.toggle("o", lit.includes(i)));
+  });
   return (
-    <div className={`bdie ${rolling ? "rolling" : ""}`} role="img" aria-label={t("Die showing {n}", { n: value })}>
+    <div ref={ref} className={`bdie ${rolling ? "rolling" : ""}`} role="img" aria-label={rolling ? t("The die is thinking") : t("Die showing {n}", { n: value })} data-rolling={rolling ? "" : undefined}>
       {Array.from({ length: 9 }, (_, i) => (
         <i key={i} className={on.has(i) ? "o" : ""} />
       ))}

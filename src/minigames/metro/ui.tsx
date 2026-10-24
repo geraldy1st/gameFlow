@@ -13,6 +13,7 @@ import { RUN, act, countdownDigit, advanceRun, currentSpeed, demoDriver, laneX, 
 import { RunnerAudio, readRunnerMute, saveRunnerMute } from "./audio";
 import { FIREWORK_MARKS, fireworkBurst, staticSparkles, updateSparks, type Camera, type FaceSet, type Fx, type RunnerSkin, type SkinLabels, type Spark } from "./skins/types";
 import { NEON, loadNeonAssets } from "./skins/neon";
+import { clearGlyphCache } from "./glyphCache";
 import "./metro-v61.css";
 import { withV61 } from "./i18n-v61";
 
@@ -402,6 +403,9 @@ export function MetroRun({ t: gameT, money, name, faces, skirt, cash, seed = RUN
     raf = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(raf);
   }, [audio, draw, driver, finish, hud, reduced, t]);
+
+  // Text sprites of the run are released when the run screen goes away (R9: iOS canvas memory).
+  useEffect(() => () => clearGlyphCache(), []);
 
   const press = useCallback(
     (a: MetroAction) => {

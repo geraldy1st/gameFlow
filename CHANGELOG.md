@@ -1,5 +1,20 @@
 # Changelog
 
+## perf-ios — lot A « iOS perf » (24/10/2026)
+
+Criteria: PERF-CA1… (renamed per QA RES-7). No rule change: `src/game/` untouched, fingerprints unchanged.
+
+| File | What | Why | What can be trimmed | Risk |
+|---|---|---|---|---|
+| `src/minigames/metro/glyphCache.ts` (new), `glyphCache.test.ts` | Text sprites: each (text, font, colour) rasterised once at 128 px in an offscreen canvas, then drawn with a scaled `drawImage`; falls back to `fillText` without canvas, with a non-colour fill or while web fonts load; capped at 128 sprites; `clearGlyphCache()` zeroes the canvases | Audit cause 1: perspective-sized `fillText` defeats the glyph cache (2.2 s of 15 s in `fillText` alone) | — | Medium: label sharpness / alignment to check on captures (R1) |
+| `src/minigames/metro/skins/neon.ts`, `shibuya.ts` | All per-frame labels (円, 駅, 地下鉄, M, line, metro, sign letters, stop numbers, bubbles) go through `cachedText`; the 3-2-1-GO countdown (stroke + fill, 3 s) keeps `fillText` | Same | — | Low: same centre/middle contract |
+| `src/minigames/metro/ui.tsx` | `MetroRun` unmount releases the sprite cache | R9 memory on iPhone | — | None |
+| `src/components/game/boite/PlayerMat.tsx` (`BoxDie`) | Random faces painted straight into the DOM in a rAF loop while rolling (no React state), re-synced to the engine face after each commit; aria-label « Le dé réfléchit » while rolling (no per-frame announcements); no flicker under reduced motion | Audit cause 2: `setFlicker` per frame = full `GameFlow` commit per frame | — | Low. R11: QA testware reading the die during a roll must use `[data-rolling]` / the final label |
+| `src/components/game/GameFlow.tsx` | `flicker` state removed; the rAF loop only times `REVEAL` (same 680 ms); `viewState` = `state` | Same | — | Low: dispatch order unchanged (oracle PERF-CA15) |
+| `src/components/game/boite/MetroBoard.tsx`, `src/styles.css` | Idle bob only on the active player's pawn (`.pawn.active`); paused (`animation-play-state`) while `.modal`, `.overlay`, `.v3-layer` or `[aria-modal=true]` is present (`:has`, Safari ≥ 15.4; older: keeps bobbing); reduced motion already stops everything | Audit cause 3: infinite SVG transform = 1 layout + recalc per frame; Q2 accepted by QA | `transform-box` kept (needed by the hop) | Low (R4: resume tested by `tools/perf/motion-check.mjs`) |
+| `src/styles.css` | `backdrop-filter` removed on `.modal` / `.overlay` under `@media (hover: none)`; `.72` veil unchanged; desktop keeps the blur | Audit cause 4: full-screen blur on iPhone GPU | — | Low: look to be approved by Mirage (captures) |
+| `tools/perf/` (new) | `bench.mjs` (from the audit's `prof.mjs`: frames, long tasks, React commits via a stub devtools hook, CDP layouts/heap, HTTP ≥ 400, image bytes to the board, heap after GC around 3 Metro runs), `run-all.sh`, `median.mjs`, `oracle.mjs` (seeded differential oracle), `motion-check.mjs` (Q2 / reduced motion) | QA RES-2/3/4: instrumentation only in the test harness, never in the app | — | None (not bundled) |
+
 ## home-v1 — Home v1 « appartement d'Aoi » (23/10/2026)
 
 | File | What | Why | What can be trimmed | Risk |
