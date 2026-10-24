@@ -35,11 +35,14 @@ const p = await ctx.newPage();
 await p.addInitScript(INIT);
 if (process.env.EXP_DPR) await p.addInitScript((d) => Object.defineProperty(window, "devicePixelRatio", { get: () => d }), +process.env.EXP_DPR); // experiment only
 const http = [];
+p.on("dialog", (d) => d.dismiss().catch(() => {})); // a native confirm() would block evaluate() forever
 p.on("response", (r) => { if (r.status() >= 400) http.push(`${r.status()} ${r.url().replace(/^https?:\/\/[^/]+/, "")}`); });
 let cdp = null;
 if (engine === "chromium") { cdp = await ctx.newCDPSession(p); await cdp.send("Performance.enable"); await cdp.send("Emulation.setCPUThrottlingRate", { rate: 4 }); }
 const metrics = async () => cdp ? Object.fromEntries((await cdp.send("Performance.getMetrics")).metrics.map((m) => [m.name, m.value])) : {};
 const out = { engine, tag, seg: {} };
+// Watchdog: a stuck step must not hang the whole series; partial results are still written.
+setTimeout(() => { out.watchdog = true; out.http = http; if (OUT) fs.writeFileSync(OUT, JSON.stringify(out)); process.exit(2); }, +(process.env.BENCH_TIMEOUT_MS ?? 420000)).unref();
 async function seg(name, fn) {
   const m0 = await metrics();
   await p.evaluate(() => window.__reset && window.__reset());
