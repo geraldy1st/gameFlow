@@ -1,5 +1,24 @@
 # Changelog
 
+### perf-ios — measurements (median of 3, reference 5b01180 → lots A+B)
+
+| Metric | Before | After | Delta |
+|---|---|---|---|
+| WebKit iPhone 13 — Metro fps | 27.2 | 49.6 | +82 % (jank 28→6) |
+| WebKit — dice fps | 37 | 60.7 | +64 % |
+| WebKit — dice React commits | 98 | 27 | −72 % |
+| WebKit — menus / idle fps | 50.6 / 52 | 60.6 / 57.5 | |
+| Chromium CPU×4 — Metro fps | 15.7 | 21.1 | +34 % (below 50 % target, software raster) |
+| Chromium — Metro long tasks | 11.5 s | 8.3 s | |
+| Chromium — dice commits / layouts | 103 / 596 | 32 / 312 | |
+| Chromium — menus / idle layouts | 414 / 245 | 164 / 205 | |
+| Image KB until board | 7239 | 520 | −93 % |
+| Metro heap after GC | 5.1→6.3 MB | 5.1→6.3 MB | flat |
+| HTTP >= 400 | 0 | 0 | |
+
+Checks: vitest 26/218, lint 1 error / 13 warnings (unchanged), fit-check 0/54 fails, check-i18n identical to base (5/56), oracle identical, motion-check 18/18 PASS, WebP manifest 120/120 OK, src/game untouched (fingerprints unchanged).
+
+
 ## perf-ios — lot B « images » (24/10/2026)
 
 Base: lot A commit on the same `perf-ios` branch (QA RES-8: each lot has its own SHA; B is tested on its SHA, which contains A).
