@@ -17,7 +17,7 @@ import { fmtMoney } from "./format";
 import { gaugeMax } from "./Gauge";
 import { ICON_PATHS } from "./icons";
 import { prefersReducedMotion } from "./hooks";
-import { toWebp } from "../webp";
+import { attachWebpFallback, toWebp } from "../webp";
 
 type TFn = (text: string, vars?: Record<string, string | number>) => string;
 
@@ -140,6 +140,7 @@ export function FriendScene({ ev, t, lang, onDone }: { ev: FriendEvent; t: TFn; 
     const px = (n: number) => `${n}px`;
     const token = (img: string, s: number, color: string, alt = "") => {
       const tk = el("tok", `<div class="tok-sq"><div class="base"></div><div class="disc"><img src="${esc(toWebp(img))}" alt="${esc(alt)}" decoding="async"/></div></div>`);
+      attachWebpFallback(tk);
       tk.style.setProperty("--s", `${s}px`);
       tk.style.setProperty("--c", color);
       return tk;

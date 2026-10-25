@@ -1,5 +1,17 @@
 # Changelog
 
+### fix(images): JPEG fallback for board pawn portrait and FriendScene (DEF-PERF-01)
+
+| File | What | Why | What can be trimmed | Risk |
+|---|---|---|---|---|
+| src/components/game/webp.ts | `webpFallbackElement()` (handles `<img src>` and SVG `<image href>`), `webpFallback` now typed for any element, `attachWebpFallback(root)` for innerHTML-built DOM | Single shared WebP→JPEG fallback, no duplicated logic | — | Low: one-shot swap, returns false for non-variants |
+| src/components/game/boite/MetroBoard.tsx | `onError={webpFallback}` on the pawn portrait `<image>` | Broken pawn portrait if the WebP fails | — | Low |
+| src/components/game/boite/FriendScene.tsx | `attachWebpFallback(tk)` on token images | Same, imperative DOM | — | Low |
+| src/components/game/webp.test.ts | 4 tests: img swap once, SVG href, attached listener, non-variant untouched | DEF-PERF-01 regression | — | — |
+
+Audit (rg `toWebp(`): every other lot B call site already had an onError fallback. Checks: vitest 26 files/222 tests, lint 1 error/13 warnings (unchanged), fit-check 0/54 fails, build:pages OK, src/game untouched, 0 HTTP >= 400, WebP manifest 120/120.
+
+
 ### perf-ios — measurements (median of 3, reference 5b01180 → lots A+B)
 
 | Metric | Before | After | Delta |

@@ -28,17 +28,29 @@ export function fromWebp(url: string): string {
 }
 
 /**
- * onError for an <img> whose src went through toWebp(): falls back once to the JPEG (WebP not
- * decodable, file missing). Returns true when it handled the error, so callers can chain their
- * own fallback otherwise.
+ * Falls back once from a toWebp() variant to its JPEG on an <img> (`src`) or an SVG <image>
+ * (`href`). Returns true when it swapped the URL, false otherwise (not a manifest variant, or
+ * already on the JPEG), so callers can chain their own fallback.
  */
-export function webpFallback(e: SyntheticEvent<HTMLImageElement>): boolean {
-  const img = e.currentTarget;
-  const src = img.getAttribute("src") ?? "";
-  const jpg = fromWebp(src);
-  if (jpg === src) return false;
-  img.setAttribute("src", jpg);
+export function webpFallbackElement(el: Element): boolean {
+  const attr = el.hasAttribute("src") || el.tagName.toLowerCase() === "img" ? "src" : "href";
+  const url = el.getAttribute(attr) ?? "";
+  const jpg = fromWebp(url);
+  if (jpg === url) return false;
+  el.setAttribute(attr, jpg);
   return true;
+}
+
+/** onError handler for React <img>/<image> elements whose URL went through toWebp(). */
+export function webpFallback(e: SyntheticEvent<Element>): boolean {
+  return webpFallbackElement(e.currentTarget);
+}
+
+/** Same fallback for imperatively built DOM (innerHTML): wires every <img> under `root`. */
+export function attachWebpFallback(root: ParentNode): void {
+  root.querySelectorAll("img").forEach((img) => {
+    img.addEventListener("error", () => webpFallbackElement(img));
+  });
 }
 
 /** Number of variants (tests). */
